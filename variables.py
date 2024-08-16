@@ -1,0 +1,9 @@
+UNANSWERED_TAG_ID = 123456789 # The ID of unanswered tag
+NOT_SOLVED_TAG_ID = 123456789 # The ID of not solved tag
+SOLVED_TAG_ID = 1234567899 # The ID of solved tag
+NEED_DEV_REVIEW_TAG_ID = 123456789 # The ID of need-dev-review tag
+SUPPORT_CHANNEL_ID = 123456789 # The ID of #support
+BOT_TOKEN = "123abc" # The token of the bot
+PREFIXES = ["sh!", "h!"] # A list of the bot's prefixes
+EXPERTS_ROLE_ID = 123456789 # The ID of community experts role
+MODERATORS_ROLE_ID = 123456789 # The ID of moderators role
