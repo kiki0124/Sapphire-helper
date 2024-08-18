@@ -22,7 +22,7 @@ def AddPostToPending(post_id: int, time: datetime.datetime) -> None:
     session.add(data)
     session.commit()
 
-def GetPendingPosts() -> list[int|None]:
+def GetPendingPosts() -> list:
     """  
     Returns a list[int] of posts (post ids) with status "closing pending", or None if no posts are currently in the db
     """
