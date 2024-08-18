@@ -108,7 +108,7 @@ class utility(commands.Cog):
                 if need_dev_review_tag not in interaction.channel.applied_tags:
                     if solved not in interaction.channel.applied_tags:
                         task =  asyncio.create_task(ClosePost(post=interaction.channel, interaction=interaction))
-                        await interaction.response.send_message(content=f"This post was marked as solved, and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.", view=CloseNow(task=task))
+                        await interaction.response.send_message(content=f"This post was marked as solved and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.", view=CloseNow(task=task))
                         await interaction.channel.remove_tags(discord.Object(id=NOT_SOLVED_TAG_ID), discord.Object(id=UNANSWERED_TAG_ID), reason=f"Solved command executed by {interaction.user.name} ({interaction.user.id})")
                         await interaction.channel.add_tags(discord.Object(id=SOLVED_TAG_ID), reason=f"Solved command used by {interaction.user.name} ({interaction.user.id})")
                     else:
@@ -118,7 +118,7 @@ class utility(commands.Cog):
                     async def on_confirm_button_click(Interaction: discord.Interaction):
                         task = asyncio.create_task(ClosePost(post=interaction.channel, interaction=Interaction))
                         await interaction.delete_original_response()
-                        await Interaction.response.send_message(content=f"This post was marked as solved, and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.", view=CloseNow(task=task))
+                        await Interaction.response.send_message(content=f"This post was marked as solved and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.", view=CloseNow(task=task))
                         await Interaction.channel.remove_tags(discord.Object(id=NOT_SOLVED_TAG_ID), discord.Object(id=UNANSWERED_TAG_ID), discord.Object(id=NEED_DEV_REVIEW_TAG_ID), reason=f"Solved command executed by {interaction.user.name} ({interaction.user.id})")
                         await Interaction.channel.add_tags(discord.Object(id=SOLVED_TAG_ID), reason=f"Solved command used by {interaction.user.name} ({interaction.user.id})")
                     button.callback = on_confirm_button_click
