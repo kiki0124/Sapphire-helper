@@ -1,0 +1,83 @@
+import discord
+from discord.ext import commands, tasks
+from variables import SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, SUPPORT_CHANNEL_ID, NEED_DEV_REVIEW_TAG_ID, UNANSWERED_TAG_ID
+import re
+import random
+
+sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
+
+class autoadd(commands.Cog):
+    def __init__(self, client):
+        self.client: commands.Bot = client
+        self.CloseAbandonedPosts.start() # Start the loop
+
+    async def cog_unload(self):
+        self.CloseAbandonedPosts.cancel() # Cancel the loop as the cog was unloaded
+
+    @commands.Cog.listener()
+    async def on_thread_create(self, thread: discord.Thread):
+        if thread.parent_id == SUPPORT_CHANNEL_ID: # Check if the message was sent in #support
+            solved_tag = thread.parent.get_tag(SOLVED_TAG_ID)
+            await thread.add_tags(discord.Object(id=UNANSWERED_TAG_ID), reason="Auto-add unanswered tag on post creation") # Add not solved tag to post
+            if solved_tag in thread.applied_tags:
+                await thread.remove_tags(discord.Object(id=SOLVED_TAG_ID), reason="Auto-remove solved tag on post creation")
+            if len(thread.starter_message.content) < 15: # Check if the amount of characters in the starting message is smaller than 15 
+                greets = ["Hi", "Hey", "Hello", "Hi there"]
+                await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already.\n* What exactly is your question or the problem you're experiencing??\n* What have you already try?\n* What are you trying to do? If possible, include a screenshot or screen recording.", mention_author=True)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if not message.author == self.client.user: # Check if the message author is Sapphire Helper
+            if message.channel.type ==  discord.ChannelType.public_thread:
+                if message.channel.parent_id == SUPPORT_CHANNEL_ID: # Check if the message channel parent is the support channel
+                    if message.channel.id not in sent_post_ids:
+                        if message.author == message.channel.owner: # Checks if the message author is the post creator
+                            need_dev_review_tag = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+                            solved_tag = message.channel.parent.get_tag(SOLVED_TAG_ID)
+                            if solved_tag not in message.channel.applied_tags and need_dev_review_tag not in message.channel.applied_tags: # make sure the post is not already solved and doesn't have the need-dev-review tag
+                                #pattern = r'.*solved.*|.*thank.*|.*ty.*|.thx.*|.*work.*'
+                                pattern = r'(solved|^ty|\sty|thanks|work|fixed)'
+                                if re.search(pattern, message.content, re.IGNORECASE):
+                                    await message.channel.send(content="-# <:tree_corner:1272886415558049893> Command suggestion: </solved:123>")
+                                    sent_post_ids.append(message.channel.id)
+                                else:
+                                    return # Ignore the message as it doesn't match the regex
+                            else:
+                                return # Ignore the message as the post is already solved or has the need-dev-review tag
+                        unanswered_tag = message.channel.parent.get_tag(UNANSWERED_TAG_ID)
+                        if unanswered_tag in message.channel.applied_tags and not message.author == message.channel.owner:
+                            await message.channel.remove_tags(discord.Object(id=UNANSWERED_TAG_ID), reason="Auto-remove unanswered tag on first message from not post creator")
+                            await message.channel.add_tags(discord.Object(id=NOT_SOLVED_TAG_ID), reason="Auto-add not solved tag on first message from not post creator")
+                    else:
+                        return # Ignore the message as a message was already sent in this channel before
+                else:
+                    return # Ignore the message as it was not sent in #support
+            else:
+                return # Ignroe the message as its channel type isn't a ForumChannel
+        else:
+            return # Ignore the message as it was sent by Sapphire helper
+
+    @tasks.loop(hours=1)
+    async def CloseAbandonedPosts(self):
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        need_dev_review = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
+        for post in support.threads:
+            if not post.locked and not post.archived:
+                if need_dev_review not in post.applied_tags:
+                    if not post.owner:
+                        await post.remove_tags(discord.Object(id=UNANSWERED_TAG_ID), discord.Object(id=NOT_SOLVED_TAG_ID), reason="User left server- auto close post")
+                        await post.add_tags(discord.Object(id=SOLVED_TAG_ID), reason="User left server- auto close post")
+                        await post.edit(archived=True, reason="User left server, auto close post")
+                    else:
+                        continue
+                else:
+                    continue
+            else:
+                continue
+
+    @CloseAbandonedPosts.before_loop
+    async def CloseAbandonedPostsBeforeLoop(self):
+        await self.client.wait_until_ready() # wait for the bot to be ready and then start the loop
+
+async def setup(client):
+    await client.add_cog(autoadd(client))
