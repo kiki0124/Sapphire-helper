@@ -9,3 +9,5 @@
 pip install -r requirements.txt
 ```
 ### 4. Run the main file- python main.py
+
+### 5. Use the sync command to sync all slash commands, and restart your discord client.
