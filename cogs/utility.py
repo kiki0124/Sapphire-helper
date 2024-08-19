@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from variables import NEED_DEV_REVIEW_TAG_ID, SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, SUPPORT_CHANNEL_ID, UNANSWERED_TAG_ID, EXPERTS_ROLE_ID, MODERATORS_ROLE_ID
+from variables import NEED_DEV_REVIEW_TAG_ID, SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, SUPPORT_CHANNEL_ID, UNANSWERED_TAG_ID, EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, CUSTOM_BRANDING_TAG_ID
 from discord import app_commands, ui
 import asyncio
 
@@ -52,8 +52,10 @@ class CloseNow(ui.View):
         if experts_role in interaction.user.roles or mods_role in interaction.user.roles or interaction.user == interaction.channel.owner:
             self.task.cancel()
             await interaction.message.edit(view=None, content=f"~~{interaction.message.content}~~\n-# Cancelled by {interaction.user.name}")
-            await interaction.channel.remove_tags(discord.Object(id=SOLVED_TAG_ID), reason=f"{interaction.user.name} cancelled marking this post as solved")
-            await interaction.channel.add_tags(discord.Object(id=NOT_SOLVED_TAG_ID), reason=f"{interaction.user.name} cancelled marking this post as solved.")
+            tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+            if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+            await interaction.channel.edit(tags=tags)
         else:
             await interaction.response.send_message(content="Only Moderators, Community Experts and the creator of the post can use this.", ephemeral=True)
 
@@ -105,12 +107,15 @@ class utility(commands.Cog):
             if interaction.user == interaction.channel.owner or experts in interaction.user.roles or moderators in interaction.user.roles: # Check if the user is the creator of the post or has experts/moderators roles
                 need_dev_review_tag = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
                 solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
+                cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
                 if need_dev_review_tag not in interaction.channel.applied_tags:
                     if solved not in interaction.channel.applied_tags:
                         task =  asyncio.create_task(ClosePost(post=interaction.channel, interaction=interaction))
-                        await interaction.response.send_message(content=f"This post was marked as solved and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.", view=CloseNow(task=task))
-                        await interaction.channel.remove_tags(discord.Object(id=NOT_SOLVED_TAG_ID), discord.Object(id=UNANSWERED_TAG_ID), reason=f"Solved command executed by {interaction.user.name} ({interaction.user.id})")
-                        await interaction.channel.add_tags(discord.Object(id=SOLVED_TAG_ID), reason=f"Solved command used by {interaction.user.name} ({interaction.user.id})")
+                        tags = [solved]
+                        if cb in interaction.channel.applied_tags:
+                            tags.append(cb)
+                        await interaction.channel.edit(applied_tags=tags)
+                        await interaction.response.send_message(content=f"This post was marked as solved, and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.", view=CloseNow(task=task))
                     else:
                         await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
                 else:
@@ -118,9 +123,11 @@ class utility(commands.Cog):
                     async def on_confirm_button_click(Interaction: discord.Interaction):
                         task = asyncio.create_task(ClosePost(post=interaction.channel, interaction=Interaction))
                         await interaction.delete_original_response()
-                        await Interaction.response.send_message(content=f"This post was marked as solved and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.", view=CloseNow(task=task))
-                        await Interaction.channel.remove_tags(discord.Object(id=NOT_SOLVED_TAG_ID), discord.Object(id=UNANSWERED_TAG_ID), discord.Object(id=NEED_DEV_REVIEW_TAG_ID), reason=f"Solved command executed by {interaction.user.name} ({interaction.user.id})")
-                        await Interaction.channel.add_tags(discord.Object(id=SOLVED_TAG_ID), reason=f"Solved command used by {interaction.user.name} ({interaction.user.id})")
+                        await Interaction.response.send_message(content=f"This post was marked as solved, and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.", view=CloseNow(task=task))
+                        tags = [solved]
+                        if cb in Interaction.channel.applied_tags:
+                            tags.append(cb)
+                        await Interaction.channel.edit(applied_tags=tags)
                     button.callback = on_confirm_button_click
                     view = ui.View()
                     view.add_item(button)
@@ -150,7 +157,10 @@ class utility(commands.Cog):
                     )
                     embed.set_footer(text="Thank you for helping Sapphire to continuously improve.")
                     await interaction.followup.send(embed=embed, view=NeedDevReviewButtons())
-                    await interaction.channel.add_tags(discord.Object(id=NEED_DEV_REVIEW_TAG_ID), reason=f"{interaction.user.name} ({interaction.user.id}) has used /need-dev-review")
+                    tags = [interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)]
+                    if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                        tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                    await interaction.channel.edit(applied_tags=tags)
                     channel = interaction.guild.get_channel(1145088659545141421)
                     await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
                 else:

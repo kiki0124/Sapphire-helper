@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands, tasks
-from variables import SUPPORT_CHANNEL_ID, SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, UNANSWERED_TAG_ID, NEED_DEV_REVIEW_TAG_ID, EXPERTS_ROLE_ID, MODERATORS_ROLE_ID
+from variables import SUPPORT_CHANNEL_ID, SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, UNANSWERED_TAG_ID, NEED_DEV_REVIEW_TAG_ID, EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, CUSTOM_BRANDING_TAG_ID
 from functions import AddPostToPending, RemovePostFromPending, GetPendingPosts, CheckPostLastMessageTime, CheckTimeLessDay
 import random
 
@@ -37,8 +37,10 @@ class remind(commands.Cog):
                                         mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
                                         if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
                                             await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
-                                            await interaction.channel.remove_tags(discord.Object(id=NOT_SOLVED_TAG_ID), reason=f"{interaction.user.name} marked this post as solved")
-                                            await interaction.channel.add_tags(discord.Object(id=SOLVED_TAG_ID), reason=f"{interaction.user.name} marked this post as solved")
+                                            tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
+                                            if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                                                tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                                            await interaction.channel.edit(applied_tags=tags)
                                         else:
                                             await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
                                     button.callback = on_close_now_click
@@ -83,9 +85,10 @@ class remind(commands.Cog):
                 need_dev_review_tag = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
                 if need_dev_review_tag not in post.applied_tags:
                     if CheckPostLastMessageTime(post_id):
-                        await post.add_tags(discord.Object(id=SOLVED_TAG_ID), reason="User inactive for 2 days.")
-                        await post.remove_tags(discord.Object(id=UNANSWERED_TAG_ID), discord.Object(id=NOT_SOLVED_TAG_ID), reason="User inactive for 2 days.")
-                        await post.edit(archived=True, reason=f"post inactive for 2 days")
+                        tags = [post.parent.get_tag(SOLVED_TAG_ID)]
+                        if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
+                            tags.append(CUSTOM_BRANDING_TAG_ID)
+                        await post.edit(archived=True, reason=f"post inactive for 2 days", applied_tags=tags)
                         RemovePostFromPending(post.id)
                     else:
                         continue

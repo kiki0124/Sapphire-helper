@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands, tasks
-from variables import SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, SUPPORT_CHANNEL_ID, NEED_DEV_REVIEW_TAG_ID, UNANSWERED_TAG_ID
+from variables import SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, SUPPORT_CHANNEL_ID, NEED_DEV_REVIEW_TAG_ID, UNANSWERED_TAG_ID, CUSTOM_BRANDING_TAG_ID
 import re
 import random
 
@@ -17,13 +17,13 @@ class autoadd(commands.Cog):
     @commands.Cog.listener()
     async def on_thread_create(self, thread: discord.Thread):
         if thread.parent_id == SUPPORT_CHANNEL_ID: # Check if the message was sent in #support
-            solved_tag = thread.parent.get_tag(SOLVED_TAG_ID)
-            await thread.add_tags(discord.Object(id=UNANSWERED_TAG_ID), reason="Auto-add unanswered tag on post creation") # Add not solved tag to post
-            if solved_tag in thread.applied_tags:
-                await thread.remove_tags(discord.Object(id=SOLVED_TAG_ID), reason="Auto-remove solved tag on post creation")
+            tags = [thread.parent.get_tag(UNANSWERED_TAG_ID)]
+            if thread.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in thread.applied_tags:
+                tags.append(thread.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+            await thread.edit(applied_tags=tags) # Add unanswered solved tag to post
             if len(thread.starter_message.content) < 15: # Check if the amount of characters in the starting message is smaller than 15 
                 greets = ["Hi", "Hey", "Hello", "Hi there"]
-                await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can helper you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
+                await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already.\n* What exactly is your question or the problem you're experiencing??\n* What have you already try?\n* What are you trying to do? If possible, include a screenshot or screen recording.", mention_author=True)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -38,7 +38,7 @@ class autoadd(commands.Cog):
                                 #pattern = r'.*solved.*|.*thank.*|.*ty.*|.thx.*|.*work.*'
                                 pattern = r'(solved|^ty|\sty|thanks|work|fixed)'
                                 if re.search(pattern, message.content, re.IGNORECASE):
-                                    await message.reply(content="-# <:tree_corner:1272886415558049893> Command suggestion: </solved:1274997472162349079>")
+                                    await message.reply(content="-# <:tree_corner:1272886415558049893> Command suggestion: </solved:123>")
                                     sent_post_ids.append(message.channel.id)
                                 else:
                                     return # Ignore the message as it doesn't match the regex
@@ -46,8 +46,10 @@ class autoadd(commands.Cog):
                                 return # Ignore the message as the post is already solved or has the need-dev-review tag
                         unanswered_tag = message.channel.parent.get_tag(UNANSWERED_TAG_ID)
                         if unanswered_tag in message.channel.applied_tags and not message.author == message.channel.owner:
-                            await message.channel.remove_tags(discord.Object(id=UNANSWERED_TAG_ID), reason="Auto-remove unanswered tag on first message from not post creator")
-                            await message.channel.add_tags(discord.Object(id=NOT_SOLVED_TAG_ID), reason="Auto-add not solved tag on first message from not post creator")
+                            tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+                            if message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in message.channel.applied_tags:
+                                tags.append(message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                            await message.channel.edit(tags=tags)
                     else:
                         return # Ignore the message as a message was already sent in this channel before
                 else:
@@ -65,9 +67,10 @@ class autoadd(commands.Cog):
             if not post.locked and not post.archived:
                 if need_dev_review not in post.applied_tags:
                     if not post.owner:
-                        await post.remove_tags(discord.Object(id=UNANSWERED_TAG_ID), discord.Object(id=NOT_SOLVED_TAG_ID), reason="User left server- auto close post")
-                        await post.add_tags(discord.Object(id=SOLVED_TAG_ID), reason="User left server- auto close post")
-                        await post.edit(archived=True, reason="User left server, auto close post")
+                        tags = [post.parent.get_tag(SOLVED_TAG_ID)]
+                        if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
+                            tags.append(post.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                        await post.edit(archived=True, reason="User left server, auto close post", tags=tags)
                     else:
                         continue
                 else:
