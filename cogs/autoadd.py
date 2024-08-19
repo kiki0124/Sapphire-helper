@@ -23,7 +23,7 @@ class autoadd(commands.Cog):
             await thread.edit(applied_tags=tags) # Add unanswered solved tag to post
             if len(thread.starter_message.content) < 15: # Check if the amount of characters in the starting message is smaller than 15 
                 greets = ["Hi", "Hey", "Hello", "Hi there"]
-                await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already.\n* What exactly is your question or the problem you're experiencing??\n* What have you already try?\n* What are you trying to do? If possible, include a screenshot or screen recording.", mention_author=True)
+                await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can helper you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -38,7 +38,7 @@ class autoadd(commands.Cog):
                                 #pattern = r'.*solved.*|.*thank.*|.*ty.*|.thx.*|.*work.*'
                                 pattern = r'(solved|^ty|\sty|thanks|work|fixed)'
                                 if re.search(pattern, message.content, re.IGNORECASE):
-                                    await message.reply(content="-# <:tree_corner:1272886415558049893> Command suggestion: </solved:123>")
+                                    await message.reply(content="-# <:tree_corner:1272886415558049893> Command suggestion: </solved:1274997472162349079>")
                                     sent_post_ids.append(message.channel.id)
                                 else:
                                     return # Ignore the message as it doesn't match the regex
