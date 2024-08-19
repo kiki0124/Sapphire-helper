@@ -90,7 +90,7 @@ class utility(commands.Cog):
                         await interaction.channel.edit(applied_tags=tags)
                         now = datetime.datetime.now()
                         one_hour_from_now = now + datetime.timedelta(hours=1)
-                        await interaction.response.send_message(content=f"This post was marked as solved.\n-# <:tree_corner:1272886415558049893> It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolved:1274997472162349078> to cancel.")
+                        await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolved:1274997472162349078> to cancel.")
                     else:
                         await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
                 else:
@@ -101,7 +101,7 @@ class utility(commands.Cog):
                         await interaction.delete_original_response()
                         now = datetime.datetime.now()
                         one_hour_from_now = now + datetime.timedelta(hours=1)
-                        await Interaction.response.send_message(content=f"This post was marked as solved.\n-# <:tree_corner:1272886415558049893> It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolved:1274997472162349078> to cancel.")
+                        await Interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolved:1274997472162349078> to cancel.")
                         tags = [solved]
                         if cb in Interaction.channel.applied_tags:
                             tags.append(cb)
