@@ -35,13 +35,15 @@ class autoadd(commands.Cog):
                             need_dev_review_tag = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
                             solved_tag = message.channel.parent.get_tag(SOLVED_TAG_ID)
                             if solved_tag not in message.channel.applied_tags and need_dev_review_tag not in message.channel.applied_tags: # make sure the post is not already solved and doesn't have the need-dev-review tag
-                                #pattern = r'.*solved.*|.*thank.*|.*ty.*|.thx.*|.*work.*'
-                                pattern = r'(solved|^ty|\sty|thanks|work|fixed)'
-                                if re.search(pattern, message.content, re.IGNORECASE):
-                                    await message.reply(content="-# <:tree_corner:1272886415558049893> Command suggestion: </solved:1274997472162349079>")
-                                    sent_post_ids.append(message.channel.id)
+                                if not message == message.channel.starter_message:
+                                    pattern = r'(solved|^ty|\sty|thanks|work|fixed)'
+                                    if re.search(pattern, message.content, re.IGNORECASE):
+                                        await message.reply(content="-# <:tree_corner:1272886415558049893> Command suggestion: </solved:1274997472162349079>")
+                                        sent_post_ids.append(message.channel.id)
+                                    else:
+                                        return # Ignore the message as it doesn't match the regex
                                 else:
-                                    return # Ignore the message as it doesn't match the regex
+                                    return # ignore the message as its the first message of the thread
                             else:
                                 return # Ignore the message as the post is already solved or has the need-dev-review tag
                         unanswered_tag = message.channel.parent.get_tag(UNANSWERED_TAG_ID)
