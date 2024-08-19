@@ -72,7 +72,7 @@ class autoadd(commands.Cog):
                         tags = [post.parent.get_tag(SOLVED_TAG_ID)]
                         if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
                             tags.append(post.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                        await post.edit(archived=True, reason="User left server, auto close post", tags=tags)
+                        await post.edit(archived=True, reason="User left server, auto close post", applied_tags=tags)
                     else:
                         continue
                 else:
