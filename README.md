@@ -16,15 +16,19 @@ pip install -r requirements.txt
 
   ## main.py- run the bot (create the session with discord), load cogs (aka extensions- commands and event listeners from other files)
   ## /cogs/utility.py- utility related commands, includes:
-  - /unsolved - lists all posts that meet the following requirements:
+  - /list-unsolved - lists all posts that meet the following requirements:
     - Not locked and not archived,
     - Without need-dev-review tag,
     - has not solved/unanswered or doesn't have solved,
   - /solved - only usable in #support by Moderators, Experts or the post's creator. Takes the following actions when used:
-    - Reply with a message saying that the post was solved and will be closed in 1 hour. The message also has 2 buttons- close now and cancel.
+    - Reply with a message saying that the post was solved and will be closed in 1 hour.
     - Removes not solved and unanswered tags,
     - Adds solved tag.
-    - After 1 hour, if the cancel button wasn't clicked the post will also be archived.
+    - After 1 hour, the post will also be archived.
+  - /unsolved - only usable in #support by Moderators, Experts or the post's creator. Takes the following actions when used:
+    - Reply with a message saying that the post was unsolved.
+    - Removes solved tag,
+    - Adds unsolved tag.
   - /need-dev-review - Only usable by Moderators and Experts. Responds with the normal need-dev-review template (including buttons), adds the need-dev-review tag, and sends a notification to 1145088659545141421
   ## /cogs/remind.py- Remind users of unsolved posts where they have been inactive, and close posts if their owners left.
   ## /cogs/bot.py- bot control related commands (only sync for now) and error handlers.
