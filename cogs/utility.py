@@ -99,7 +99,9 @@ class utility(commands.Cog):
                         task = asyncio.create_task(ClosePost(post=interaction.channel, interaction=Interaction))
                         close_tasks[interaction.channel] = task # Add the task and post to the "close_tasks" dict
                         await interaction.delete_original_response()
-                        await Interaction.response.send_message(content=f"This post was marked as solved, and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.")
+                        now = datetime.datetime.now()
+                        one_hour_from_now = now + datetime.timedelta(hours=1)
+                        await Interaction.response.send_message(content=f"This post was marked as solved\n-# <:tree_corner:1272886415558049893> It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolved:123> to cancel.")
                         tags = [solved]
                         if cb in Interaction.channel.applied_tags:
                             tags.append(cb)
