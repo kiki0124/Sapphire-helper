@@ -49,7 +49,7 @@ class autoadd(commands.Cog):
                             tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                             if message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in message.channel.applied_tags:
                                 tags.append(message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                            await message.channel.edit(tags=tags)
+                            await message.channel.edit(applied_tags=tags)
                     else:
                         return # Ignore the message as a message was already sent in this channel before
                 else:
