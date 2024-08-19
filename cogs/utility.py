@@ -3,11 +3,14 @@ from discord.ext import commands
 from variables import NEED_DEV_REVIEW_TAG_ID, SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, SUPPORT_CHANNEL_ID, UNANSWERED_TAG_ID, EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, CUSTOM_BRANDING_TAG_ID
 from discord import app_commands, ui
 import asyncio
+import datetime
+
+close_tasks: dict[discord.Thread, asyncio.Task] = {}
 
 async def ClosePost(post: discord.Thread, interaction: discord.Interaction) -> None:
     await asyncio.sleep(3600)
-    await interaction.edit_original_response(view=None)
     await post.edit(archived=True, reason="Auto archive solved post after 1 hour")
+    close_tasks.pop(post)
 
 class NeedDevReviewButtons(ui.View):
     def __init__(self):
@@ -28,37 +31,6 @@ class NeedDevReviewButtons(ui.View):
         embed.set_image(url="https://img-temp.sapph.xyz/fef61749-efb4-46c5-4015-acc7311d7900")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-class CloseNow(ui.View):
-    def __init__(self, task: asyncio.Task):
-        super().__init__(timeout=3600)
-        self.task = task
-    
-    @ui.button(label="Close now", style=discord.ButtonStyle.grey, custom_id="close-now")
-    async def on_close_now_click(self, interaction: discord.Interaction, button: discord.Button):
-        await interaction.response.defer(ephemeral=True)
-        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-        mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
-        if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
-            await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
-            await interaction.channel.edit(archived=True, reason=f'{interaction.user.name} used "close now" button')
-            self.task.cancel()
-        else:
-            await interaction.followup.send(content=f"Only Moderators, Community Experts, and the creator of the post can use this.", ephemeral=True)
-
-    @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="close-cancel")
-    async def on_cancel_click(self, interaction: discord.Interaction, button: discord.Button):
-        experts_role = interaction.guild.get_role(EXPERTS_ROLE_ID)
-        mods_role = interaction.guild.get_role(MODERATORS_ROLE_ID)
-        if experts_role in interaction.user.roles or mods_role in interaction.user.roles or interaction.user == interaction.channel.owner:
-            self.task.cancel()
-            await interaction.message.edit(view=None, content=f"~~{interaction.message.content}~~\n-# Cancelled by {interaction.user.name}")
-            tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-            if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-            await interaction.channel.edit(applied_tags=tags)
-        else:
-            await interaction.response.send_message(content="Only Moderators, Community Experts and the creator of the post can use this.", ephemeral=True)
-
 class utility(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
@@ -67,9 +39,9 @@ class utility(commands.Cog):
     async def on_ready(self):
         self.client.add_view(NeedDevReviewButtons())
 
-    @app_commands.command(name="unsolved",  description="Lists all currently unsolved posts")
+    @app_commands.command(name="list-unsolved",  description="Lists all currently unsolved posts")
     @commands.guild_only() # Allow the command to only be used in guilds
-    async def unsolved(self, interaction: discord.Interaction):
+    async def list_unsolved(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         posts = '' # Define an initial empty string to add the links to
         support = interaction.guild.get_channel(SUPPORT_CHANNEL_ID) # Get #support channel
@@ -111,19 +83,23 @@ class utility(commands.Cog):
                 if need_dev_review_tag not in interaction.channel.applied_tags:
                     if solved not in interaction.channel.applied_tags:
                         task =  asyncio.create_task(ClosePost(post=interaction.channel, interaction=interaction))
+                        close_tasks[interaction.channel] = task # Add the and post to the "close_tasks" dict
                         tags = [solved]
                         if cb in interaction.channel.applied_tags:
                             tags.append(cb)
                         await interaction.channel.edit(applied_tags=tags)
-                        await interaction.response.send_message(content=f"This post was marked as solved, and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.", view=CloseNow(task=task))
+                        now = datetime.datetime.now()
+                        one_hour_from_now = now + datetime.timedelta(hours=1)
+                        await interaction.response.send_message(content=f"This post was marked as solved\n-# <:tree_corner:1272886415558049893> It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolved:123> to cancel.")
                     else:
                         await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
                 else:
                     button = ui.Button(label="Confirm", style=discord.ButtonStyle.green, custom_id="solved-confirm")
                     async def on_confirm_button_click(Interaction: discord.Interaction):
                         task = asyncio.create_task(ClosePost(post=interaction.channel, interaction=Interaction))
+                        close_tasks[interaction.channel] = task # Add the task and post to the "close_tasks" dict
                         await interaction.delete_original_response()
-                        await Interaction.response.send_message(content=f"This post was marked as solved, and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.", view=CloseNow(task=task))
+                        await Interaction.response.send_message(content=f"This post was marked as solved, and will be closed in 1 hour. Please create a new post if you are having a different or similar issue.")
                         tags = [solved]
                         if cb in Interaction.channel.applied_tags:
                             tags.append(cb)
@@ -141,6 +117,28 @@ class utility(commands.Cog):
                 colour=0xce3636
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="unsolved", description="Cancel this post from being closed")
+    @app_commands.guild_only()
+    async def unsolved(self, interaction: discord.Interaction):
+        if isinstance(interaction.channel, discord.Thread):
+            if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+                experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
+                mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
+                if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
+                    if interaction.channel in close_tasks:
+                        close_tasks.pop(interaction.channel)
+                        tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+                        if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                            tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                        await interaction.channel.edit(applied_tags=tags)
+                        await interaction.response.send_message(content="Post successfully unsolved")
+                    else:
+                        await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later")
+            else:
+                await interaction.response.send_message(content="This command can only be used in <#1023653278485057596>")
+        else:
+            await interaction.response.send_message(content=f"This command can only be used inside of a post in <#1023653278485057596>", ephemeral=True)
 
     @app_commands.command(name="need-dev-review", description="This post needs to be reviewd by the developer")
     @app_commands.guild_only()
