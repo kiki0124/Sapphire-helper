@@ -52,7 +52,7 @@ class utility(commands.Cog):
                 need_dev_review_tag = support.get_tag(NEED_DEV_REVIEW_TAG_ID) # Get need-dev-review tag
                 unanswered_tag = support.get_tag(UNANSWERED_TAG_ID)
                 if need_dev_review_tag not in post.applied_tags: # Check if the post doesn't have need dev review tag
-                    if not_solved_tag in post.applied_tags or solved_tag not in post.applied_tags or unanswered_tag in post.applied_tags: # Check if the post has not solved tag or doesn't have solve/unanswered
+                    if not_solved_tag in post.applied_tags or solved_tag not in post.applied_tags or unanswered_tag in post.applied_tags: # Check if the post has not solved tag or doesn't have solved or has unanswered
                         posts += f"* {post.mention}\n" # Add the current post's link to the posts list
                     else:
                         continue # Continue to the next iteration of the loop as the current post has solved tag
