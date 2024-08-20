@@ -63,7 +63,7 @@ class remind(commands.Cog):
     
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
-        if message.channel.type == discord.ChannelType.public_thread: # Check if the message was sent in a public thread
+        if isinstance(message.channel, discord.Thread): # Check if the message was sent in a public thread
             if message.channel.parent.id == SUPPORT_CHANNEL_ID: # Check if the parent of the public thread is #support
                 if message.channel.id in GetPendingPosts(): # Check if the specific post is marked as creator not answering
                     if message.author == message.channel.owner: # check if the author of the message is the creator of the post

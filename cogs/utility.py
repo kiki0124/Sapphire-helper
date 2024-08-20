@@ -7,7 +7,7 @@ import datetime
 
 close_tasks: dict[discord.Thread, asyncio.Task] = {}
 
-async def ClosePost(post: discord.Thread, interaction: discord.Interaction) -> None:
+async def ClosePost(post: discord.Thread) -> None:
     await asyncio.sleep(3600)
     await post.edit(archived=True, reason="Auto archive solved post after 1 hour")
     close_tasks.pop(post)
@@ -75,14 +75,14 @@ class utility(commands.Cog):
     async def solved(self, interaction: discord.Interaction):
         experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
         moderators = interaction.guild.get_role(MODERATORS_ROLE_ID)
-        if interaction.channel.type == discord.ChannelType.public_thread:
+        if isinstance(interaction.channel, discord.Thread):
             if interaction.user == interaction.channel.owner or experts in interaction.user.roles or moderators in interaction.user.roles: # Check if the user is the creator of the post or has experts/moderators roles
                 need_dev_review_tag = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
                 solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
                 cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
                 if need_dev_review_tag not in interaction.channel.applied_tags:
                     if solved not in interaction.channel.applied_tags:
-                        task =  asyncio.create_task(ClosePost(post=interaction.channel, interaction=interaction))
+                        task =  asyncio.create_task(ClosePost(post=interaction.channel))
                         close_tasks[interaction.channel] = task # Add the and post to the "close_tasks" dict
                         tags = [solved]
                         if cb in interaction.channel.applied_tags:
@@ -96,7 +96,7 @@ class utility(commands.Cog):
                 else:
                     button = ui.Button(label="Confirm", style=discord.ButtonStyle.green, custom_id="solved-confirm")
                     async def on_confirm_button_click(Interaction: discord.Interaction):
-                        task = asyncio.create_task(ClosePost(post=interaction.channel, interaction=Interaction))
+                        task = asyncio.create_task(ClosePost(post=interaction.channel))
                         close_tasks[interaction.channel] = task # Add the task and post to the "close_tasks" dict
                         await interaction.delete_original_response()
                         now = datetime.datetime.now()
@@ -148,7 +148,7 @@ class utility(commands.Cog):
     async def need_dev_review(self, interaction: discord.Interaction):
         experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
         moderators = interaction.guild.get_role(MODERATORS_ROLE_ID)
-        if interaction.channel.type == discord.ChannelType.public_thread:
+        if isinstance(interaction.channel, discord.Thread):
             if moderators in interaction.user.roles or experts in interaction.user.roles:
                 if interaction.channel.parent.id == SUPPORT_CHANNEL_ID:
                     await interaction.response.defer()

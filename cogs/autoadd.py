@@ -28,7 +28,7 @@ class autoadd(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message.author == self.client.user: # Check if the message author is Sapphire Helper
-            if message.channel.type ==  discord.ChannelType.public_thread:
+            if isinstance(message.channel, discord.Thread):
                 if message.channel.parent_id == SUPPORT_CHANNEL_ID: # Check if the message channel parent is the support channel
                     if message.channel.id not in sent_post_ids:
                         if message.author == message.channel.owner: # Checks if the message author is the post creator
