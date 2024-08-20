@@ -3,12 +3,34 @@ from discord.ext import commands, tasks
 from variables import SUPPORT_CHANNEL_ID, SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, UNANSWERED_TAG_ID, NEED_DEV_REVIEW_TAG_ID, EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, CUSTOM_BRANDING_TAG_ID
 from functions import AddPostToPending, RemovePostFromPending, GetPendingPosts, CheckPostLastMessageTime, CheckTimeLessDay
 import random
+from discord import ui
+
+class CloseNow(ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    
+    @ui.button(label="Issue already solved? Close post now", custom_id="remind-close-now", style=discord.ButtonStyle.grey)
+    async def on_close_now_click(self, interaction: discord.Interaction, button: ui.Button):
+        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
+        mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
+        if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
+            await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
+            tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
+            if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+            await interaction.channel.edit(applied_tags=tags)
+        else:
+            await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
 
 class remind(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
         self.SendReminders.start() # start the loop
         self.ClosePendingPosts.start() # start the loop
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        self.client.add_view(CloseNow())
 
     async def cog_unload(self):
         self.SendReminders.cancel() # cancel the loop as the cog was unloaded
@@ -31,22 +53,7 @@ class remind(commands.Cog):
                             if CheckTimeLessDay(time=message.created_at.replace(second=0, microsecond=0, tzinfo=None)): # checks if the time of the message is more than 24 hours ago
                                 if post.owner: # make sure the post owner is in the cache
                                     greetings = ["Hi", "Hello", "Hey", "Hi there"]
-                                    button = discord.ui.Button(label="Issue already solved? Close post now", custom_id="remind-close-now", style=discord.ButtonStyle.grey) # define the button
-                                    async def on_close_now_click(interaction: discord.Interaction): # define the button's function/action
-                                        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-                                        mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
-                                        if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
-                                            await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
-                                            tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
-                                            if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                                                tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                                            await interaction.channel.edit(applied_tags=tags)
-                                        else:
-                                            await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
-                                    button.callback = on_close_now_click
-                                    view = discord.ui.View()
-                                    view.add_item(button)
-                                    await message.channel.send(content=f"{random.choices(greetings)[0]} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=view)
+                                    await message.channel.send(content=f"{random.choices(greetings)[0]} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
                                     AddPostToPending(post_id=post.id, time=message.created_at.replace(second=0, microsecond=0))
                                 else:
                                     continue
