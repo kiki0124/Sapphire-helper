@@ -143,7 +143,7 @@ class utility(commands.Cog):
         else:
             await interaction.response.send_message(content=f"This command can only be used inside of a post in <#1023653278485057596>", ephemeral=True)
 
-    @app_commands.command(name="need-dev-review", description="This post needs to be reviewed by the developer")
+    @app_commands.command(name="needs-dev-review", description="This post needs to be reviewed by the developer")
     @app_commands.guild_only()
     async def need_dev_review(self, interaction: discord.Interaction):
         experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
