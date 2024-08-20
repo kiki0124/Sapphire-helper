@@ -129,6 +129,7 @@ class utility(commands.Cog):
                 mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
                     if interaction.channel in close_tasks:
+                        close_tasks[interaction.channel].cancel()
                         close_tasks.pop(interaction.channel)
                         tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                         if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
