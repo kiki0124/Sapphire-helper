@@ -137,7 +137,7 @@ class utility(commands.Cog):
                         await interaction.channel.edit(applied_tags=tags)
                         await interaction.response.send_message(content="Post successfully unsolved")
                     else:
-                        await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later")
+                        await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
             else:
                 await interaction.response.send_message(content="This command can only be used in <#1023653278485057596>")
         else:
