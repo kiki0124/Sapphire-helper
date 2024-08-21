@@ -120,7 +120,7 @@ class utility(commands.Cog):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="unsolved", description="Cancel this post from being closed")
+    @app_commands.command(name="unsolve", description="Cancel this post from being closed")
     @app_commands.guild_only()
     async def unsolved(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread):
