@@ -136,8 +136,16 @@ class utility(commands.Cog):
                             tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
                         await interaction.channel.edit(applied_tags=tags)
                         await interaction.response.send_message(content="Post successfully unsolved")
+                    elif interaction.channel.parent.get_tag(SOLVED_TAG_ID) in interaction.channel.applied_tags:
+                        tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+                        if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                            tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                        await interaction.channel.edit(applied_tags=tags)
+                        await interaction.response.send_message(content="Post successfully unsolved")
                     else:
                         await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
+                else:
+                    await interaction.response.send_message(content="This command can only be used by Moderators, Community Experts, and the creator of the post.", ephemeral=True)
             else:
                 await interaction.response.send_message(content="This command can only be used in <#1023653278485057596>")
         else:
