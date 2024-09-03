@@ -50,12 +50,11 @@ class autoadd(commands.Cog):
                                     return # ignore the message as its the first message of the thread
                             else:
                                 return # Ignore the message as the post is already solved or has the need-dev-review tag
-                        unanswered_tag = message.channel.parent.get_tag(UNANSWERED_TAG_ID)
-                        if unanswered_tag in message.channel.applied_tags and not message.author == message.channel.owner:
-                            tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-                            if message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in message.channel.applied_tags:
-                                tags.append(message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                            await message.channel.edit(applied_tags=tags)
+                    elif message.channel.parent.get_tag(UNANSWERED_TAG_ID) in message.channel.applied_tags and not message.author == message.channel.owner:
+                        tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+                        if message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in message.channel.applied_tags:
+                            tags.append(message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                        await message.channel.edit(applied_tags=tags)
                     else:
                         return # Ignore the message as a message was already sent in this channel before
                 else:
