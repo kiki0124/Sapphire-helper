@@ -101,7 +101,7 @@ class utility(commands.Cog):
                         await interaction.delete_original_response()
                         now = datetime.datetime.now()
                         one_hour_from_now = now + datetime.timedelta(hours=1)
-                        await Interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolved:1274997472162349078> to cancel.")
+                        await Interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:1281211280618950708> to cancel.")
                         tags = [solved]
                         if cb in Interaction.channel.applied_tags:
                             tags.append(cb)
