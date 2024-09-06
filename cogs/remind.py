@@ -19,6 +19,7 @@ class CloseNow(ui.View):
             if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
                 tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
             await interaction.channel.edit(applied_tags=tags, archived=True)
+            RemovePostFromPending(interaction.channel.id)
         else:
             await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
 
