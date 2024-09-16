@@ -134,13 +134,13 @@ class utility(commands.Cog):
                         tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                         if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
                             tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                        await interaction.channel.edit(applied_tags=tags)
+                        await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /unsolve")
                         await interaction.response.send_message(content="Post successfully unsolved")
                     elif interaction.channel.parent.get_tag(SOLVED_TAG_ID) in interaction.channel.applied_tags:
                         tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                         if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
                             tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                        await interaction.channel.edit(applied_tags=tags)
+                        await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /unsolve")
                         await interaction.response.send_message(content="Post successfully unsolved")
                     else:
                         await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
@@ -169,7 +169,7 @@ class utility(commands.Cog):
                     tags = [interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)]
                     if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
                         tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                    await interaction.channel.edit(applied_tags=tags)
+                    await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /need-dev-review")
                     channel = interaction.guild.get_channel(1145088659545141421)
                     await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
                 else:
