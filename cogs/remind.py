@@ -18,7 +18,7 @@ class CloseNow(ui.View):
             tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
             if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
                 tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-            await interaction.channel.edit(applied_tags=tags, archived=True)
+            await interaction.channel.edit(applied_tags=tags, archived=True, reason=f"{interaction.user.name} Clicked close now button")
             RemovePostFromPending(interaction.channel.id)
         else:
             await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
@@ -96,7 +96,7 @@ class remind(commands.Cog):
                         tags = [post.parent.get_tag(SOLVED_TAG_ID)]
                         if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
                             tags.append(CUSTOM_BRANDING_TAG_ID)
-                        await post.edit(archived=True, reason=f"post inactive for 2 days", applied_tags=tags)
+                        await post.edit(archived=True, reason="post inactive for 2 days", applied_tags=tags)
                         RemovePostFromPending(post.id)
                     else:
                         continue
