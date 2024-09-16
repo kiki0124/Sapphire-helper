@@ -20,7 +20,7 @@ class autoadd(commands.Cog):
             tags = [thread.parent.get_tag(UNANSWERED_TAG_ID)]
             if thread.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in thread.applied_tags:
                 tags.append(thread.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-            await thread.edit(applied_tags=tags) # Add unanswered solved tag to post
+            await thread.edit(applied_tags=tags, reason="Auto-add unanswered tag to a new post") # Add unanswered solved tag to post
             if len(thread.starter_message.content) < 15: # Check if the amount of characters in the starting message is smaller than 15 
                 greets = ["Hi", "Hey", "Hello", "Hi there"]
                 await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
@@ -54,7 +54,7 @@ class autoadd(commands.Cog):
                         tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                         if message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in message.channel.applied_tags:
                             tags.append(message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                        await message.channel.edit(applied_tags=tags)
+                        await message.channel.edit(applied_tags=tags, reason="Auto-remove unanswered tag and replace with not solved tag")
                     else:
                         return # Ignore the message as a message was already sent in this channel before
                 else:
