@@ -48,8 +48,12 @@ class remind(commands.Cog):
                     if post.id not in GetPendingPosts(): # check if the post isn't already marked as closing pending
                         try:
                             message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
-                        except discord.NotFound: # message might be none, take care of that
-                            continue # Message was most likely deleted, continue to the next iteration
+                        except discord.HTTPException as error: # create an exception for cases where the message couldn't be fetched
+                            experts_channel = self.client.get_channel(1145378626326495242) # get the sapphire-experts channel
+                            await experts_channel.send( # send a message to the channel with the content below this comment
+                                content=f"Reminder message could not be sent to {post.mention}.\nError: `{error.text}` Error code: `{error.code}` Status: `{error.status}`"
+                            )
+                            continue # Continue to the next iteration of the loop
                         if message.author != post.owner: # checks if the last message's author is post creator
                             if CheckTimeLessDay(time=message.created_at.replace(second=0, microsecond=0, tzinfo=None)): # checks if the time of the message is more than 24 hours ago
                                 if post.owner: # make sure the post owner is in the cache
