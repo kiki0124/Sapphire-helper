@@ -21,9 +21,9 @@ class autoadd(commands.Cog):
             if thread.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in thread.applied_tags:
                 tags.append(thread.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
             await thread.edit(applied_tags=tags, reason="Auto-add unanswered tag to a new post") # Add unanswered solved tag to post
-            if len(thread.starter_message.content) < 15: # Check if the amount of characters in the starting message is smaller than 15 
-                greets = ["Hi", "Hey", "Hello", "Hi there"]
-                await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
+            if (thread.starter_message.content and len(thread.starter_message.content) < 15) or (not thread.starter_message.content and thread.starter_message.attachments[0]): # Check if the amount of characters in the starting message is smaller than 15 
+                    greets = ["Hi", "Hey", "Hello", "Hi there"]
+                    await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
