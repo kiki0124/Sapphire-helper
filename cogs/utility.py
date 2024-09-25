@@ -35,6 +35,15 @@ class utility(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
     
+    @staticmethod
+    async def ModOrExpertOrOP(interaction: discord.Interaction):
+        """  
+        Checks if the interaction user is a Moderator or Community Expert or the creator of the post
+        """
+        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
+        mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
+        return experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner
+
     @commands.Cog.listener()
     async def on_ready(self):
         self.client.add_view(NeedDevReviewButtons())
@@ -60,28 +69,28 @@ class utility(commands.Cog):
                     continue # Continue to the next iteration of the loop as the current post has need dev review tag
             else:
                 continue # Continue to the next iteration of the loop as the current post is archived (closed) or locked
-        if posts != '': # Check if posts var has any characters in it
+        if posts: # Check if posts var has any characters in it
             embed = discord.Embed(
                 title="Unsolved posts:",
                 description=posts,
                 colour=0x2b2d31
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
-        elif posts == '': # Check if no posts were found
+        elif not posts: # Check if no posts were found
             await interaction.followup.send(content="There aren't any unsolved posts at the moment, come back later...", ephemeral=True)
 
     @app_commands.command(name="solved", description="Mark the current post as solved")
+    @app_commands.check(ModOrExpertOrOP)
     @app_commands.guild_only()
     async def solved(self, interaction: discord.Interaction):
-        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-        moderators = interaction.guild.get_role(MODERATORS_ROLE_ID)
         if isinstance(interaction.channel, discord.Thread):
-            if interaction.user == interaction.channel.owner or experts in interaction.user.roles or moderators in interaction.user.roles: # Check if the user is the creator of the post or has experts/moderators roles
+            if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:    
                 need_dev_review_tag = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
                 solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
                 cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
                 if need_dev_review_tag not in interaction.channel.applied_tags:
                     if solved not in interaction.channel.applied_tags:
+                        await interaction.response.defer()
                         task =  asyncio.create_task(ClosePost(post=interaction.channel))
                         close_tasks[interaction.channel] = task # Add the and post to the "close_tasks" dict
                         tags = [solved]
@@ -90,18 +99,21 @@ class utility(commands.Cog):
                         await interaction.channel.edit(applied_tags=tags)
                         now = datetime.datetime.now()
                         one_hour_from_now = now + datetime.timedelta(hours=1)
-                        await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolved:1274997472162349078> to cancel.")
+                        await interaction.followup.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolved:1281211280618950708> to cancel.")
                     else:
-                        await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
+                        await interaction.response.defer(ephemeral=True)
+                        await interaction.followup.send(content="This post is already marked as solved.", ephemeral=True)
                 else:
+                    await interaction.response.defer(ephemeral=True)
                     button = ui.Button(label="Confirm", style=discord.ButtonStyle.green, custom_id="solved-confirm")
                     async def on_confirm_button_click(Interaction: discord.Interaction):
+                        await Interaction.response.defer()
                         task = asyncio.create_task(ClosePost(post=interaction.channel))
                         close_tasks[interaction.channel] = task # Add the task and post to the "close_tasks" dict
                         await interaction.delete_original_response()
                         now = datetime.datetime.now()
                         one_hour_from_now = now + datetime.timedelta(hours=1)
-                        await Interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:1281211280618950708> to cancel.")
+                        await Interaction.followup.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:1281211280618950708> to cancel.")
                         tags = [solved]
                         if cb in Interaction.channel.applied_tags:
                             tags.append(cb)
@@ -109,83 +121,66 @@ class utility(commands.Cog):
                     button.callback = on_confirm_button_click
                     view = ui.View()
                     view.add_item(button)
-                    await interaction.response.send_message(content="This post has need-dev-review tag, are you sure you would like to mark it as solved?", view=view, ephemeral=True)
+                    await interaction.followup.send(content="This post has the need-dev-review tag, are you sure you would like to mark it as solved?", view=view, ephemeral=True)
             else:
-                await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
+                await interaction.response.defer(ephemeral=True)
+                await interaction.followup.send(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
         else:
-            embed = discord.Embed(
-                title="Command disabled in this channel",
-                description="> This command can only be used inside of a post in <#1023653278485057596>.",
-                colour=0xce3636
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.defer(ephemeral=True)
+            await interaction.followup.send(content=f"This command can only be used in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
     @app_commands.command(name="unsolve", description="Cancel the post from being closed")
+    @app_commands.check(ModOrExpertOrOP)
     @app_commands.guild_only()
     async def unsolved(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread):
             if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-                experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-                mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
-                if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
-                    if interaction.channel in close_tasks:
-                        close_tasks[interaction.channel].cancel()
-                        close_tasks.pop(interaction.channel)
-                        tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-                        if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                            tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                        await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /unsolve")
-                        await interaction.response.send_message(content="Post successfully unsolved")
-                    elif interaction.channel.parent.get_tag(SOLVED_TAG_ID) in interaction.channel.applied_tags:
-                        tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-                        if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                            tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                        await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /unsolve")
-                        await interaction.response.send_message(content="Post successfully unsolved")
-                    else:
-                        await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
+                await interaction.response.defer()
+                if interaction.channel in close_tasks:
+                    close_tasks[interaction.channel].cancel()
+                    close_tasks.pop(interaction.channel)
+                    tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+                    if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                        tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                    await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /unsolve")
+                    await interaction.followup.send(content="Post successfully unsolved")
+                elif interaction.channel.parent.get_tag(SOLVED_TAG_ID) in interaction.channel.applied_tags:
+                    tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+                    if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                        tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                    await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /unsolve")
+                    await interaction.followup.send(content="Post successfully unsolved")
                 else:
-                    await interaction.response.send_message(content="This command can only be used by Moderators, Community Experts, and the creator of the post.", ephemeral=True)
+                    await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
             else:
-                await interaction.response.send_message(content="This command can only be used in <#1023653278485057596>")
+                await interaction.response.send_message(content="This command can only be used in <#1023653278485057596>", ephemeral=True)
         else:
             await interaction.response.send_message(content=f"This command can only be used inside of a post in <#1023653278485057596>", ephemeral=True)
 
     @app_commands.command(name="needs-dev-review", description="This post needs to be reviewed by the developer")
     @app_commands.guild_only()
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def need_dev_review(self, interaction: discord.Interaction):
-        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-        moderators = interaction.guild.get_role(MODERATORS_ROLE_ID)
-        if isinstance(interaction.channel, discord.Thread):
-            if moderators in interaction.user.roles or experts in interaction.user.roles:
-                if interaction.channel.parent.id == SUPPORT_CHANNEL_ID:
-                    await interaction.response.defer()
-                    embed = discord.Embed(
-                        description=f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by {interaction.user.mention}\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n3. When did this issue start to occur?\n4. What is the issue and which steps lead to it?\n5. Can this issue be reproduced by other users/in other servers?\n6. Which server IDs are related to this issue?\n7. What did you already try to fix this issue by yourself? Did it work?\n8. Does this issue need to be fixed urgently?\n\n_ _",
-                        colour=0x2b2d31
-                    )
-                    embed.set_footer(text="Thank you for helping Sapphire to continuously improve.")
-                    await interaction.followup.send(embed=embed, view=NeedDevReviewButtons())
-                    tags = [interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)]
-                    if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                        tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                    await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /need-dev-review")
-                    channel = interaction.guild.get_channel(1145088659545141421)
-                    await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
-                else:
-                    await interaction.response.defer(ephemeral=True)
-                    embed = discord.Embed(
-                        title="Command disabled in this channel",
-                        description="> This command can only be used inside of a post in <#1023653278485057596>.",
-                        colour=0xce3636
-                    )
-                    await interaction.followup.send(embed=embed, ephemeral=True)
+        if isinstance(interaction.channel, discord.Thread): # check if the interaction channel is a thread
+            if interaction.channel.parent.id == SUPPORT_CHANNEL_ID: # check if the thread parent channel is #support
+                await interaction.response.defer() # defer the interaction response
+                embed = discord.Embed(
+                    description=f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by {interaction.user.mention}\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n3. When did this issue start to occur?\n4. What is the issue and which steps lead to it?\n5. Can this issue be reproduced by other users/in other servers?\n6. Which server IDs are related to this issue?\n7. What did you already try to fix this issue by yourself? Did it work?\n8. Does this issue need to be fixed urgently?\n\n_ _",
+                    colour=0x2b2d31
+                )
+                embed.set_footer(text="Thank you for helping Sapphire to continuously improve.")
+                await interaction.followup.send(embed=embed, view=NeedDevReviewButtons()) # send the embed with the buttons
+                tags = [interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)] 
+                if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                    tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /need-dev-review") # Add need-dev-review tag
+                channel = interaction.guild.get_channel(1145088659545141421)
+                await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}') # Send a message to a private mods channel so they can forward it
             else:
                 await interaction.response.defer(ephemeral=True)
-                await interaction.followup.send(content="Only Moderators and Community Experts can use this command.", ephemeral=True)
+                await interaction.followup.send(content="This command can only be used in #support!", ephemeral=True)    
         else:
-            await interaction.response.defer(ephemeral=True)
-            await interaction.followup.send(content="This command can only be used in #support!", ephemeral=True)
-                
+            await interaction.followup.send(content="This command can only be used in a thread inside of #support!", ephemeral=True)
+            
 async def setup(client):
     await client.add_cog(utility(client))
