@@ -49,7 +49,7 @@ class remind(commands.Cog):
                         try:
                             message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
                         except discord.HTTPException as error: # create an exception for cases where the message couldn't be fetched
-                            experts_channel = self.client.get_channel(1145378626326495242) # get the sapphire-experts channel
+                            experts_channel = post.guild.get_channel_or_thread(1290009354589962371) # get the sapphire-experts channel
                             await experts_channel.send( # send a message to the channel with the content below this comment
                                 content=f"Reminder message could not be sent to {post.mention}.\nError: `{error.text}` Error code: `{error.code}` Status: `{error.status}`"
                             )
