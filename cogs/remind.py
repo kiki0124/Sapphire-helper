@@ -4,6 +4,9 @@ from variables import SUPPORT_CHANNEL_ID, SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, UNAN
 from functions import AddPostToPending, RemovePostFromPending, GetPendingPosts, CheckPostLastMessageTime, CheckTimeLessDay
 import random
 from discord import ui
+import datetime
+
+reminder_not_sent_posts: dict[int, int] = {}
 
 class CloseNow(ui.View):
     def __init__(self):
@@ -28,6 +31,7 @@ class remind(commands.Cog):
         self.client: commands.Bot = client
         self.SendReminders.start() # start the loop
         self.ClosePendingPosts.start() # start the loop
+        self.CheckExceptionPosts.start()
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -36,6 +40,51 @@ class remind(commands.Cog):
     async def cog_unload(self):
         self.SendReminders.cancel() # cancel the loop as the cog was unloaded
         self.ClosePendingPosts.cancel() # cancel the loop as the cog was unloaded
+        self.CheckExceptionPosts.cancel()
+
+    @tasks.loop(hours=1)
+    async def CheckExceptionPosts(self):
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        to_remove = []
+        for post_id, tries in reminder_not_sent_posts.items():
+            post = support.guild.get_channel_or_thread(post_id)
+            if tries < 24:
+                try:
+                    message: discord.Message|None = await post.fetch_message(post.last_message_id)
+                except discord.NotFound:
+                    tries+=1
+                    reminder_not_sent_posts[post.id] = tries
+                    continue
+                if CheckTimeLessDay(message.created_at.replace(tzinfo=None)):
+                    if post.owner:
+                        greetings = ["Hi", "Hello", "Hey", "Hi there"]
+                        await message.channel.send(content=f"{random.choices(greetings)[0]} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
+                        AddPostToPending(post_id=post.id, time=message.created_at.replace(second=0, microsecond=0))
+                        to_remove.append(post.id)
+                        continue
+                    else:
+                        continue
+                else:
+                    to_remove.append(post.id)
+                    continue
+            else:
+                try:
+                    message = await post.fetch_message(post.last_message_id)
+                except discord.HTTPException as e:
+                    experts_channel = post.guild.get_channel_or_thread(1290009354589962371) # get the sapphire-experts channel
+                    await experts_channel.send( # send a message to the channel with the content below this comment
+                        content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: `{e.status}`"
+                    )
+                    to_remove.append(post.id)
+                    continue
+                if CheckTimeLessDay(message.created_at.replace(tzinfo=None)):
+                    AddPostToPending(post.id, datetime.datetime.now(tz=None))
+                    continue
+                else:
+                    to_remove.append(post.id)
+                    continue
+        for post_id in to_remove:
+            reminder_not_sent_posts.pop(post_id)
 
     @tasks.loop(hours=1)
     async def SendReminders(self):
@@ -45,15 +94,16 @@ class remind(commands.Cog):
         for post in channel.threads: # start a loop for threads in the channel threads
             if not post.locked and not post.archived: # check if the post is not locked and not archived
                 if need_dev_review_tag not in post.applied_tags and solved_tag not in post.applied_tags: # Make sure the post isn't already solved, doesn't have need dev review
-                    if post.id not in GetPendingPosts(): # check if the post isn't already marked as closing pending
+                    if post.id not in GetPendingPosts() and post.id not in reminder_not_sent_posts: # check if the post isn't already marked as closing pending
                         try:
                             message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
-                        except discord.HTTPException as error: # create an exception for cases where the message couldn't be fetched
-                            experts_channel = self.client.get_channel(1145378626326495242) # get the sapphire-experts channel
-                            await experts_channel.send( # send a message to the channel with the content below this comment
-                                content=f"Reminder message could not be sent to {post.mention}.\nError: `{error.text}` Error code: `{error.code}` Status: `{error.status}`"
-                            )
+                        except discord.NotFound: # create an exception for cases where the message couldn't be fetched
+                            reminder_not_sent_posts[post.id] = 1
                             continue # Continue to the next iteration of the loop
+                        except discord.HTTPException as e:
+                            alerts = post.guild.get_channel_or_thread(1290009354589962371)
+                            await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
+                            continue
                         if message.author != post.owner: # checks if the last message's author is post creator
                             if CheckTimeLessDay(time=message.created_at.replace(second=0, microsecond=0, tzinfo=None)): # checks if the time of the message is more than 24 hours ago
                                 if post.owner: # make sure the post owner is in the cache
@@ -109,13 +159,17 @@ class remind(commands.Cog):
                     continue
             else:
                 continue
-    
+
     @SendReminders.before_loop
     async def SendRemindersBeforeLoop(self):
         await self.client.wait_until_ready()
 
     @ClosePendingPosts.before_loop
     async def ClosePendingPostsBeforeLoop(self):
+        await self.client.wait_until_ready()
+
+    @CheckExceptionPosts.before_loop
+    async def ExceptionPostsBeforeLoop(self):
         await self.client.wait_until_ready()
 
 async def setup(client):
