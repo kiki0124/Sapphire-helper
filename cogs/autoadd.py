@@ -38,7 +38,7 @@ class autoadd(commands.Cog):
                                 if not message == message.channel.starter_message:
                                     pattern = r'(solved|^ty$|\sty|thank|work|fixed|thx|tysm)'
                                     negative_pattern = r"(doesn'?t|isn'?t|not?|but|before|wont)"
-                                    if not bool(re.search(negative_pattern, message.content, re.IGNORECASE)):
+                                    if not re.search(negative_pattern, message.content, re.IGNORECASE):
                                         if re.search(pattern, message.content, re.IGNORECASE):
                                             await message.reply(content="-# <:tree_corner:1272886415558049893>Command suggestion: </solved:1274997472162349079>")
                                             sent_post_ids.append(message.channel.id)
