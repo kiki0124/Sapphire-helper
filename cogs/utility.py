@@ -135,8 +135,8 @@ class utility(commands.Cog):
     async def unsolved(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread):
             if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-                await interaction.response.defer()
                 if interaction.channel in close_tasks:
+                    await interaction.response.defer()
                     close_tasks[interaction.channel].cancel()
                     close_tasks.pop(interaction.channel)
                     tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
@@ -145,6 +145,7 @@ class utility(commands.Cog):
                     await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /unsolve")
                     await interaction.followup.send(content="Post successfully unsolved")
                 elif interaction.channel.parent.get_tag(SOLVED_TAG_ID) in interaction.channel.applied_tags:
+                    await interaction.response.defer()
                     tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                     if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
                         tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
