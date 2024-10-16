@@ -1,8 +1,18 @@
 import discord
 from discord.ext import commands, tasks
-from variables import SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, SUPPORT_CHANNEL_ID, NEED_DEV_REVIEW_TAG_ID, UNANSWERED_TAG_ID, CUSTOM_BRANDING_TAG_ID
 import re
 import random
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
+NOT_SOLVED_TAG_ID = int(os.getenv("NOT_SOLVED_TAG_ID"))
+SUPPORT_CHANNEL_ID = int(os.getenv('SUPPORT_CHANNEL_ID'))
+NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
+UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
+CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 
 sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 

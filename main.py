@@ -1,9 +1,14 @@
 import discord
 from discord.ext import commands
 import os
-from variables import BOT_TOKEN, PREFIXES
+from dotenv import load_dotenv
 
-client = commands.Bot(command_prefix=PREFIXES ,intents=discord.Intents.all(), help_command=None, strip_after_prefix=True)
+load_dotenv()
+
+TOKEN = os.getenv("BOT_TOKEN")
+PREFIX = os.getenv("PREFIX")
+
+client = commands.Bot(command_prefix=PREFIX ,intents=discord.Intents.all(), help_command=None, strip_after_prefix=True)
 
 @client.event
 async def on_ready():
@@ -18,4 +23,4 @@ async def setup_hook():
         else:
             print(f"Skipped loading {filename[:-3]}")
 
-client.run(BOT_TOKEN)
+client.run(TOKEN)

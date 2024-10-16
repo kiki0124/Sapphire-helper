@@ -1,8 +1,14 @@
 import discord
 from discord.ext import commands
-from variables import EXPERTS_ROLE_ID, MODERATORS_ROLE_ID
 import datetime
 from discord import app_commands
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
+MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 
 class bot(commands.Cog):
     def __init__(self, client):

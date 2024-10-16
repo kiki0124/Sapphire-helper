@@ -1,10 +1,20 @@
 import discord
 from discord.ext import commands, tasks
-from variables import SUPPORT_CHANNEL_ID, SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, UNANSWERED_TAG_ID, NEED_DEV_REVIEW_TAG_ID, EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, CUSTOM_BRANDING_TAG_ID
 from functions import AddPostToPending, RemovePostFromPending, GetPendingPosts, CheckPostLastMessageTime, CheckTimeLessDay
 import random
 from discord import ui
 import datetime
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
+SUPPORT_CHANNEL_ID = int(os.getenv('SUPPORT_CHANNEL_ID'))
+NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
+CUSTOM_BRANDING_TAG_ID = int(os.getenv("CUSTOM_BRANDING_TAG_ID"))
+MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
+EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 
 reminder_not_sent_posts: dict[int, int] = {}
 

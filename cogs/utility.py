@@ -1,9 +1,21 @@
 import discord
 from discord.ext import commands
-from variables import NEED_DEV_REVIEW_TAG_ID, SOLVED_TAG_ID, NOT_SOLVED_TAG_ID, SUPPORT_CHANNEL_ID, UNANSWERED_TAG_ID, EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, CUSTOM_BRANDING_TAG_ID
 from discord import app_commands, ui
 import asyncio
 import datetime
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
+NOT_SOLVED_TAG_ID = int(os.getenv("NOT_SOLVED_TAG_ID"))
+SUPPORT_CHANNEL_ID = int(os.getenv('SUPPORT_CHANNEL_ID'))
+NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
+UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
+CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
+EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
+MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 
 close_tasks: dict[discord.Thread, asyncio.Task] = {}
 
