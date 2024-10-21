@@ -22,7 +22,7 @@ def AddPostToPending(post_id: int, time: datetime.datetime) -> None:
     session.add(data)
     session.commit()
 
-def GetPendingPosts() -> list:
+def GetPendingPosts() -> list[int]:
     """  
     Returns a list[int] of posts (post ids) with status "closing pending", or None if no posts are currently in the db
     """
@@ -47,7 +47,7 @@ def CheckPostLastMessageTime(post_id: int) -> bool:
     one_day_ago = now - datetime.timedelta(days=1)
     return not one_day_ago.replace(tzinfo=None) <= loaded_time.replace(tzinfo=None) <= now.replace(tzinfo=None)
 
-def CheckTimeLessDay(time: datetime) -> bool:
+def CheckTimeMoreThanDay(time: datetime) -> bool:
     """  
     Check if the given time is more than a day ago
     """

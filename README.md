@@ -1,6 +1,6 @@
 ## Setup
 
-### 1. Replace all of the variables in variables.py to their actual value.
+### 1. Rename `_.env` to `.env` and replace each variable with its actual value.
 
 ### 2. In cogs/autoadd.py -> line 37, replace 123 with the command ID.
 

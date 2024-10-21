@@ -1,11 +1,12 @@
 import discord
 from discord.ext import commands, tasks
-from functions import AddPostToPending, RemovePostFromPending, GetPendingPosts, CheckPostLastMessageTime, CheckTimeLessDay
+from functions import AddPostToPending, RemovePostFromPending, GetPendingPosts, CheckPostLastMessageTime, CheckTimeMoreThanDay
 import random
 from discord import ui
 import datetime
 import os
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 
@@ -15,8 +16,20 @@ NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
 CUSTOM_BRANDING_TAG_ID = int(os.getenv("CUSTOM_BRANDING_TAG_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
+ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
+WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
+NOT_SOLVED_TAG_ID = int(os.getenv("NOT_SOLVED_TAG_ID"))
 
-reminder_not_sent_posts: dict[int, int] = {}
+reminder_not_sent_posts: dict[int, int] = {} # declare a dictionary of post ids: the amount of tries
+waiting_for_reply_posts: dict[int, asyncio.Task] = {} # declare a dictionary of post ids: the task for each post, used to know when to add the wiating for reply tag to posts
+
+async def AddWaitingForOpTag(post: discord.Thread):
+    await asyncio.sleep(600)
+    tags = [post.parent.get_tag(NOT_SOLVED_TAG_ID), post.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)]
+    if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
+        tags.append(post.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+    await post.edit(applied_tags=tags)
+    waiting_for_reply_posts.pop(post.id)
 
 class CloseNow(ui.View):
     def __init__(self):
@@ -65,7 +78,7 @@ class remind(commands.Cog):
                     tries+=1
                     reminder_not_sent_posts[post.id] = tries
                     continue
-                if CheckTimeLessDay(message.created_at.replace(tzinfo=None)):
+                if CheckTimeMoreThanDay(message.created_at.replace(tzinfo=None)):
                     if post.owner:
                         greetings = ["Hi", "Hello", "Hey", "Hi there"]
                         await message.channel.send(content=f"{random.choices(greetings)[0]} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
@@ -81,13 +94,13 @@ class remind(commands.Cog):
                 try:
                     message = await post.fetch_message(post.last_message_id)
                 except discord.HTTPException as e:
-                    experts_channel = post.guild.get_thread(1290009354589962371) # get the sapphire-experts channel
+                    experts_channel = post.guild.get_thread(ALERTS_THREAD_ID) # get the sapphire-experts channel
                     await experts_channel.send( # send a message to the channel with the content below this comment
                         content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: `{e.status}`"
                     )
                     to_remove.append(post.id)
                     continue
-                if CheckTimeLessDay(message.created_at.replace(tzinfo=None)):
+                if CheckTimeMoreThanDay(message.created_at.replace(tzinfo=None)):
                     AddPostToPending(post.id, datetime.datetime.now(tz=None))
                     continue
                 else:
@@ -115,39 +128,41 @@ class remind(commands.Cog):
                             await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
                             continue
                         if message.author != post.owner: # checks if the last message's author is post creator
-                            if CheckTimeLessDay(time=message.created_at.replace(second=0, microsecond=0, tzinfo=None)): # checks if the time of the message is more than 24 hours ago
+                            if CheckTimeMoreThanDay(time=message.created_at.replace(microsecond=0, tzinfo=None)): # checks if the time of the message is more than 24 hours ago
                                 if post.owner: # make sure the post owner is in the cache
                                     greetings = ["Hi", "Hello", "Hey", "Hi there"]
                                     await message.channel.send(content=f"{random.choices(greetings)[0]} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
                                     AddPostToPending(post_id=post.id, time=message.created_at.replace(second=0, microsecond=0))
-                                else:
-                                    continue
-                            else:
-                                continue # Continue to the next post as the message
-                        else:
-                            continue # The last message was not sent by the post creator, continue to the next post
-                    else:
-                        continue
-                else:
-                    continue
-            else:
-                continue
     
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message) -> None:
-        if isinstance(message.channel, discord.Thread): # Check if the message was sent in a public thread
-            if message.channel.parent.id == SUPPORT_CHANNEL_ID: # Check if the parent of the public thread is #support
-                if message.channel.id in GetPendingPosts(): # Check if the specific post is marked as creator not answering
-                    if message.author == message.channel.owner: # check if the author of the message is the creator of the post
-                        RemovePostFromPending(message.channel.id) # remove the post from creator not answering list
-                    else:
-                        return # ignore as the message author isn't the post creator
-                else:
-                    return # ignore as the post isn't in reminder pending or closing pending lists
-            else:
-                return # ignore as the message's parent isn't #support
+    async def PendingPostsListener(self, message: discord.Message):
+        if message.channel.id in GetPendingPosts():
+            if message.author == message.channel.owner:
+                RemovePostFromPending(message.channel.id) # Remove the message from pending list as the 
+                
+    async def AddRemoveWaitingTag(self, message: discord.Message):
+        waiting_for_reply = message.channel.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
+        if waiting_for_reply in message.channel.applied_tags and message.author == message.channel.owner: # check if the post has waiting for reply tag and the author of the message is op
+            tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+            cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+            if cb in message.channel.applied_tags:
+                tags.append(cb)
+            await message.channel.edit(applied_tags=tags) # edit the channel to remove waiting for reply tag
+        if waiting_for_reply not in message.channel.applied_tags and message.author != message.channel.owner: # check if the post doesn't have waiting for reply tag and the message author isn't op
+            task = asyncio.create_task(AddWaitingForOpTag(message.channel)) # create a new task with the AddWaitingForOpTag coroutine
+            waiting_for_reply_posts[message.channel.id] = task # add the task with the channel to the dict
+        if waiting_for_reply not in message.channel.applied_tags and message.author == message.channel.owner and message.channel.id in waiting_for_reply_posts.keys():
+            waiting_for_reply_posts.pop(message.channel.id)
         else:
-            return # ignore as the message wasn't sent in a public thread
+            return # any other scenario, ignore the message
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if isinstance(message.channel, discord.Thread):
+            if message.channel.parent_id == SUPPORT_CHANNEL_ID:
+                need_dev_review = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+                if not message.channel.locked and not need_dev_review in message.channel.applied_tags:
+                    await self.AddRemoveWaitingTag(message)
+                    await self.PendingPostsListener(message)
 
     @tasks.loop(hours=1)
     async def ClosePendingPosts(self):
@@ -181,6 +196,18 @@ class remind(commands.Cog):
     @CheckExceptionPosts.before_loop
     async def ExceptionPostsBeforeLoop(self):
         await self.client.wait_until_ready()
+
+    @commands.command()
+    async def getdata(self, ctx: commands.Context):
+        print(waiting_for_reply_posts)
+
+    @commands.command()
+    async def check_post_pending(self, ctx, post: discord.Thread):
+        await ctx.reply(post.id in GetPendingPosts())
+
+    @commands.command()
+    async def check_post_waiting(self, ctx, post: discord.Thread):
+        await ctx.reply(post.id in waiting_for_reply_posts)
 
 async def setup(client):
     await client.add_cog(remind(client))

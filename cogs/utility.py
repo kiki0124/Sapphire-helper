@@ -111,7 +111,7 @@ class utility(commands.Cog):
                         await interaction.channel.edit(applied_tags=tags)
                         now = datetime.datetime.now()
                         one_hour_from_now = now + datetime.timedelta(hours=1)
-                        await interaction.followup.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolved:1281211280618950708> to cancel.")
+                        await interaction.followup.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:1281211280618950708> to cancel.")
                     else:
                         await interaction.response.defer(ephemeral=True)
                         await interaction.followup.send(content="This post is already marked as solved.", ephemeral=True)
