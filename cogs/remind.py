@@ -141,16 +141,16 @@ class remind(commands.Cog):
                 
     async def AddRemoveWaitingTag(self, message: discord.Message):
         waiting_for_reply = message.channel.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
-        if waiting_for_reply in message.channel.applied_tags and message.author == message.channel.owner: # check if the post has waiting for reply tag and the author of the message is op
+        if waiting_for_reply in message.channel.applied_tags and message.author != message.channel.owner: # check if the post has waiting for reply tag and the author of the message is op
             tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
             cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
             if cb in message.channel.applied_tags:
                 tags.append(cb)
             await message.channel.edit(applied_tags=tags) # edit the channel to remove waiting for reply tag
-        if waiting_for_reply not in message.channel.applied_tags and message.author != message.channel.owner: # check if the post doesn't have waiting for reply tag and the message author isn't op
+        if waiting_for_reply not in message.channel.applied_tags and message.author == message.channel.owner: # check if the post doesn't have waiting for reply tag and the message author isn't op
             task = asyncio.create_task(AddWaitingForOpTag(message.channel)) # create a new task with the AddWaitingForOpTag coroutine
             waiting_for_reply_posts[message.channel.id] = task # add the task with the channel to the dict
-        if waiting_for_reply not in message.channel.applied_tags and message.author == message.channel.owner and message.channel.id in waiting_for_reply_posts.keys():
+        if waiting_for_reply not in message.channel.applied_tags and message.author != message.channel.owner and message.channel.id in waiting_for_reply_posts.keys():
             waiting_for_reply_posts.pop(message.channel.id)
         else:
             return # any other scenario, ignore the message
