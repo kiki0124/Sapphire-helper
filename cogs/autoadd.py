@@ -46,7 +46,7 @@ class autoadd(commands.Cog):
                             solved_tag = message.channel.parent.get_tag(SOLVED_TAG_ID)
                             if solved_tag not in message.channel.applied_tags and need_dev_review_tag not in message.channel.applied_tags: # make sure the post is not already solved and doesn't have the need-dev-review tag
                                 if not message == message.channel.starter_message:
-                                    pattern = r'(solved|^ty$|\sty|thank|work|fixed|thx|tysm)'
+                                    pattern = r'(solved|ty|thanks?|works?|fixed|thx|tysm)\b'
                                     negative_pattern = r"(doe?s?n.?t|isn.?t|not?|but|before|wont)\b"
                                     if not re.search(negative_pattern, message.content, re.IGNORECASE):
                                         if re.search(pattern, message.content, re.IGNORECASE):
