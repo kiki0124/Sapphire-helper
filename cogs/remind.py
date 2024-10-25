@@ -90,7 +90,7 @@ class remind(commands.Cog):
                 else:
                     to_remove.append(post.id)
                     continue
-            else:
+            elif tries == 24:
                 try:
                     message = await post.fetch_message(post.last_message_id)
                 except discord.HTTPException as e:
