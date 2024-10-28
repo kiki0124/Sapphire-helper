@@ -100,7 +100,7 @@ class utility(commands.Cog):
                 need_dev_review_tag = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
                 solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
                 cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-                if need_dev_review_tag not in interaction.channel.applied_tags:
+                if need_dev_review_tag not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower():
                     if solved not in interaction.channel.applied_tags:
                         await interaction.response.defer()
                         task =  asyncio.create_task(ClosePost(post=interaction.channel))
