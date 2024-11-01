@@ -98,7 +98,6 @@ class remind(commands.Cog):
                     await experts_channel.send( # send a message to the channel with the content below this comment
                         content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: `{e.status}`"
                     )
-                    to_remove.append(post.id)
                     continue
                 if CheckTimeMoreThanDay(message.created_at.replace(tzinfo=None)):
                     AddPostToPending(post.id, datetime.datetime.now(tz=None))
