@@ -141,6 +141,16 @@ class utility(commands.Cog):
             await interaction.response.defer(ephemeral=True)
             await interaction.followup.send(content=f"This command can only be used in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
+    @app_commands.command(name="remove", description="Remove the given member from the current post")
+    @app_commands.describe(user="What user do you want to remove?")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    async def remove(self, interaction: discord.Interaction, user: discord.Member):
+        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id==SUPPORT_CHANNEL_ID:
+            await interaction.channel.remove_user(user)
+            await interaction.response.send_message(content=f"Successfully removed {user.name} from this post.", ephemeral=True)
+        else:
+            await interaction.response.send_message(content=f"You can only use this command in a thread in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
+
     @app_commands.command(name="unsolve", description="Cancel the post from being closed")
     @app_commands.check(ModOrExpertOrOP)
     @app_commands.guild_only()
