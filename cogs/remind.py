@@ -60,12 +60,16 @@ class remind(commands.Cog):
         self.CheckExceptionPosts.cancel()
 
     async def AddWaitingForOpTag(post: discord.Thread):
-        await asyncio.sleep(600)
-        tags = [post.parent.get_tag(NOT_SOLVED_TAG_ID), post.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)]
-        if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
-            tags.append(post.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-        await post.edit(applied_tags=tags)
-        waiting_for_reply_posts.pop(post.id)
+        unanswered = post.parent.get_tag(UNANSWERED_TAG_ID)
+        if not unanswered in post.applied_tags:
+            await asyncio.sleep(600)
+            tags = [post.parent.get_tag(NOT_SOLVED_TAG_ID), post.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)]
+            if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
+                tags.append(post.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+            await post.edit(applied_tags=tags)
+            waiting_for_reply_posts.pop(post.id)
+        else:
+            return
 
     @tasks.loop(hours=1)
     async def CheckExceptionPosts(self):
