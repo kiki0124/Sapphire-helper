@@ -141,7 +141,7 @@ class remind(commands.Cog):
                 RemovePostFromPending(message.channel.id) # Remove the message from pending list as the 
                 
     async def AddRemoveWaitingTag(self, message: discord.Message):
-        if not message.channel.parent.get_tag(UNANSWERED_TAG_ID) in message.channel.applied_tags:
+        if not message.channel.parent.get_tag(UNANSWERED_TAG_ID) in message.channel.applied_tags and not message.channel.parent.get_tag(SOLVED_TAG_ID) in message.channel.applied_tags:
             waiting_for_reply = message.channel.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
             if waiting_for_reply in message.channel.applied_tags and message.author != message.channel.owner: # check if the post has waiting for reply tag and the author of the message is op
                 tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
