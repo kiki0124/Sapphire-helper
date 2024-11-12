@@ -120,7 +120,7 @@ class remind(commands.Cog):
                             await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
                             continue
                         if message.author != post.owner: # checks if the last message's author is post creator
-                            if check_time_more_than_day(time=message.created_at.replace(microsecond=0, tzinfo=None)): # checks if the time of the message is more than 24 hours ago
+                            if check_time_more_than_day(time=message.created_at.replace(tzinfo=None)): # checks if the time of the message is more than 24 hours ago
                                 if post.owner: # make sure the post owner is in the cache
                                     greetings = ["Hi", "Hello", "Hey", "Hi there"]
                                     await message.channel.send(content=f"{random.choices(greetings)[0]} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())

@@ -51,6 +51,6 @@ def check_time_more_than_day(time: datetime) -> bool:
     """  
     Check if the given time is more than a day ago
     """
-    now = datetime.datetime.now().replace(second=0, microsecond=0)
+    now = datetime.datetime.now()
     one_day_ago = now - datetime.timedelta(days=1)
     return not one_day_ago <= time <= now
