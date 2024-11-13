@@ -1,4 +1,3 @@
 __pycache__
 .env
 cogs/readthedamnrules.py
-cogs/waiting_for_reply.py
