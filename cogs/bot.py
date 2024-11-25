@@ -34,10 +34,13 @@ class bot(commands.Cog):
     @commands.command(name="restart")
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def restart(self, ctx: commands.Context):
-        extensions = self.client.extensions # declare a list of the extensions
-        await ctx.reply(content=f"Reloading `{len(extensions)}` extensions")
-        for extension in extensions: # initiate a loop for all of the extensions
-            await self.client.reload_extension(extension) # reload each one
+        extensions = os.listdir("./cogs")
+        await ctx.reply(content=f"Reloading {len(extensions)} extension(s)", mention_author=False)
+        for filename in extensions:
+            if filename.endswith(".py"):
+                await self.client.reload_extension(f"cogs.{filename[:-3]}")
+            else:
+                continue
 
     @commands.command()
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID) # check if the user executing the command has experts role or moderators role

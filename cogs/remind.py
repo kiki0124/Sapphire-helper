@@ -6,7 +6,6 @@ from discord import ui
 import datetime
 import os
 from dotenv import load_dotenv
-import asyncio
 
 load_dotenv()
 
