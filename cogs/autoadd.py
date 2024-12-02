@@ -47,7 +47,7 @@ class autoadd(commands.Cog):
                             if solved_tag not in message.channel.applied_tags and need_dev_review_tag not in message.channel.applied_tags: # make sure the post is not already solved and doesn't have the need-dev-review tag
                                 if not message == message.channel.starter_message:
                                     pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
-                                    negative_pattern = r"(doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t)"
+                                    negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?"
                                     if not re.search(negative_pattern, message.content, re.IGNORECASE):
                                         if re.search(pattern, message.content, re.IGNORECASE):
                                             await message.reply(content="-# <:tree_corner:1272886415558049893>Command suggestion: </solved:1274997472162349079>")
