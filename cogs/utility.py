@@ -58,7 +58,7 @@ class utility(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        self.client.add_view(NeedDevReviewButtons())
+        self.client.add_view(NeedDevReviewButtons()) # add the need dev review button/view to make it persistent (work after restart)
 
     @app_commands.command(name="list-unsolved",  description="Lists all currently unsolved posts")
     @commands.guild_only() # Allow the command to only be used in guilds
@@ -93,7 +93,7 @@ class utility(commands.Cog):
 
     @app_commands.command(name="solved", description="Mark the current post as solved")
     @app_commands.check(ModOrExpertOrOP)
-    @app_commands.guild_only()
+    @app_commands.guild_only() # make the command only usable in guilds- not dms
     async def solved(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread):
             if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:    
@@ -103,19 +103,19 @@ class utility(commands.Cog):
                 if need_dev_review_tag not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower():
                     if solved not in interaction.channel.applied_tags:
                         await interaction.response.defer()
-                        task =  asyncio.create_task(ClosePost(post=interaction.channel))
+                        task =  asyncio.create_task(ClosePost(post=interaction.channel)) # create a task to close the post in 1 hour
                         close_tasks[interaction.channel] = task # Add the and post to the "close_tasks" dict
-                        tags = [solved]
-                        if cb in interaction.channel.applied_tags:
-                            tags.append(cb)
+                        tags = [solved] # declare an initial list of tags to be applied to the post
+                        if cb in interaction.channel.applied_tags: 
+                            tags.append(cb) # add cb tag as it was in the post before the command was used
                         await interaction.channel.edit(applied_tags=tags)
                         now = datetime.datetime.now()
-                        one_hour_from_now = now + datetime.timedelta(hours=1)
+                        one_hour_from_now = now + datetime.timedelta(hours=1) # create a tiem object from 1 hour into the future from now, to be used as timestamp in the message
                         await interaction.followup.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:1281211280618950708> to cancel.")
                     else:
                         await interaction.response.defer(ephemeral=True)
                         await interaction.followup.send(content="This post is already marked as solved.", ephemeral=True)
-                else:
+                else: # post has ndr, send confirmation message
                     await interaction.response.defer(ephemeral=True)
                     button = ui.Button(label="Confirm", style=discord.ButtonStyle.green, custom_id="solved-confirm")
                     async def on_confirm_button_click(Interaction: discord.Interaction):
@@ -130,9 +130,9 @@ class utility(commands.Cog):
                         if cb in Interaction.channel.applied_tags:
                             tags.append(cb)
                         await Interaction.channel.edit(applied_tags=tags)
-                    button.callback = on_confirm_button_click
+                    button.callback = on_confirm_button_click # declare the callback for the button as the function above
                     view = ui.View()
-                    view.add_item(button)
+                    view.add_item(button) # add the item to the view
                     await interaction.followup.send(content="This post has the need-dev-review tag, are you sure you would like to mark it as solved?", view=view, ephemeral=True)
             else:
                 await interaction.response.defer(ephemeral=True)
