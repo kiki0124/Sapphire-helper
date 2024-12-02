@@ -1,56 +1,54 @@
-from sqlalchemy import create_engine, Column, Integer, String, delete
-from sqlalchemy.orm import sessionmaker, declarative_base
-import datetime
+import datetime # python module for using datetime objects
+import aiosqlite as sql # asynchronous, sqlite based, database wrapper for Python
 
-engine = create_engine("sqlite:///data.db")
-Base = declarative_base()
+async def main(): # main function, create the table, should only be called once
+    async with sql.connect("data.db") as conn: # create an asynchronous connection with the db
+        async with conn.cursor() as cu: # create an asynchronous connection with the db cursor
+            await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER UNIQUE NOT NULL, timestamp INTEGER NOT NULL)") # execute given command
+            await conn.commit() # commit changes
 
-class pending_posts(Base):
-    __tablename__ = "Closing-pending"
-    post_id = Column(Integer, primary_key=True)
-    time_str = Column(String)
-
-Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
-session = Session()
-
-def add_post_to_pending(post_id: int, time: datetime.datetime) -> None:
-    """  
-    Move a post from Unanswered posts db to pending_posts db
+async def add_post_to_pending(post_id: int, timestamp) -> None:
     """
-    data = pending_posts(post_id=post_id, time_str=time.replace(second=0, microsecond=0).isoformat())
-    session.add(data)
-    session.commit()
-
-def get_pending_posts() -> list[int]:
-    """  
-    Returns a list[int] of posts (post ids) with status "closing pending", or None if no posts are currently in the db
+    Add the post with the given id and timestamp to pending db
     """
-    posts = [post_id[0] for post_id in session.query(pending_posts.post_id).all()]
-    return posts
+    async with sql.connect('data.db') as conn:
+        async with conn.cursor() as cu:
+            await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES ({post_id}, {timestamp})") # insert post id and timestamp
+            await conn.commit()
 
-def remove_post_from_pending(post_id: int) -> None:
+async def get_pending_posts() -> list[int]:
+    """
+    Get all posts in pending posts table. Returns a list of integers.
+    """
+    async with sql.connect('data.db') as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT post_id FROM pending_posts") # select all post_ids from pending posts table
+            return [int(post_id[0]) for post_id in await cu.fetchall()]
+
+async def remove_post_from_pending(post_id: int) -> None:
     """  
     Remove a post form closing pending db
     """
-    stmt = delete(pending_posts).where(pending_posts.post_id==post_id)
-    session.execute(stmt)
-    session.commit()
+    async with sql.connect('data.db') as conn:
+        async with conn.cursor() as cu:
+            await cu.execute(f"DELETE FROM pending_posts WHERE post_id={post_id}") # delete a post with the given id from db
+            await conn.commit()
 
-def check_post_last_message_time(post_id: int) -> bool:
-    """
-    Returns if the time str of a post is more than one day ago.
-    """
-    time_str = session.query(pending_posts).where(pending_posts.post_id==post_id).first()
-    loaded_time = datetime.datetime.fromisoformat(time_str.time_str)
-    now = datetime.datetime.now()
-    one_day_ago = now - datetime.timedelta(days=1)
-    return not one_day_ago.replace(tzinfo=None) <= loaded_time.replace(tzinfo=None) <= now.replace(tzinfo=None)
-
-def check_time_more_than_day(time: datetime) -> bool:
+def check_time_more_than_day(timestamp: int) -> bool:
     """  
     Check if the given time is more than a day ago
     """
-    now = datetime.datetime.now()
-    one_day_ago = now - datetime.timedelta(days=1)
-    return not one_day_ago <= time <= now
+    time = datetime.datetime.fromtimestamp(timestamp, tz=datetime.datetime.now().astimezone().tzinfo) # turn the time from timestamp (int) to an aware datetime object
+    one_day_ago = datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo) - datetime.timedelta(days=1) # define a datetime object that is 1 day ago
+    return not one_day_ago <= time # check if the time (from given timestamp) is "more or equal to" (before) 1 day ago datetime object
+
+async def check_post_last_message_time(post_id: int) -> bool:
+    """
+    Returns if the timestamp of a post (from db) is more than one day ago (24 hours).
+    """
+    async with sql.connect('data.db') as conn:
+        async with conn.cursor() as cu:
+            await cu.execute(f"SELECT timestamp FROM pending_posts WHERE post_id={post_id}") # get the timestamp of the post with the given id
+            result = await cu.fetchone()
+            timestamp = result[0] # result is tuple, select the first item
+            return check_time_more_than_day(timestamp) # check if the time is more than a day with the timestamp

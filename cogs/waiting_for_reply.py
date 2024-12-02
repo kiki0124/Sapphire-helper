@@ -12,15 +12,15 @@ WAITING_FOR_REPLY_TAG_ID = int(os.getenv('WAITING_FOR_REPLY_TAG_ID'))
 UNANSWERED_TAG_ID = int(os.getenv("UNANSWERED_TAG_ID"))
 posts: dict[int, asyncio.Task] = {}
 
-async def add_waiting_tag(post: discord.Thread) -> None:
-        await asyncio.sleep(600)
+async def add_waiting_tag(post: discord.Thread) -> None: # task for adding the waiting tag after 10 minutes of delay
+        await asyncio.sleep(600) # wait for 600 seconds
         applied_tags = post.applied_tags
         applied_tags.append(post.parent.get_tag(WAITING_FOR_REPLY_TAG_ID))
         solved = post.parent.get_tag(SOLVED_TAG_ID)
         ndr = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
         if not solved in post.applied_tags and not ndr in post.applied_tags and not post.archived:
             await post.edit(applied_tags=applied_tags)
-            posts.pop(post.id)
+            posts.pop(post.id) # remove post from internal list of posts that are waiting for waiting tag to be added
 
 class waiting_for_reply(commands.Cog):
     def __init__(self, client):
@@ -47,14 +47,6 @@ class waiting_for_reply(commands.Cog):
                             applied_tags = message.channel.applied_tags
                             applied_tags.remove(waiting_tag)
                             await message.channel.edit(applied_tags=applied_tags)
-
-    @commands.command()
-    async def getdata(self, ctx):
-        print(posts)
-    
-    @commands.command()
-    async def check(self, ctx, post: discord.Thread):
-        await ctx.reply(content=f'{post.id in posts.keys()}')
 
 async def setup(client):
     await client.add_cog(waiting_for_reply(client))
