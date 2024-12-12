@@ -5,6 +5,7 @@ import asyncio
 import datetime
 import os
 from dotenv import load_dotenv
+from functions import remove_post_from_rtdr, get_post_creator_id
 
 load_dotenv()
 
@@ -16,6 +17,7 @@ UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
+NDR_CHANNEL_ID = int(os.getenv('NDR_CHANNEL_ID'))
 
 close_tasks: dict[discord.Thread, asyncio.Task] = {}
 
@@ -23,8 +25,16 @@ async def ClosePost(post: discord.Thread) -> None:
     await asyncio.sleep(3600)
     await post.edit(archived=True, reason="Auto archive solved post after 1 hour")
     close_tasks.pop(post)
+    await remove_post_from_rtdr(post.id)
 
-class NeedDevReviewButtons(ui.View):
+async def mark_post_as_ndr(interaction: discord.Interaction):
+    tags = interaction.channel.applied_tags
+    tags.append(interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID))
+    await interaction.channel.edit(applied_tags=tags)
+    channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
+    await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
+
+class need_dev_review_buttons(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
     
@@ -43,6 +53,30 @@ class NeedDevReviewButtons(ui.View):
         embed.set_image(url="https://img-temp.sapph.xyz/fef61749-efb4-46c5-4015-acc7311d7900")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+class ndr_options_buttons(ui.View):
+    def __init__(self, Interaction: discord.Interaction):
+        super().__init__(timeout=None)
+        self.Interaction = Interaction
+    
+    @ui.button(label="Only add tag", style=discord.ButtonStyle.grey, custom_id="ndr-only-add-tag")
+    async def on_only_add_tag_click(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.response.defer(ephemeral=False)
+        await mark_post_as_ndr(interaction)
+        await interaction.channel.send(content="Post successfully marked as *needs-dev-review*.")
+        await self.Interaction.delete_original_response()
+
+    @ui.button(label="Add tag & send questions", style=discord.ButtonStyle.grey, custom_id="ndr-tag-and-questions")
+    async def on_send_questions_click(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.response.defer()
+        await mark_post_as_ndr(interaction)
+        embed = discord.Embed(
+                    description=f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by {interaction.user.mention}\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _",
+                    colour=0x2b2d31
+                )
+        embed.set_footer(text="Thank you for helping Sapphire to continuously improve.")
+        await interaction.channel.send(embed=embed, view=need_dev_review_buttons()) # send the embed with the buttons
+        await self.Interaction.delete_original_response()
+
 class utility(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
@@ -54,11 +88,11 @@ class utility(commands.Cog):
         """
         experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
         mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
-        return experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner
+        return experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel.id)
 
     @commands.Cog.listener()
     async def on_ready(self):
-        self.client.add_view(NeedDevReviewButtons()) # add the need dev review button/view to make it persistent (work after restart)
+        self.client.add_view(need_dev_review_buttons()) # add the need dev review button/view to make it persistent (work after restart)
 
     @app_commands.command(name="list-unsolved",  description="Lists all currently unsolved posts")
     @commands.guild_only() # Allow the command to only be used in guilds
@@ -186,19 +220,24 @@ class utility(commands.Cog):
     async def need_dev_review(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread): # check if the interaction channel is a thread
             if interaction.channel.parent.id == SUPPORT_CHANNEL_ID: # check if the thread parent channel is #support
-                await interaction.response.defer() # defer the interaction response
-                embed = discord.Embed(
-                    description=f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by {interaction.user.mention}\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _",
-                    colour=0x2b2d31
-                )
-                embed.set_footer(text="Thank you for helping Sapphire to continuously improve.")
-                await interaction.followup.send(embed=embed, view=NeedDevReviewButtons()) # send the embed with the buttons
-                tags = [interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)] 
-                if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                    tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /need-dev-review") # Add need-dev-review tag
-                channel = interaction.guild.get_channel(1145088659545141421)
-                await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}') # Send a message to a private mods channel so they can forward it
+                ndr_tag = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+                if ndr_tag not in interaction.channel.applied_tags:
+                    await interaction.response.defer(ephemeral=True)
+                    """embed = discord.Embed(
+                        description=f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by {interaction.user.mention}\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _",
+                        colour=0x2b2d31
+                    )
+                    embed.set_footer(text="Thank you for helping Sapphire to continuously improve.")
+                    await interaction.followup.send(embed=embed, view=need_dev_review_buttons()) # send the embed with the buttons
+                    tags = [interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)] 
+                    if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                        tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                    await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /need-dev-review") # Add need-dev-review tag
+                    channel = interaction.guild.get_channel(1145088659545141421)
+                    await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}') # Send a message to a private mods channel so they can forward it """
+                    await interaction.followup.send(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
+                else:
+                    await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
             else:
                 await interaction.response.defer(ephemeral=True)
                 await interaction.followup.send(content="This command can only be used in #support!", ephemeral=True)    

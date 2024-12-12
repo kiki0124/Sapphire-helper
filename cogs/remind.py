@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands, tasks
-from functions import add_post_to_pending, remove_post_from_pending, get_pending_posts, check_post_last_message_time, check_time_more_than_day
+from functions import add_post_to_pending, remove_post_from_pending, get_pending_posts, check_post_last_message_time, check_time_more_than_day, get_post_creator_id, remove_post_from_rtdr
 import random
 from discord import ui
 import datetime
@@ -122,7 +122,8 @@ class remind(commands.Cog):
                             if check_time_more_than_day(message.created_at.timestamp()): # checks if the time of the message is more than 24 hours ago
                                 if post.owner: # make sure the post owner is in the cache
                                     greetings = ["Hi", "Hello", "Hey", "Hi there"]
-                                    await message.channel.send(content=f"{random.choices(greetings)[0]} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
+                                    post_author_id = await get_post_creator_id(post.id) or post.owner_id
+                                    await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
                                     await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
     
     async def pending_posts_listener(self, message: discord.Message):
@@ -146,12 +147,13 @@ class remind(commands.Cog):
             if post: # check if the post was successfully fetched (not None)
                 need_dev_review_tag = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
                 if need_dev_review_tag not in post.applied_tags:
-                    if check_post_last_message_time(post_id): # check if the last message was sent more than 48 hours ago (24 hours after the reminder message)
+                    if await check_post_last_message_time(post_id): # check if the last message was sent more than 48 hours ago (24 hours after the reminder message)
                         tags = [post.parent.get_tag(SOLVED_TAG_ID)]
                         if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
                             tags.append(CUSTOM_BRANDING_TAG_ID)
                         await post.edit(archived=True, reason="post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
                         await remove_post_from_pending(post.id) # remove post from pending as it was closed
+                        await remove_post_from_rtdr(post.id) # remove the post from readthedamnrules system (if its there)
                     else:
                         continue # the last message is not yet 48 hours ago, continue to the next post
                 else:

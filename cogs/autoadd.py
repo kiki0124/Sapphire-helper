@@ -4,6 +4,7 @@ import re
 import random
 import os
 from dotenv import load_dotenv
+from functions import get_post_creator_id
 
 load_dotenv()
 
@@ -41,7 +42,7 @@ class autoadd(commands.Cog):
             if isinstance(message.channel, discord.Thread):
                 if message.channel.parent_id == SUPPORT_CHANNEL_ID: # Check if the message channel parent is the support channel
                     if message.channel.id not in sent_post_ids:
-                        if message.author == message.channel.owner: # Checks if the message author is the post creator
+                        if message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id): # Checks if the message author is the post creator
                             need_dev_review_tag = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
                             solved_tag = message.channel.parent.get_tag(SOLVED_TAG_ID)
                             if solved_tag not in message.channel.applied_tags and need_dev_review_tag not in message.channel.applied_tags: # make sure the post is not already solved and doesn't have the need-dev-review tag
@@ -52,28 +53,12 @@ class autoadd(commands.Cog):
                                         if re.search(pattern, message.content, re.IGNORECASE):
                                             await message.reply(content="-# <:tree_corner:1272886415558049893>Command suggestion: </solved:1274997472162349079>")
                                             sent_post_ids.append(message.channel.id)
-                                        else:
-                                            return # Ignore the message as it doesn't match the regex
-                                    else:
-                                        return # Ignore as the message matches the negative regex
-                                else:
-                                    return # ignore the message as its the first message of the thread
-                            else:
-                                return # Ignore the message as the post is already solved or has the need-dev-review tag
                     if message.channel.parent.get_tag(UNANSWERED_TAG_ID) in message.channel.applied_tags and not message.author == message.channel.owner:
                         tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                         if message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in message.channel.applied_tags:
                             tags.append(message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
                         await message.channel.edit(applied_tags=tags, reason="Auto-remove unanswered tag and replace with not solved tag")
-                    else:
-                        return # Ignore the message as a message was already sent in this channel before
-                else:
-                    return # Ignore the message as it was not sent in #support
-            else:
-                return # Ignroe the message as its channel type isn't a ForumChannel
-        else:
-            return # Ignore the message as it was sent by Sapphire helper
-
+                
     @tasks.loop(hours=1)
     async def CloseAbandonedPosts(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
@@ -86,12 +71,6 @@ class autoadd(commands.Cog):
                         if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
                             tags.append(post.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
                         await post.edit(archived=True, reason="User left server, auto close post", applied_tags=tags)
-                    else:
-                        continue
-                else:
-                    continue
-            else:
-                continue
 
     @CloseAbandonedPosts.before_loop
     async def CloseAbandonedPostsBeforeLoop(self):
