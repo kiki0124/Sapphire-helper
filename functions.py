@@ -1,10 +1,12 @@
 import datetime # python module for using datetime objects
 import aiosqlite as sql # asynchronous, sqlite based, database wrapper for Python
 
+
 async def main(): # main function, create the table, should only be called once
     async with sql.connect("data.db") as conn: # create an asynchronous connection with the db
         async with conn.cursor() as cu: # create an asynchronous connection with the db cursor
-            await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER UNIQUE NOT NULL, timestamp INTEGER NOT NULL)") # execute given command
+            await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER UNIQUE NOT NULL PRIMARY KEY, timestamp INTEGER NOT NULL)") # execute given command
+            await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER UNIQUE NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await conn.commit() # commit changes
 
 async def add_post_to_pending(post_id: int, timestamp) -> None:
@@ -52,3 +54,43 @@ async def check_post_last_message_time(post_id: int) -> bool:
             result = await cu.fetchone()
             timestamp = result[0] # result is tuple, select the first item
             return check_time_more_than_day(timestamp) # check if the time is more than a day with the timestamp
+
+# readthedamnrules system related functions
+
+async def add_post_to_rtdr(post_id: int, user_id: int) -> None:
+    """  
+    Add post with given id to readthedamnrules table/system
+    """
+    async with sql.connect('data.db') as conn:
+        async with conn.cursor() as cu:
+            await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES ({post_id}, {user_id})") # insert the post to the table with the post id and user/author id
+            await conn.commit()
+
+async def get_post_creator_id(post_id: int) -> int|None:
+    """  
+    Get the id of whoever the post was created for if its part of readthedamnrules system
+    """
+    async with sql.connect('data.db') as conn:
+        async with conn.cursor() as cu:
+            await cu.execute(f"SELECT user_id FROM readthedamnrules WHERE post_id={post_id}") # select only the user id (as thats what needed to return)
+            result = None
+            result = await cu.fetchone() # there should only be one returned result, so fetchone
+            return result[0] if result else None # .fetchone() returns a tuple, return the first item
+
+async def remove_post_from_rtdr(post_id: int) -> None:
+    """  
+    Remove post with given id from readthedamnrules system
+    """
+    async with sql.connect('data.db') as conn:
+        async with conn.cursor() as cu:
+            await cu.execute(f"DELETE FROM readthedamnrules WHERE post_id={post_id}")
+            await conn.commit()
+
+""" async def get_rtdr_post_ids() -> list[int]:
+    ""  
+    Returns all posts ids as list[int] from readthedamnrules system
+    ""
+    async with sql.connect('data.db') as conn:
+        async with conn.cursor() as cu:
+            await cu.execute(f'SELECT post_id FROM readthedamnrules')
+            return [int(i[0]) for i in await cu.fetchall()] # .fetchall is a list of tuples, turn it to a list of integers and return it as list[int] """
