@@ -176,6 +176,7 @@ class utility(commands.Cog):
             await interaction.followup.send(content=f"This command can only be used in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
     @app_commands.command(name="remove", description="Remove the given member from the current post")
+    @app_commands.guild_only()
     @app_commands.describe(user="What user do you want to remove?")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def remove(self, interaction: discord.Interaction, user: discord.Member):
