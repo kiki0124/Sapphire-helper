@@ -85,12 +85,3 @@ async def remove_post_from_rtdr(post_id: int) -> None:
         async with conn.cursor() as cu:
             await cu.execute(f"DELETE FROM readthedamnrules WHERE post_id={post_id}")
             await conn.commit()
-
-""" async def get_rtdr_post_ids() -> list[int]:
-    ""  
-    Returns all posts ids as list[int] from readthedamnrules system
-    ""
-    async with sql.connect('data.db') as conn:
-        async with conn.cursor() as cu:
-            await cu.execute(f'SELECT post_id FROM readthedamnrules')
-            return [int(i[0]) for i in await cu.fetchall()] # .fetchall is a list of tuples, turn it to a list of integers and return it as list[int] """

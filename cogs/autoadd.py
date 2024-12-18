@@ -54,7 +54,14 @@ class autoadd(commands.Cog):
                     negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?"
                     if not re.search(negative_pattern, message.content, re.IGNORECASE):
                         if re.search(pattern, message.content, re.IGNORECASE):
-                            await message.reply(content="-# <:tree_corner:1272886415558049893>Command suggestion: </solved:1274997472162349079>")
+                            solved_id = 1274997472162349079
+                            for command in await self.client.tree.fetch_commands():
+                                if command.name == "solved": 
+                                    solved_id=command.id
+                                    break
+                                else:
+                                    continue
+                            await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{solved_id}>")
                             sent_post_ids.append(message.channel.id)
         elif message.channel.parent.get_tag(UNANSWERED_TAG_ID) in message.channel.applied_tags and not message.author == message.channel.owner:
             tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]

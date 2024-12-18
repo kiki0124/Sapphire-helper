@@ -9,6 +9,7 @@ load_dotenv()
 
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
+ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 
 class bot(commands.Cog):
     def __init__(self, client):
@@ -22,6 +23,10 @@ class bot(commands.Cog):
     def cog_unload(self):
         tree = self.client.tree
         tree.on_error = self._old_tree_error
+
+    async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, guild: discord.Guild) -> None:
+        alerts_thread = guild.get_channel_or_thread(ALERTS_THREAD_ID)
+        await alerts_thread.send(content=f"Unhandled error: `{error}`\n<@1105414178937774150>")
 
     @commands.command(name="ping")
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
@@ -77,19 +82,18 @@ class bot(commands.Cog):
             )
             await ctx.reply(embed=embed, mention_author=False)
         else: 
+            await self.send_unhandled_error(error=error, guild=ctx.guild)
             raise error # raise the error if it isn't handled properly above
 
     async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingAnyRole): # check if the error is MissingAnyRole
-            await interaction.response.defer(ephemeral=True)
-            await interaction.followup.send(content=f"Only Moderators and Community Experts can use this command!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only Moderators and Community Experts can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.CheckFailure): # Check if the error is CheckFailure (failure of a custom check- checks if user is mod/expert/op)
-            await interaction.response.defer(ephemeral=True)
-            await interaction.followup.send(content=f"Only Moderators, Community Experts and the OP can use this command!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only Moderators, Community Experts and the OP can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.NoPrivateMessage): # Check if the command was used in DMs
-            await interaction.response.defer(ephemeral=True)
-            await interaction.followup.send(content="You may not use this command in DMs!", ephemeral=True)
+            await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
         else:
+            await self.send_unhandled_error(error=error, guild=interaction.guild)
             raise error # Raise the error if it wasn't handled properly above
 
 async def setup(client: commands.Bot):
