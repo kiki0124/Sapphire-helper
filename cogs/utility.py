@@ -90,10 +90,19 @@ class utility(commands.Cog):
         close_tasks[post] = task # Add the and post to the "close_tasks" dict
         tags = [post.parent.get_tag(SOLVED_TAG_ID)] # declare an initial list of tags to be applied to the post
         cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-        if cb in post.applied_tags: 
-            tags.append(cb) # add cb tag as it was in the post before the command was used
+        if cb in post.applied_tags: tags.append(cb) # add cb tag as it was in the post before the command was used
         await post.edit(applied_tags=tags)
         return task                
+
+    async def unsolve_post(self, post: discord.Thread) -> None:
+        if post in close_tasks: 
+            close_tasks[post].cancel()
+            close_tasks.pop(post)
+        tags = [post.parent.get_tag(NOT_SOLVED_TAG_ID)]
+        cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        if cb in post.applied_tags: tags.append(cb)
+        await post.edit(applied_tags=tags)
+
 
     @staticmethod
     async def ModOrExpertOrOP(interaction: discord.Interaction):
@@ -151,13 +160,6 @@ class utility(commands.Cog):
                 if need_dev_review_tag not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower():
                     if solved not in interaction.channel.applied_tags:
                         await self.mark_post_as_solved(interaction.channel)
-                        """ task =  asyncio.create_task(close_post(post=interaction.channel)) # create a task to close the post in 1 hour
-                        close_tasks[interaction.channel] = task # Add the and post to the "close_tasks" dict
-                        tags = [solved] # declare an initial list of tags to be applied to the post
-                        if cb in interaction.channel.applied_tags: 
-                            tags.append(cb) # add cb tag as it was in the post before the command was used
-                        await interaction.channel.edit(applied_tags=tags)
-                        """
                         one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1) # create a tiem object from 1 hour into the future from now, to be used as timestamp in the message
                         unsolve_id = 1281211280618950708
                         for command in await self.client.tree.fetch_commands():
@@ -208,19 +210,8 @@ class utility(commands.Cog):
     async def unsolved(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread):
             if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-                if interaction.channel in close_tasks:
-                    close_tasks[interaction.channel].cancel()
-                    close_tasks.pop(interaction.channel)
-                    tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-                    if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                        tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                    await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /unsolve")
-                    await interaction.response.send_message(content="Post successfully unsolved")
-                elif interaction.channel.parent.get_tag(SOLVED_TAG_ID) in interaction.channel.applied_tags:
-                    tags = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-                    if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                        tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                    await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /unsolve")
+                if interaction.channel in close_tasks or interaction.channel.parent.get_tag(SOLVED_TAG_ID) in interaction.channel.applied_tags:
+                    await self.unsolve_post(interaction.channel)
                     await interaction.response.send_message(content="Post successfully unsolved")
                 else:
                     await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
@@ -237,18 +228,6 @@ class utility(commands.Cog):
             if interaction.channel.parent.id == SUPPORT_CHANNEL_ID: # check if the thread parent channel is #support
                 ndr_tag = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
                 if ndr_tag not in interaction.channel.applied_tags:
-                    """embed = discord.Embed(
-                        description=f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by {interaction.user.mention}\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _",
-                        colour=0x2b2d31
-                    )
-                    embed.set_footer(text="Thank you for helping Sapphire to continuously improve.")
-                    await interaction.followup.send(embed=embed, view=need_dev_review_buttons()) # send the embed with the buttons
-                    tags = [interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)] 
-                    if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                        tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                    await interaction.channel.edit(applied_tags=tags, reason=f"{interaction.user.name} used /need-dev-review") # Add need-dev-review tag
-                    channel = interaction.guild.get_channel(1145088659545141421)
-                    await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}') # Send a message to a private mods channel so they can forward it """
                     await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
                 else:
                     await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
