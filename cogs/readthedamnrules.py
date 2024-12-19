@@ -43,7 +43,7 @@ class readthedamnrules(commands.Cog):
     @commands.Cog.listener('on_message')
     async def redirect_to_support(self, message: discord.Message):
         if not message.author.bot:
-            if message.channel.id == GENERAL_CHANNEL_ID and message.reference and message.guild.me in message.mentions:
+            if message.channel.id == GENERAL_CHANNEL_ID and message.reference and message.content.startswith(self.client.user.mention):
                 experts = message.guild.get_role(EXPERTS_ROLE_ID)
                 moderators = message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in message.author.roles or moderators in message.author.roles:
