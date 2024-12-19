@@ -1,4 +1,3 @@
 __pycache__
 .env
-cogs/easter_eggs.py
 data.db
