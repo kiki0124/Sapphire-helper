@@ -30,7 +30,7 @@ class waiting_for_reply(commands.Cog):
     async def add_remove_waiting_for_reply(self, message: discord.Message):
         if not message.author == self.client.user:
             if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
-                if message != message.channel.starter_message:
+                if message != message.channel.starter_message: # make sure its not a new post- prevent it from replacing unanswered with wfr
                     solved = message.channel.parent.get_tag(SOLVED_TAG_ID)
                     ndr = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
                     unanswered = message.channel.parent.get_tag(UNANSWERED_TAG_ID)

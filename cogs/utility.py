@@ -22,10 +22,10 @@ NDR_CHANNEL_ID = int(os.getenv('NDR_CHANNEL_ID'))
 close_tasks: dict[discord.Thread, asyncio.Task] = {}
 
 async def ClosePost(post: discord.Thread) -> None:
-    await asyncio.sleep(3600)
+    await asyncio.sleep(3600) # wait for 3,600 seconds
     await post.edit(archived=True, reason="Auto archive solved post after 1 hour")
-    close_tasks.pop(post)
-    await remove_post_from_rtdr(post.id)
+    close_tasks.pop(post) # remove the post from internal lists of posts waiting to be closed- list used for /unsolve
+    await remove_post_from_rtdr(post.id) # remove the post from rtdr table if it was there or do nothing if it wasn't
 
 async def mark_post_as_ndr(interaction: discord.Interaction):
     tags = interaction.channel.applied_tags
@@ -84,7 +84,8 @@ class utility(commands.Cog):
     @staticmethod
     async def ModOrExpertOrOP(interaction: discord.Interaction):
         """  
-        Checks if the interaction user is a Moderator or Community Expert or the creator of the post
+        Checks if the interaction user is a Moderator or Community Expert or the creator of the post\n
+        --Integrated with rtdr system
         """
         experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
         mods = interaction.guild.get_role(MODERATORS_ROLE_ID)

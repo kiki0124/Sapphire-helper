@@ -28,29 +28,29 @@ class readthedamnrules(commands.Cog):
             for attachment in msg.attachments: files.append(await attachment.to_file())
         content = ''.join(m.content+"\n" for m in messages_to_move)
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        if message: 
+        if message: # message is none if the system is triggered by reaction, check if it isn't none
             title = message.content.removeprefix(message.guild.me.mention) or f"Support for {reference_message.author.name}"
-        else:
+        else: # it is none, define a "default" title
             title = f"Support for {reference_message.author.name}"
         post_data = await support.create_thread(
             name=title,
             files=files,
             content=f"**Original message:**\n```\n{content}```\n\n{reference_message.author.mention} please provide any additional information here so we can give you the best help.\n-# Created by {user.name}"
         )
-        await add_post_to_rtdr(post_id=post_data[0].id, user_id=reference_message.author.id)
-        return post_data[0]
+        await add_post_to_rtdr(post_id=post_data[0].id, user_id=reference_message.author.id) # add the post to the db with the user that it was created for
+        return post_data[0] # return the post that was created for it to be mentioned in the reply message
 
     @commands.Cog.listener('on_message')
     async def redirect_to_support(self, message: discord.Message):
         if not message.author.bot:
-            if message.channel.id == GENERAL_CHANNEL_ID and message.reference and message.content.startswith(self.client.user.mention):
+            if message.channel.id == GENERAL_CHANNEL_ID and message.reference and message.content.startswith(self.client.user.mention): # make sure the message is in general channel, is a reply to some message and pings the bot
                 experts = message.guild.get_role(EXPERTS_ROLE_ID)
                 moderators = message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in message.author.roles or moderators in message.author.roles:
                     replied_message = await message.channel.fetch_message(message.reference.message_id)
-                    if not replied_message.author == message.author:
+                    if not replied_message.author == message.author: # prevent the system from being used when replying to your own message
                         message_reference = await message.channel.fetch_message(message.reference.message_id)
-                        post = await self.handle_request(reference_message=message_reference, user=message.author, message=message)
+                        post = await self.handle_request(reference_message=message_reference, user=message.author, message=message) # handle the request
                         await message.reply(content=f"Post created at {post.mention}", mention_author=False, delete_after=5)
                 else:
                     return
@@ -58,12 +58,12 @@ class readthedamnrules(commands.Cog):
     @commands.Cog.listener('on_reaction_add')
     async def reaction_redirect_to_support(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         if reaction.message.channel.id == GENERAL_CHANNEL_ID:
-            reactions = ["❓", "❔"]
-            if reaction.message.author != user and (reaction.emoji in reactions):
+            reactions = ["❓", "❔"] # allowed reactions, all other reactions will be ignored in this context
+            if reaction.message.author != user and reaction.emoji in reactions: # make sure the user isn't adding a reaction to their own message and the reaction is an allowed reaction
                 experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
                 mods = reaction.message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in user.roles or mods in user.roles:
-                    await self.handle_request(reaction.message, user=user)
+                    await self.handle_request(reaction.message, user=user) # handle the request with the reaction message
                     await reaction.remove(user)
 
 async def setup(client):
