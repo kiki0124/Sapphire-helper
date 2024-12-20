@@ -6,6 +6,7 @@ import datetime
 import os
 from dotenv import load_dotenv
 from functions import remove_post_from_rtdr, get_post_creator_id
+from functools import lru_cache
 
 load_dotenv()
 
@@ -18,8 +19,6 @@ CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 NDR_CHANNEL_ID = int(os.getenv('NDR_CHANNEL_ID'))
-
-
 
 class need_dev_review_buttons(ui.View):
     def __init__(self):
@@ -87,8 +86,14 @@ class utility(commands.Cog):
         else:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
             return False
-        
+    
+    @lru_cache() # cache the result to prevent rate limits, cache is cleared with every restart
     async def get_unsolve_id(self) -> int:
+        """  
+        Get the id of /unsolve command.
+        This fetches the 
+        """
+        print("get_unsolve_id used")
         unsolve_id = 1281211280618950708
         for command in await self.client.tree.fetch_commands():
             if command.name == "unsolve": 
@@ -157,7 +162,6 @@ class utility(commands.Cog):
                     if self.ndr not in post.applied_tags: # Check if the post doesn't have need dev review tag
                         if self.not_solved in post.applied_tags or self.solve not in post.applied_tags or self.unanswered in post.applied_tags: # Check if the post has not solved tag or doesn't have solved or has unanswered
                             posts += f"* {post.mention}\n" # Add the current post's link to the posts list
-                    
         if posts: # Check if posts var has any characters in it
             embed = discord.Embed(
                 title="Unsolved posts:",
@@ -189,7 +193,7 @@ class utility(commands.Cog):
                     unsolve_id = await self.get_unsolve_id()
                     await Interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{unsolve_id}> to cancel.")
                 button.callback = on_confirm_button_click # declare the callback for the button as the function above
-                view = ui.View()
+                view = ui.View() # construct an empty view item
                 view.add_item(button) # add the item to the view
                 await interaction.response.send_message(content="This post has the need-dev-review tag, are you sure you would like to mark it as solved?", view=view, ephemeral=True)
             
