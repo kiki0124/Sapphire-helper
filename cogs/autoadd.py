@@ -5,6 +5,7 @@ import random
 import os
 from dotenv import load_dotenv
 from functions import get_post_creator_id
+from functools import lru_cache
 
 load_dotenv()
 
@@ -30,6 +31,17 @@ class autoadd(commands.Cog):
         self.close_abandoned_posts.cancel() # Cancel the loop as the cog was unloaded
 
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
+
+    @lru_cache()
+    async def get_solved_id(self):
+        solved_id = 1274997472162349079
+        for command in await self.client.tree.fetch_commands():
+                if command.name == "solved": 
+                    solved_id=command.id
+                    break
+                else:
+                    continue
+        return solved_id
 
     @commands.Cog.listener('on_message')
     async def message(self, message: discord.Message):
@@ -57,14 +69,7 @@ class autoadd(commands.Cog):
                     negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?"
                     if not re.search(negative_pattern, message.content, re.IGNORECASE):
                         if re.search(pattern, message.content, re.IGNORECASE):
-                            solved_id = 1274997472162349079
-                            for command in await self.client.tree.fetch_commands():
-                                if command.name == "solved": 
-                                    solved_id=command.id
-                                    break
-                                else:
-                                    continue
-                            await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{solved_id}>")
+                            await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.get_solved_id()}>")
                             self.sent_post_ids.append(message.channel.id)
         elif self.unanswered in message.channel.applied_tags and not message.author == message.channel.owner:
             tags = [self.not_solved]
