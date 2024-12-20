@@ -15,8 +15,6 @@ NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 
-sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
-
 class autoadd(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
@@ -25,7 +23,8 @@ class autoadd(commands.Cog):
     async def cog_unload(self):
         self.close_abandoned_posts.cancel() # Cancel the loop as the cog was unloaded
 
-    
+    sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
+
     @commands.Cog.listener('on_message')
     async def message(self, message: discord.Message):
         if not message.author == self.client.user: # Check if the message author is Sapphire Helper
@@ -33,7 +32,7 @@ class autoadd(commands.Cog):
                 if message.channel.parent_id == SUPPORT_CHANNEL_ID:
                     if message.id == message.channel.id:
                         await self.on_thread_create(message.channel)
-                    if not message.channel.id in sent_post_ids:
+                    if not message.channel.id in self.sent_post_ids:
                         await self.send_suggestion_message(message)
 
     async def on_thread_create(self, thread: discord.Thread):
@@ -62,7 +61,7 @@ class autoadd(commands.Cog):
                                 else:
                                     continue
                             await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{solved_id}>")
-                            sent_post_ids.append(message.channel.id)
+                            self.sent_post_ids.append(message.channel.id)
         elif message.channel.parent.get_tag(UNANSWERED_TAG_ID) in message.channel.applied_tags and not message.author == message.channel.owner:
             tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
             if message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in message.channel.applied_tags:
