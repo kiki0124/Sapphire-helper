@@ -45,7 +45,7 @@ class ndr_options_buttons(ui.View):
         super().__init__(timeout=None)
         self.Interaction = Interaction
     
-    async def mark_post_as_ndr(interaction: discord.Interaction):
+    async def mark_post_as_ndr(self, interaction: discord.Interaction):
         tags = interaction.channel.applied_tags
         tags.append(interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID))
         await interaction.channel.edit(applied_tags=tags)
@@ -72,8 +72,14 @@ class ndr_options_buttons(ui.View):
         await self.Interaction.delete_original_response() # Delete the original (ephemeral) response
 
 class utility(commands.Cog):
-    def __init__(self, client):
+    def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
+        support = client.get_channel(SUPPORT_CHANNEL_ID)
+        self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
+        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
+        self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
+        self.solve = support.get_tag(SOLVED_TAG_ID)
+        self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
 
     async def is_in_support(self, interaction: discord.Interaction) -> bool:
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
@@ -110,9 +116,8 @@ class utility(commands.Cog):
         """
         task =  asyncio.create_task(self.close_post(post=post)) # create a task to close the post in 1 hour
         self.close_tasks[post] = task # Add the and post to the "close_tasks" dict
-        tags = [post.parent.get_tag(SOLVED_TAG_ID)] # declare an initial list of tags to be applied to the post
-        cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-        if cb in post.applied_tags: tags.append(cb) # add cb tag as it was in the post before the command was used
+        tags = [self.solve] # declare an initial list of tags to be applied to the post
+        if self.cb in post.applied_tags: tags.append(self.cb) # add cb tag as it was in the post before the command was used
         await post.edit(applied_tags=tags)
         return task                
 
@@ -123,9 +128,8 @@ class utility(commands.Cog):
         if post in self.close_tasks: 
             self.close_tasks[post].cancel()
             self.close_tasks.pop(post)
-        tags = [post.parent.get_tag(NOT_SOLVED_TAG_ID)]
-        cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-        if cb in post.applied_tags: tags.append(cb)
+        tags = [self.not_solved]
+        if self.cb in post.applied_tags: tags.append(self.cb)
         await post.edit(applied_tags=tags)
 
     @staticmethod
@@ -150,12 +154,8 @@ class utility(commands.Cog):
         for post in await interaction.guild.active_threads(): # Loop through all threads in #support
             if post.parent_id == SUPPORT_CHANNEL_ID:
                 if not post.locked: # Check if the post is not archived and not locked
-                    not_solved_tag = post.parent.get_tag(NOT_SOLVED_TAG_ID) # Get not solved tag
-                    solved_tag = post.parent.get_tag(SOLVED_TAG_ID) # Get solved tag
-                    ndr = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID) # Get need-dev-review tag
-                    unanswered_tag = post.parent.get_tag(UNANSWERED_TAG_ID)
-                    if ndr not in post.applied_tags: # Check if the post doesn't have need dev review tag
-                        if not_solved_tag in post.applied_tags or solved_tag not in post.applied_tags or unanswered_tag in post.applied_tags: # Check if the post has not solved tag or doesn't have solved or has unanswered
+                    if self.ndr not in post.applied_tags: # Check if the post doesn't have need dev review tag
+                        if self.not_solved in post.applied_tags or self.solve not in post.applied_tags or self.unanswered in post.applied_tags: # Check if the post has not solved tag or doesn't have solved or has unanswered
                             posts += f"* {post.mention}\n" # Add the current post's link to the posts list
                     
         if posts: # Check if posts var has any characters in it
@@ -173,10 +173,8 @@ class utility(commands.Cog):
     @app_commands.guild_only() # make the command only usable in guilds- not dms
     async def solved(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):
-            need_dev_review_tag = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
-            if need_dev_review_tag not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower():
-                if solved not in interaction.channel.applied_tags:
+            if self.ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower():
+                if self.solve not in interaction.channel.applied_tags:
                     await self.mark_post_as_solved(interaction.channel)
                     one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1) # create a tiem object from 1 hour into the future from now, to be used as timestamp in the message
                     unsolve_id = await self.get_unsolve_id()
@@ -209,7 +207,7 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     async def unsolved(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):        
-            if interaction.channel in self.close_tasks or interaction.channel.parent.get_tag(SOLVED_TAG_ID) in interaction.channel.applied_tags:
+            if interaction.channel in self.close_tasks or self.solve in interaction.channel.applied_tags:
                 await self.unsolve_post(interaction.channel)
                 await interaction.response.send_message(content="Post successfully unsolved")
             else:
@@ -220,8 +218,7 @@ class utility(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def need_dev_review(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):
-            ndr_tag = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            if ndr_tag not in interaction.channel.applied_tags:
+            if self.ndr not in interaction.channel.applied_tags:
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
