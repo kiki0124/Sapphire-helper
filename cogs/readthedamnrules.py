@@ -28,10 +28,8 @@ class readthedamnrules(commands.Cog):
             for attachment in msg.attachments: files.append(await attachment.to_file())
         content = ''.join(m.content+"\n" for m in messages_to_move)
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        if message: # message is none if the system is triggered by reaction, check if it isn't none
-            title = message.content.removeprefix(message.guild.me.mention) or f"Support for {reference_message.author.name}"
-        else: # it is none, define a "default" title
-            title = f"Support for {reference_message.author.name}"
+        title = f"Support for {reference_message.author.name}"
+        if message: title = message.content.removeprefix(message.guild.me.mention) or f"Support for {reference_message.author.name}" # message may be none if system is triggered by reaction, if it's not None set the post title to the message content without the bot mention
         post_data = await support.create_thread(
             name=title,
             files=files,
