@@ -19,20 +19,7 @@ EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 NDR_CHANNEL_ID = int(os.getenv('NDR_CHANNEL_ID'))
 
-close_tasks: dict[discord.Thread, asyncio.Task] = {}
 
-async def close_post(post: discord.Thread) -> None:
-    await asyncio.sleep(3600) # wait for 3,600 seconds
-    await post.edit(archived=True, reason="Auto archive solved post after 1 hour")
-    close_tasks.pop(post) # remove the post from internal lists of posts waiting to be closed- list used for /unsolve
-    await remove_post_from_rtdr(post.id) # remove the post from rtdr table if it was there or do nothing if it wasn't
-
-async def mark_post_as_ndr(interaction: discord.Interaction):
-    tags = interaction.channel.applied_tags
-    tags.append(interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID))
-    await interaction.channel.edit(applied_tags=tags)
-    channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
-    await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
 
 class need_dev_review_buttons(ui.View):
     def __init__(self):
@@ -58,36 +45,64 @@ class ndr_options_buttons(ui.View):
         super().__init__(timeout=None)
         self.Interaction = Interaction
     
+    async def mark_post_as_ndr(interaction: discord.Interaction):
+        tags = interaction.channel.applied_tags
+        tags.append(interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID))
+        await interaction.channel.edit(applied_tags=tags)
+        channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
+        await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
+
     @ui.button(label="Only add tag", style=discord.ButtonStyle.grey, custom_id="ndr-only-add-tag")
     async def on_only_add_tag_click(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer(ephemeral=False)
-        await mark_post_as_ndr(interaction)
-        await interaction.channel.send(content="Post successfully marked as *needs-dev-review*.")
-        await self.Interaction.delete_original_response()
+        await self.mark_post_as_ndr(interaction) # adds the ndr tag and sends a message in the mods' channel
+        await interaction.channel.send(content="Post successfully marked as *needs-dev-review*.") # use channel.send rather than responding to the interaction so that it wont display "original message could not be displayed"
+        await self.Interaction.delete_original_response() # delete the ephemeral message with the option buttons
 
     @ui.button(label="Add tag & send questions", style=discord.ButtonStyle.grey, custom_id="ndr-tag-and-questions")
     async def on_send_questions_click(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer()
-        await mark_post_as_ndr(interaction)
+        await self.mark_post_as_ndr(interaction)
         embed = discord.Embed(
                     description=f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by {interaction.user.mention}\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _",
                     colour=0x2b2d31
                 )
         embed.set_footer(text="Thank you for helping Sapphire to continuously improve.")
         await interaction.channel.send(embed=embed, view=need_dev_review_buttons()) # send the embed with the buttons
-        await self.Interaction.delete_original_response()
+        await self.Interaction.delete_original_response() # Delete the original (ephemeral) response
 
 class utility(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
-    
+
+    async def get_unsolve_id(self) -> int:
+        unsolve_id = 1281211280618950708
+        for command in await self.client.tree.fetch_commands():
+            if command.name == "unsolve": 
+                unsolve_id=command.id
+                break
+            else:
+                continue
+        return unsolve_id
+
+    close_tasks: dict[discord.Thread, asyncio.Task] = {} # posts that are waiting to be closed, used so that they it will be cancelable with /unsolve
+
+    async def close_post(self, post: discord.Thread) -> None:
+        """  
+        Used with asyncio.create_task to close the given post after an hour of delay.
+        """
+        await asyncio.sleep(3600) # wait for 3,600 seconds
+        await post.edit(archived=True, reason="Auto archive solved post after 1 hour")
+        self.close_tasks.pop(post) # remove the post from internal lists of posts waiting to be closed- list used for /unsolve
+        await remove_post_from_rtdr(post.id) # remove the post from rtdr table if it was there or do nothing if it wasn't
+
     async def mark_post_as_solved(self, post: discord.Thread) -> None:
         """  
         Mark the given post as solved- adds tags and create task with delay to archive it.
         Returns the task
         """
-        task =  asyncio.create_task(close_post(post=post)) # create a task to close the post in 1 hour
-        close_tasks[post] = task # Add the and post to the "close_tasks" dict
+        task =  asyncio.create_task(self.close_post(post=post)) # create a task to close the post in 1 hour
+        self.close_tasks[post] = task # Add the and post to the "close_tasks" dict
         tags = [post.parent.get_tag(SOLVED_TAG_ID)] # declare an initial list of tags to be applied to the post
         cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
         if cb in post.applied_tags: tags.append(cb) # add cb tag as it was in the post before the command was used
@@ -95,14 +110,16 @@ class utility(commands.Cog):
         return task                
 
     async def unsolve_post(self, post: discord.Thread) -> None:
-        if post in close_tasks: 
-            close_tasks[post].cancel()
-            close_tasks.pop(post)
+        """  
+        Cancel marking the given post as solved, used in /unsolve command
+        """
+        if post in self.close_tasks: 
+            self.close_tasks[post].cancel()
+            self.close_tasks.pop(post)
         tags = [post.parent.get_tag(NOT_SOLVED_TAG_ID)]
         cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
         if cb in post.applied_tags: tags.append(cb)
         await post.edit(applied_tags=tags)
-
 
     @staticmethod
     async def ModOrExpertOrOP(interaction: discord.Interaction):
@@ -161,13 +178,7 @@ class utility(commands.Cog):
                     if solved not in interaction.channel.applied_tags:
                         await self.mark_post_as_solved(interaction.channel)
                         one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1) # create a tiem object from 1 hour into the future from now, to be used as timestamp in the message
-                        unsolve_id = 1281211280618950708
-                        for command in await self.client.tree.fetch_commands():
-                            if command.name == "unsolve": 
-                                unsolve_id=command.id
-                                break
-                            else:
-                                continue
+                        unsolve_id = await self.get_unsolve_id()
                         await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{unsolve_id}> to cancel.")
                     else:
                         await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
@@ -176,13 +187,7 @@ class utility(commands.Cog):
                     async def on_confirm_button_click(Interaction: discord.Interaction):
                         await self.mark_post_as_solved(interaction.channel)
                         one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
-                        unsolve_id = 1281211280618950708
-                        for command in await self.client.tree.fetch_commands():
-                            if command.name == "unsolve": 
-                                unsolve_id=command.id
-                                break
-                            else:
-                                continue
+                        unsolve_id = await self.get_unsolve_id()
                         await Interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{unsolve_id}> to cancel.")
                     button.callback = on_confirm_button_click # declare the callback for the button as the function above
                     view = ui.View()
@@ -210,7 +215,7 @@ class utility(commands.Cog):
     async def unsolved(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread):
             if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-                if interaction.channel in close_tasks or interaction.channel.parent.get_tag(SOLVED_TAG_ID) in interaction.channel.applied_tags:
+                if interaction.channel in self.close_tasks or interaction.channel.parent.get_tag(SOLVED_TAG_ID) in interaction.channel.applied_tags:
                     await self.unsolve_post(interaction.channel)
                     await interaction.response.send_message(content="Post successfully unsolved")
                 else:
