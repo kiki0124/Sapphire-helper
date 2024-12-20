@@ -147,22 +147,17 @@ class utility(commands.Cog):
     async def list_unsolved(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         posts = '' # Define an initial empty string to add the links to
-        support = interaction.guild.get_channel(SUPPORT_CHANNEL_ID) # Get #support channel
-        for post in support.threads: # Loop through all threads in #support
-            if not post.archived and not post.locked: # Check if the post is not archived and not locked
-                not_solved_tag = support.get_tag(NOT_SOLVED_TAG_ID) # Get not solved tag
-                solved_tag = support.get_tag(SOLVED_TAG_ID) # Get solved tag
-                need_dev_review_tag = support.get_tag(NEED_DEV_REVIEW_TAG_ID) # Get need-dev-review tag
-                unanswered_tag = support.get_tag(UNANSWERED_TAG_ID)
-                if need_dev_review_tag not in post.applied_tags: # Check if the post doesn't have need dev review tag
-                    if not_solved_tag in post.applied_tags or solved_tag not in post.applied_tags or unanswered_tag in post.applied_tags: # Check if the post has not solved tag or doesn't have solved or has unanswered
-                        posts += f"* {post.mention}\n" # Add the current post's link to the posts list
-                    else:
-                        continue # Continue to the next iteration of the loop as the current post has solved tag
-                else:
-                    continue # Continue to the next iteration of the loop as the current post has need dev review tag
-            else:
-                continue # Continue to the next iteration of the loop as the current post is archived (closed) or locked
+        for post in await interaction.guild.active_threads(): # Loop through all threads in #support
+            if post.parent_id == SUPPORT_CHANNEL_ID:
+                if not post.locked: # Check if the post is not archived and not locked
+                    not_solved_tag = post.parent.get_tag(NOT_SOLVED_TAG_ID) # Get not solved tag
+                    solved_tag = post.parent.get_tag(SOLVED_TAG_ID) # Get solved tag
+                    ndr = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID) # Get need-dev-review tag
+                    unanswered_tag = post.parent.get_tag(UNANSWERED_TAG_ID)
+                    if ndr not in post.applied_tags: # Check if the post doesn't have need dev review tag
+                        if not_solved_tag in post.applied_tags or solved_tag not in post.applied_tags or unanswered_tag in post.applied_tags: # Check if the post has not solved tag or doesn't have solved or has unanswered
+                            posts += f"* {post.mention}\n" # Add the current post's link to the posts list
+                    
         if posts: # Check if posts var has any characters in it
             embed = discord.Embed(
                 title="Unsolved posts:",
