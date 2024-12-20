@@ -16,7 +16,6 @@ CUSTOM_BRANDING_TAG_ID = int(os.getenv("CUSTOM_BRANDING_TAG_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
-NOT_SOLVED_TAG_ID = int(os.getenv("NOT_SOLVED_TAG_ID"))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 
 reminder_not_sent_posts: dict[int, int] = {} # declare a dictionary of post ids: the amount of tries
@@ -42,11 +41,15 @@ class CloseNow(ui.View):
             await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
 
 class remind(commands.Cog):
-    def __init__(self, client):
+    def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
         self.send_reminders.start() # start the loop
         self.close_pending_posts.start() # start the loop
         self.check_exception_posts.start()
+        support = client.get_channel(SUPPORT_CHANNEL_ID)
+        self.solved = support.get_tag(SOLVED_TAG_ID)
+        self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
+        self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -103,12 +106,10 @@ class remind(commands.Cog):
     @tasks.loop(hours=1)
     async def send_reminders(self):
         channel = self.client.get_channel(SUPPORT_CHANNEL_ID) # get the channel
-        solved_tag = channel.get_tag(SOLVED_TAG_ID)
-        need_dev_review_tag = channel.get_tag(NEED_DEV_REVIEW_TAG_ID)
         for post in await channel.guild.active_threads(): # start a loop for threads in the channel threads
             if post.parent_id==SUPPORT_CHANNEL_ID:
                 if not post.locked: # check if the post is not locked and not archived
-                    if need_dev_review_tag not in post.applied_tags and solved_tag not in post.applied_tags: # Make sure the post isn't already solved, doesn't have need dev review
+                    if self.ndr not in post.applied_tags and self.solved not in post.applied_tags: # Make sure the post isn't already solved, doesn't have need dev review
                         if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts: # check if the post isn't already marked as closing pending
                             try:
                                 message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
@@ -136,8 +137,7 @@ class remind(commands.Cog):
     async def on_message(self, message: discord.Message):
         if not message.author == self.client.user:
             if isinstance(message.channel, discord.Thread) and  message.channel.parent_id==SUPPORT_CHANNEL_ID: # check if the message was sent in a thread
-                ndr = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-                if not message.channel.locked and not ndr in message.channel.applied_tags: # check if the post doesn't have ndr and isn't locked
+                if not message.channel.locked and not self.ndr in message.channel.applied_tags: # check if the post doesn't have ndr and isn't locked
                     await self.pending_posts_listener(message) # call the PendingPostsListener coroutien that is related to the reminder system
 
     @tasks.loop(hours=1)
@@ -145,12 +145,10 @@ class remind(commands.Cog):
         for post_id in await get_pending_posts(): # loop through all posts that have closing pending status
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
-                need_dev_review_tag = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-                if need_dev_review_tag not in post.applied_tags:
+                if self.ndr not in post.applied_tags:
                     if await check_post_last_message_time(post_id): # check if the last message was sent more than 48 hours ago (24 hours after the reminder message)
-                        tags = [post.parent.get_tag(SOLVED_TAG_ID)]
-                        if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
-                            tags.append(CUSTOM_BRANDING_TAG_ID)
+                        tags = [self.solved]
+                        if self.cb in post.applied_tags: tags.append(self.cb)
                         await post.edit(archived=True, reason="post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
                         await remove_post_from_pending(post.id) # remove post from pending as it was closed
                         await remove_post_from_rtdr(post.id) # remove the post from readthedamnrules system (if its there)
