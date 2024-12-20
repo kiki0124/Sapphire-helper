@@ -105,27 +105,28 @@ class remind(commands.Cog):
         channel = self.client.get_channel(SUPPORT_CHANNEL_ID) # get the channel
         solved_tag = channel.get_tag(SOLVED_TAG_ID)
         need_dev_review_tag = channel.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        for post in channel.threads: # start a loop for threads in the channel threads
-            if not post.locked and not post.archived: # check if the post is not locked and not archived
-                if need_dev_review_tag not in post.applied_tags and solved_tag not in post.applied_tags: # Make sure the post isn't already solved, doesn't have need dev review
-                    if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts: # check if the post isn't already marked as closing pending
-                        try:
-                            message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
-                        except discord.NotFound: # create an exception for cases where the message couldn't be fetched
-                            reminder_not_sent_posts[post.id] = 1
-                            continue # Continue to the next iteration of the loop
-                        except discord.HTTPException as e:
-                            alerts = post.guild.get_thread(1290009354589962371)
-                            await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
-                            continue
-                        if message.author != post.owner: # checks if the last message's author is post creator
-                            if check_time_more_than_day(message.created_at.timestamp()): # checks if the time of the message is more than 24 hours ago
-                                if post.owner: # make sure the post owner is in the cache
-                                    greetings = ["Hi", "Hello", "Hey", "Hi there"]
-                                    post_author_id = await get_post_creator_id(post.id) or post.owner_id
-                                    await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
-                                    await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
-    
+        for post in await channel.guild.active_threads(): # start a loop for threads in the channel threads
+            if post.parent_id==SUPPORT_CHANNEL_ID:
+                if not post.locked: # check if the post is not locked and not archived
+                    if need_dev_review_tag not in post.applied_tags and solved_tag not in post.applied_tags: # Make sure the post isn't already solved, doesn't have need dev review
+                        if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts: # check if the post isn't already marked as closing pending
+                            try:
+                                message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
+                            except discord.NotFound: # create an exception for cases where the message couldn't be fetched
+                                reminder_not_sent_posts[post.id] = 1
+                                continue # Continue to the next iteration of the loop
+                            except discord.HTTPException as e:
+                                alerts = post.guild.get_thread(ALERTS_THREAD_ID)
+                                await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
+                                continue
+                            if message.author != post.owner: # checks if the last message's author is post creator
+                                if check_time_more_than_day(message.created_at.timestamp()): # checks if the time of the message is more than 24 hours ago
+                                    if post.owner: # make sure the post owner is in the cache
+                                        greetings = ["Hi", "Hello", "Hey", "Hi there"]
+                                        post_author_id = await get_post_creator_id(post.id) or post.owner_id
+                                        await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
+                                        await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
+        
     async def pending_posts_listener(self, message: discord.Message):
         if message.channel.id in await get_pending_posts():
             if message.author == message.channel.owner:
@@ -134,11 +135,10 @@ class remind(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message.author == self.client.user:
-            if isinstance(message.channel, discord.Thread): # check if the message was sent in a thread
-                if message.channel.parent_id == SUPPORT_CHANNEL_ID: # check if the thread's parent is #support
-                    need_dev_review = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-                    if not message.channel.locked and not need_dev_review in message.channel.applied_tags: # check if the post doesn't have ndr and isn't locked
-                        await self.pending_posts_listener(message) # call the PendingPostsListener coroutien that is related to the reminder system
+            if isinstance(message.channel, discord.Thread) and  message.channel.parent_id==SUPPORT_CHANNEL_ID: # check if the message was sent in a thread
+                ndr = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+                if not message.channel.locked and not ndr in message.channel.applied_tags: # check if the post doesn't have ndr and isn't locked
+                    await self.pending_posts_listener(message) # call the PendingPostsListener coroutien that is related to the reminder system
 
     @tasks.loop(hours=1)
     async def close_pending_posts(self):
