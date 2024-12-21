@@ -97,7 +97,6 @@ class utility(commands.Cog):
         Get the id of /unsolve command.
         This fetches the 
         """
-        print("get_unsolve_id used")
         unsolve_id = 1281211280618950708
         for command in await self.client.tree.fetch_commands():
             if command.name == "unsolve": 
