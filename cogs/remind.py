@@ -43,14 +43,28 @@ class CloseNow(ui.View):
 class remind(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
+        self.get_tags.start()
         self.send_reminders.start() # start the loop
         self.close_pending_posts.start() # start the loop
         self.check_exception_posts.start()
-        support = client.get_channel(SUPPORT_CHANNEL_ID)
-        self.solved = support.get_tag(SOLVED_TAG_ID)
+
+    @tasks.loop(seconds=1, count=1)
+    async def get_tags(self):
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        self.unanswered = support.get_tag(UNANSWERED_TAG_ID, )
         self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
+        self.solved = support.get_tag(SOLVED_TAG_ID)
         self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
 
+    """ @lru_cache(typed=True)
+    async def get_tag(self, tag: str) -> discord.ForumTag:
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        match tag:
+            case "solved": return support.get_tag(SOLVED_TAG_ID)
+            case "ndr": return support.get_tag(NEED_DEV_REVIEW_TAG_ID)
+            case "cb": return support.get_tag(CUSTOM_BRANDING_TAG_ID)
+            case _: return "Not found"
+        """        
     @commands.Cog.listener()
     async def on_ready(self):
         self.client.add_view(CloseNow())
@@ -147,7 +161,7 @@ class remind(commands.Cog):
             if post: # check if the post was successfully fetched (not None)
                 if self.ndr not in post.applied_tags:
                     if await check_post_last_message_time(post_id): # check if the last message was sent more than 48 hours ago (24 hours after the reminder message)
-                        tags = [self.solved]
+                        tags = [self.ndr]
                         if self.cb in post.applied_tags: tags.append(self.cb)
                         await post.edit(archived=True, reason="post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
                         await remove_post_from_pending(post.id) # remove post from pending as it was closed
@@ -163,6 +177,7 @@ class remind(commands.Cog):
     @send_reminders.before_loop
     @close_pending_posts.before_loop
     @check_exception_posts.before_loop
+    @get_tags.before_loop
     async def loops_before_loop(self):
         await self.client.wait_until_ready() # only start the loop when the bot is ready (online)
 

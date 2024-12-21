@@ -19,16 +19,21 @@ CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 class autoadd(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
+        self.get_tags.start()
         self.close_abandoned_posts.start() # Start the loop
-        support = client.get_channel(SUPPORT_CHANNEL_ID)
-        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
+
+    def cog_unload(self):
+        self.close_abandoned_posts.cancel() # Cancel the loop as the cog was unloaded
+
+    @tasks.loop(seconds=1, count=1)
+    async def get_tags(self):
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        self.unanswered = support.get_tag(UNANSWERED_TAG_ID, )
+        print(self.unanswered.name or "no name found")
         self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
         self.solved = support.get_tag(SOLVED_TAG_ID)
         self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
         self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-
-    async def cog_unload(self):
-        self.close_abandoned_posts.cancel() # Cancel the loop as the cog was unloaded
 
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
@@ -89,7 +94,8 @@ class autoadd(commands.Cog):
                             await post.edit(archived=True, reason="User left server, auto close post", applied_tags=tags)
 
     @close_abandoned_posts.before_loop
-    async def CAP_before_loop(self):
+    @get_tags.before_loop
+    async def wait_until_ready(self):
         await self.client.wait_until_ready() # wait for the bot to be ready and then start the loop
 
 async def setup(client):

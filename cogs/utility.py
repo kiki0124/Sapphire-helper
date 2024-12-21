@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands, ui
 import asyncio
 import datetime
@@ -73,12 +73,16 @@ class ndr_options_buttons(ui.View):
 class utility(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
-        support = client.get_channel(SUPPORT_CHANNEL_ID)
+        self.get_tags.start()
+
+    @tasks.loop(seconds=1, count=1)
+    async def get_tags(self):
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        self.unanswered = support.get_tag(UNANSWERED_TAG_ID, )
         self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
-        self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
         self.solve = support.get_tag(SOLVED_TAG_ID)
         self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
+        self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
 
     async def is_in_support(self, interaction: discord.Interaction) -> bool:
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
@@ -227,5 +231,10 @@ class utility(commands.Cog):
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
             
+
+    @get_tags.before_loop
+    async def wait_until_ready(self):
+        await self.client.wait_until_ready()
+
 async def setup(client):
     await client.add_cog(utility(client))

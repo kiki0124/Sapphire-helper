@@ -16,7 +16,6 @@ class readthedamnrules(commands.Cog):
         self.client: commands.Bot = client
     
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
-        #replied_message = await message.channel.fetch_message(message.reference.message_id) # get a full Message object from the replied message id
         messages_to_move: list[discord.Message] = [reference_message] # declare a list of the messages to move to the new post
         async for msg in reference_message.channel.history(limit=None, after=reference_message.created_at):
             if msg.author == reference_message.author:
