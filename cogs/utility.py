@@ -78,7 +78,7 @@ class utility(commands.Cog):
     @tasks.loop(seconds=1, count=1)
     async def get_tags(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        self.unanswered = support.get_tag(UNANSWERED_TAG_ID, )
+        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
         self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
         self.solve = support.get_tag(SOLVED_TAG_ID)
         self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
