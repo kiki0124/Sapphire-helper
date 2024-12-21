@@ -56,15 +56,6 @@ class remind(commands.Cog):
         self.solved = support.get_tag(SOLVED_TAG_ID)
         self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
 
-    """ @lru_cache(typed=True)
-    async def get_tag(self, tag: str) -> discord.ForumTag:
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        match tag:
-            case "solved": return support.get_tag(SOLVED_TAG_ID)
-            case "ndr": return support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            case "cb": return support.get_tag(CUSTOM_BRANDING_TAG_ID)
-            case _: return "Not found"
-        """        
     @commands.Cog.listener()
     async def on_ready(self):
         self.client.add_view(CloseNow())
