@@ -39,10 +39,10 @@ class bot(commands.Cog):
     @commands.command(name="restart")
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def restart(self, ctx: commands.Context):
-        extensions = os.listdir("./cogs")
+        extensions = os.listdir("./cogs") # list of files that should be loaded
         await ctx.reply(content=f"Reloading {len(extensions)} extension(s)", mention_author=False)
         for filename in extensions:
-            if filename.endswith(".py"):
+            if filename.endswith(".py"): # only load python file
                 await self.client.reload_extension(f"cogs.{filename[:-3]}")
             else:
                 continue
@@ -60,7 +60,6 @@ class bot(commands.Cog):
     @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         match error:
-        
             case commands.CommandNotFound: # Check if the specific error is CommandNotFound
                 return # Ignore the error
             case commands.NoPrivateMessage: # Check if the specific error is NoPrivateMessage- triggered when a command is used in DMs instead of normal server channel
