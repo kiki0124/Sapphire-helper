@@ -17,12 +17,8 @@ class bot(commands.Cog):
 
     def cog_load(self):
         tree = self.client.tree
-        self._old_tree_error = tree.on_error
         tree.on_error = self.tree_on_error
     
-    def cog_unload(self):
-        tree = self.client.tree
-        tree.on_error = self._old_tree_error
 
     async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, guild: discord.Guild) -> None:
         alerts_thread = guild.get_channel_or_thread(ALERTS_THREAD_ID)
