@@ -17,12 +17,8 @@ class bot(commands.Cog):
 
     def cog_load(self):
         tree = self.client.tree
-        self._old_tree_error = tree.on_error
         tree.on_error = self.tree_on_error
     
-    def cog_unload(self):
-        tree = self.client.tree
-        tree.on_error = self._old_tree_error
 
     async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, guild: discord.Guild) -> None:
         alerts_thread = guild.get_channel_or_thread(ALERTS_THREAD_ID)
@@ -39,10 +35,10 @@ class bot(commands.Cog):
     @commands.command(name="restart")
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def restart(self, ctx: commands.Context):
-        extensions = os.listdir("./cogs")
+        extensions = os.listdir("./cogs") # list of files that should be loaded
         await ctx.reply(content=f"Reloading {len(extensions)} extension(s)", mention_author=False)
         for filename in extensions:
-            if filename.endswith(".py"):
+            if filename.endswith(".py"): # only load python file
                 await self.client.reload_extension(f"cogs.{filename[:-3]}")
             else:
                 continue
@@ -59,42 +55,30 @@ class bot(commands.Cog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        if isinstance(error, commands.errors.CommandNotFound): # Check if the specific error is CommandNotFound
-            return # Ignore the error
-        elif isinstance(error, commands.errors.NoPrivateMessage): # Check if the specific error is NoPrivateMessage- triggered when a command is used in DMs instead of normal server channel
-            embed = discord.Embed(
-                title="Command disabled in this channel",
-                description="> This command cannot be executed in DM channels. You may only use guild channels.",
-                colour=0xce3636
-            )
-            await ctx.reply(embed=embed, mention_author=False)
-        elif isinstance(error, commands.errors.MissingAnyRole): # check if the error is MissingAnyRole
-            embed = discord.Embed(
-                title="No permissions",
-                description=f"> You are not allowed to execute this command.",
-                colour=0xCE3636
-            )
-            await ctx.reply(embed=embed, mention_author=False)
-        elif isinstance(error, commands.errors.CommandOnCooldown): # Check if the error is CommandOnCooldown
-            embed = discord.Embed(
-                description="This command is currently on cooldown!",
-                colour=discord.Colour.red()
-            )
-            await ctx.reply(embed=embed, mention_author=False)
-        else: 
-            await self.send_unhandled_error(error=error, guild=ctx.guild)
-            raise error # raise the error if it isn't handled properly above
+        match error:
+            case commands.CommandNotFound: # Check if the specific error is CommandNotFound
+                return # Ignore the error
+            case commands.NoPrivateMessage: # Check if the specific error is NoPrivateMessage- triggered when a command is used in DMs instead of normal server channel
+                await ctx.reply(content="This command cannot be executed in DM channels.", mention_author=False)
+            case commands.errors.MissingAnyRole: # check if the error is MissingAnyRole
+                await ctx.reply(content="Insufficient permissions- you are not allowed to execute this command.", mention_author=False)
+            case commands.CommandOnCooldown: # Check if the error is CommandOnCooldown
+                await ctx.reply(content="Command currently on cooldown, try again later...", mention_author=False)
+            case _:
+                await self.send_unhandled_error(error=error, guild=ctx.guild)
+                raise error # raise the error if it isn't handled properly above
 
     async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.MissingAnyRole): # check if the error is MissingAnyRole
-            await interaction.response.send_message(content=f"Only Moderators and Community Experts can use this command!", ephemeral=True)
-        elif isinstance(error, app_commands.CheckFailure): # Check if the error is CheckFailure (failure of a custom check- checks if user is mod/expert/op)
-            await interaction.response.send_message(content=f"Only Moderators, Community Experts and the OP can use this command!", ephemeral=True)
-        elif isinstance(error, app_commands.NoPrivateMessage): # Check if the command was used in DMs
-            await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
-        else:
-            await self.send_unhandled_error(error=error, guild=interaction.guild)
-            raise error # Raise the error if it wasn't handled properly above
+        match error:
+            case app_commands.MissingAnyRole:
+                await interaction.response.send_message(content=f"Only Moderators and Community Experts can use this command!", ephemeral=True)
+            case app_commands.CheckFailure: # Check if the error is CheckFailure (failure of a custom check- checks if user is mod/expert/op)
+                await interaction.response.send_message(content=f"Only Moderators, Community Experts and the OP can use this command!", ephemeral=True)
+            case app_commands.NoPrivateMessage: # Check if the command was used in DMs
+                await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
+            case _:
+                await self.send_unhandled_error(error=error, guild=interaction.guild)
+                raise error # Raise the error if it wasn't handled properly above
 
 async def setup(client: commands.Bot):
     await client.add_cog(bot(client))

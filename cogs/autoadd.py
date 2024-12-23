@@ -5,6 +5,7 @@ import random
 import os
 from dotenv import load_dotenv
 from functions import get_post_creator_id
+from functools import lru_cache
 
 load_dotenv()
 
@@ -15,17 +16,37 @@ NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 
-sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
-
 class autoadd(commands.Cog):
-    def __init__(self, client):
+    def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
+        self.get_tags.start()
         self.close_abandoned_posts.start() # Start the loop
 
-    async def cog_unload(self):
+    def cog_unload(self):
         self.close_abandoned_posts.cancel() # Cancel the loop as the cog was unloaded
 
-    
+    @tasks.loop(seconds=1, count=1)
+    async def get_tags(self):
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
+        self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
+        self.solved = support.get_tag(SOLVED_TAG_ID)
+        self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
+        self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
+
+    sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
+
+    @lru_cache()
+    async def get_solved_id(self):
+        solved_id = 1274997472162349079
+        for command in await self.client.tree.fetch_commands():
+                if command.name == "solved": 
+                    solved_id=command.id
+                    break
+                else:
+                    continue
+        return solved_id
+
     @commands.Cog.listener('on_message')
     async def message(self, message: discord.Message):
         if not message.author == self.client.user: # Check if the message author is Sapphire Helper
@@ -33,57 +54,47 @@ class autoadd(commands.Cog):
                 if message.channel.parent_id == SUPPORT_CHANNEL_ID:
                     if message.id == message.channel.id:
                         await self.on_thread_create(message.channel)
-                    if not message.channel.id in sent_post_ids:
+                    if not message.channel.id in self.sent_post_ids:
                         await self.send_suggestion_message(message)
 
     async def on_thread_create(self, thread: discord.Thread):
         tags = thread.applied_tags
-        tags.append(thread.parent.get_tag(UNANSWERED_TAG_ID))
-        await thread.edit(applied_tags=tags, reason="Auto-add unanswered tag to a new post") # Add unanswered solved tag to post
+        tags.append(self.unanswered)
+        await thread.edit(applied_tags=tags, reason="Auto-add unanswered tag to a new post")
         if thread.starter_message.content and len(thread.starter_message.content) < 15: # Check if the amount of characters in the starting message is smaller than 15 
             greets = ["Hi", "Hey", "Hello", "Hi there"]
             await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
 
     async def send_suggestion_message(self, message: discord.Message):
         if message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id): # Checks if the message author is the post creator
-            need_dev_review_tag = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            solved_tag = message.channel.parent.get_tag(SOLVED_TAG_ID)
-            if solved_tag not in message.channel.applied_tags and need_dev_review_tag not in message.channel.applied_tags: # make sure the post is not already solved and doesn't have the need-dev-review tag
+            if self.solved not in message.channel.applied_tags and self.ndr not in message.channel.applied_tags: # make sure the post is not already solved and doesn't have the need-dev-review tag
                 if not message == message.channel.starter_message:
                     pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
                     negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?"
                     if not re.search(negative_pattern, message.content, re.IGNORECASE):
                         if re.search(pattern, message.content, re.IGNORECASE):
-                            solved_id = 1274997472162349079
-                            for command in await self.client.tree.fetch_commands():
-                                if command.name == "solved": 
-                                    solved_id=command.id
-                                    break
-                                else:
-                                    continue
-                            await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{solved_id}>")
-                            sent_post_ids.append(message.channel.id)
-        elif message.channel.parent.get_tag(UNANSWERED_TAG_ID) in message.channel.applied_tags and not message.author == message.channel.owner:
-            tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-            if message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in message.channel.applied_tags:
-                tags.append(message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                            await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.get_solved_id()}>")
+                            self.sent_post_ids.append(message.channel.id)
+        elif self.unanswered in message.channel.applied_tags and not message.author == message.channel.owner:
+            tags = [self.not_solved]
+            if self.cb in message.channel.applied_tags: tags.append(self.cb)
             await message.channel.edit(applied_tags=tags, reason="Auto-remove unanswered tag and replace with not solved tag")
                 
     @tasks.loop(hours=1)
     async def close_abandoned_posts(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        need_dev_review = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        for post in support.threads:
-            if not post.locked and not post.archived:
-                if need_dev_review not in post.applied_tags:
-                    if not post.owner:
-                        tags = [post.parent.get_tag(SOLVED_TAG_ID)]
-                        if post.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in post.applied_tags:
-                            tags.append(post.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                        await post.edit(archived=True, reason="User left server, auto close post", applied_tags=tags)
+        for post in await support.guild.active_threads():
+            if post.parent_id == SUPPORT_CHANNEL_ID:
+                if not post.locked:
+                    if self.ndr not in post.applied_tags:
+                        if not post.owner:
+                            tags = [self.solved]
+                            if self.cb in post.applied_tags: tags.append(self.cb)
+                            await post.edit(archived=True, reason="User left server, auto close post", applied_tags=tags)
 
     @close_abandoned_posts.before_loop
-    async def CAP_before_loop(self):
+    @get_tags.before_loop
+    async def wait_until_ready(self):
         await self.client.wait_until_ready() # wait for the bot to be ready and then start the loop
 
 async def setup(client):

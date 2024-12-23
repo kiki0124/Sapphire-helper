@@ -16,7 +16,6 @@ class readthedamnrules(commands.Cog):
         self.client: commands.Bot = client
     
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
-        #replied_message = await message.channel.fetch_message(message.reference.message_id) # get a full Message object from the replied message id
         messages_to_move: list[discord.Message] = [reference_message] # declare a list of the messages to move to the new post
         async for msg in reference_message.channel.history(limit=None, after=reference_message.created_at):
             if msg.author == reference_message.author:
@@ -28,10 +27,8 @@ class readthedamnrules(commands.Cog):
             for attachment in msg.attachments: files.append(await attachment.to_file())
         content = ''.join(m.content+"\n" for m in messages_to_move)
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        if message: # message is none if the system is triggered by reaction, check if it isn't none
-            title = message.content.removeprefix(message.guild.me.mention) or f"Support for {reference_message.author.name}"
-        else: # it is none, define a "default" title
-            title = f"Support for {reference_message.author.name}"
+        title = f"Support for {reference_message.author.name}"
+        if message: title = message.content.removeprefix(message.guild.me.mention)# message may be none if system is triggered by reaction, if it's not None set the post title to the message content without the bot mention
         post_data = await support.create_thread(
             name=title,
             files=files,
@@ -68,4 +65,3 @@ class readthedamnrules(commands.Cog):
 
 async def setup(client):
     await client.add_cog(readthedamnrules(client))
-    

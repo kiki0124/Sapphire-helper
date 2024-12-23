@@ -25,7 +25,7 @@ async def get_pending_posts() -> list[int]:
     async with sql.connect('data.db') as conn:
         async with conn.cursor() as cu:
             await cu.execute("SELECT post_id FROM pending_posts") # select all post_ids from pending posts table
-            return [int(post_id[0]) for post_id in await cu.fetchall()]
+            return [int(post_id[0]) for post_id in await cu.fetchall()] # change the return type to list[int]
 
 async def remove_post_from_pending(post_id: int) -> None:
     """  
@@ -75,7 +75,7 @@ async def get_post_creator_id(post_id: int) -> int|None:
             await cu.execute(f"SELECT user_id FROM readthedamnrules WHERE post_id={post_id}") # select only the user id (as thats what needed to return)
             result = None
             result = await cu.fetchone() # there should only be one returned result, so fetchone
-            return result[0] if result else None # .fetchone() returns a tuple, return the first item
+            return result[0] if result else None # .fetchone() returns a tuple, return the first item or None if there isn't a first item
 
 async def remove_post_from_rtdr(post_id: int) -> None:
     """  
