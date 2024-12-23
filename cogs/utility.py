@@ -232,7 +232,6 @@ class utility(commands.Cog):
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
             
-
     @get_tags.before_loop
     async def wait_until_ready(self):
         await self.client.wait_until_ready()

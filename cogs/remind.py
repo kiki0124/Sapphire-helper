@@ -19,9 +19,6 @@ ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 
 reminder_not_sent_posts: dict[int, int] = {} # declare a dictionary of post ids: the amount of tries
-#waiting_for_reply_posts: dict[int, asyncio.Task] = {} # declare a dictionary of post ids: the task for each post, used to know when to add the wiating for reply tag to posts
-
-
 class CloseNow(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -141,7 +138,7 @@ class remind(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message.author == self.client.user:
-            if isinstance(message.channel, discord.Thread) and  message.channel.parent_id==SUPPORT_CHANNEL_ID: # check if the message was sent in a thread
+            if isinstance(message.channel, discord.Thread) and  message.channel.parent_id == SUPPORT_CHANNEL_ID: # check if the message was sent in a thread
                 if not message.channel.locked and not self.ndr in message.channel.applied_tags: # check if the post doesn't have ndr and isn't locked
                     await self.pending_posts_listener(message) # call the PendingPostsListener coroutien that is related to the reminder system
 
