@@ -45,8 +45,10 @@ class ndr_options_buttons(ui.View):
         self.Interaction = Interaction
     
     async def mark_post_as_ndr(self, interaction: discord.Interaction):
-        tags = interaction.channel.applied_tags
-        tags.append(interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID))
+        ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+        tags = [ndr]
+        cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        if cb in interaction.channel.applied_tags: tags.append(cb)
         await interaction.channel.edit(applied_tags=tags, reason="Post marked as needs-dev-review with /needs-dev-review")
         channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
