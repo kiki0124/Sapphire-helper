@@ -28,7 +28,7 @@ class readthedamnrules(commands.Cog):
         content = ''.join(m.content+"\n" for m in messages_to_move)
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         title = f"Support for {reference_message.author.name}"
-        if message: title = message.content.removeprefix(message.guild.me.mention) or f"Support for {reference_message.author.name}" # message may be none if system is triggered by reaction, if it's not None set the post title to the message content without the bot mention
+        if message: title = message.content.removeprefix(message.guild.me.mention)# message may be none if system is triggered by reaction, if it's not None set the post title to the message content without the bot mention
         post_data = await support.create_thread(
             name=title,
             files=files,
