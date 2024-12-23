@@ -47,7 +47,7 @@ class ndr_options_buttons(ui.View):
     async def mark_post_as_ndr(self, interaction: discord.Interaction):
         tags = interaction.channel.applied_tags
         tags.append(interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID))
-        await interaction.channel.edit(applied_tags=tags)
+        await interaction.channel.edit(applied_tags=tags, reason="Post marked as needs-dev-review with /needs-dev-review")
         channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
 
@@ -126,8 +126,8 @@ class utility(commands.Cog):
         self.close_tasks[post] = task # Add the and post to the "close_tasks" dict
         tags = [self.solve] # declare an initial list of tags to be applied to the post
         if self.cb in post.applied_tags: tags.append(self.cb) # add cb tag as it was in the post before the command was used
-        await post.edit(applied_tags=tags)
-        return task                
+        await post.edit(applied_tags=tags, reason="Post marked as solved with /solved")
+        return task
 
     async def unsolve_post(self, post: discord.Thread) -> None:
         """  
@@ -138,7 +138,7 @@ class utility(commands.Cog):
             self.close_tasks.pop(post)
         tags = [self.not_solved]
         if self.cb in post.applied_tags: tags.append(self.cb)
-        await post.edit(applied_tags=tags)
+        await post.edit(applied_tags=tags, reason="Post unsolved with /unsolve")
 
     @staticmethod
     async def one_of_mod_expert_op(interaction: discord.Interaction):

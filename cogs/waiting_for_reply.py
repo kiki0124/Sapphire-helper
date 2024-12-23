@@ -32,7 +32,7 @@ class waiting_for_reply(commands.Cog):
         applied_tags = post.applied_tags
         applied_tags.append(self.waiting_for_reply)
         if not self.solved in post.applied_tags and not self.ndr in post.applied_tags and not post.archived:
-            await post.edit(applied_tags=applied_tags)
+            await post.edit(applied_tags=applied_tags, reason="Waiting for reply system")
             self.posts.pop(post.id) # remove post from internal list of posts that are waiting for waiting tag to be added
 
     @commands.Cog.listener('on_message')
@@ -51,7 +51,7 @@ class waiting_for_reply(commands.Cog):
                         elif message.author != message.channel.owner and self.waiting_for_reply in message.channel.applied_tags:
                             applied_tags = message.channel.applied_tags
                             applied_tags.remove(self.waiting_for_reply)
-                            await message.channel.edit(applied_tags=applied_tags)
+                            await message.channel.edit(applied_tags=applied_tags, reason="Remove waiting for reply tag as last message author isn't OP")
 
     @get_tags.before_loop
     async def wait_until_ready(self):
