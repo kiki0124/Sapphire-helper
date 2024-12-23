@@ -149,7 +149,7 @@ class remind(commands.Cog):
             if post: # check if the post was successfully fetched (not None)
                 if self.ndr not in post.applied_tags:
                     if await check_post_last_message_time(post_id): # check if the last message was sent more than 48 hours ago (24 hours after the reminder message)
-                        tags = [self.ndr]
+                        tags = [self.solved]
                         if self.cb in post.applied_tags: tags.append(self.cb)
                         await post.edit(archived=True, reason="Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
                         await remove_post_from_pending(post.id) # remove post from pending as it was closed
