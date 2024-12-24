@@ -6,7 +6,6 @@ import datetime
 import os
 from dotenv import load_dotenv
 from functions import remove_post_from_rtdr, get_post_creator_id
-from functools import lru_cache
 
 load_dotenv()
 
@@ -77,23 +76,6 @@ class utility(commands.Cog):
         self.client: commands.Bot = client
         self.get_tags.start()
 
-    @tasks.loop(seconds=1, count=1)
-    async def get_tags(self):
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
-        self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        self.solve = support.get_tag(SOLVED_TAG_ID)
-        self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-        self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
-
-    async def is_in_support(self, interaction: discord.Interaction) -> bool:
-        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            return True
-        else:
-            await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
-            return False
-    
-    @lru_cache() # cache the result to prevent rate limits, cache is cleared with every restart
     async def get_unsolve_id(self) -> int:
         """  
         Get the id of /unsolve command.
@@ -108,6 +90,24 @@ class utility(commands.Cog):
                 continue
         return unsolve_id
 
+    @tasks.loop(seconds=1, count=1)
+    async def get_tags(self):
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
+        self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
+        self.solve = support.get_tag(SOLVED_TAG_ID)
+        self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
+        self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
+        self.unsolve_id = await self.get_unsolve_id()
+
+    async def is_in_support(self, interaction: discord.Interaction) -> bool:
+        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+            return True
+        else:
+            await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
+            return False
+    
+    
     close_tasks: dict[discord.Thread, asyncio.Task] = {} # posts that are waiting to be closed, used so that they it will be cancelable with /unsolve
 
     async def close_post(self, post: discord.Thread) -> None:

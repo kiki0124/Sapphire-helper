@@ -19,7 +19,6 @@ class bot(commands.Cog):
         tree = self.client.tree
         tree.on_error = self.tree_on_error
     
-
     async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, guild: discord.Guild) -> None:
         alerts_thread = guild.get_channel_or_thread(ALERTS_THREAD_ID)
         await alerts_thread.send(content=f"Unhandled error: `{error}`\n<@1105414178937774150>")
