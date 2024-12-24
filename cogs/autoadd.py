@@ -5,6 +5,7 @@ import random
 import os
 from dotenv import load_dotenv
 from functions import get_post_creator_id
+from aiocache import cached
 
 load_dotenv()
 
@@ -24,6 +25,7 @@ class autoadd(commands.Cog):
     def cog_unload(self):
         self.close_abandoned_posts.cancel() # Cancel the loop as the cog was unloaded
 
+    @cached()
     async def get_solved_id(self):
         solved_id = 1274997472162349079
         for command in await self.client.tree.fetch_commands():
@@ -42,7 +44,6 @@ class autoadd(commands.Cog):
         self.solved = support.get_tag(SOLVED_TAG_ID)
         self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
         self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-        self.solved_id = await self.get_solved_id()
 
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 

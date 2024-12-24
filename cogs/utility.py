@@ -6,6 +6,7 @@ import datetime
 import os
 from dotenv import load_dotenv
 from functions import remove_post_from_rtdr, get_post_creator_id
+from aiocache import cached
 
 load_dotenv()
 
@@ -76,6 +77,7 @@ class utility(commands.Cog):
         self.client: commands.Bot = client
         self.get_tags.start()
 
+    @cached()
     async def get_unsolve_id(self) -> int:
         """  
         Get the id of /unsolve command.
@@ -98,7 +100,6 @@ class utility(commands.Cog):
         self.solve = support.get_tag(SOLVED_TAG_ID)
         self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
         self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
-        self.unsolve_id = await self.get_unsolve_id()
 
     async def is_in_support(self, interaction: discord.Interaction) -> bool:
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
@@ -186,8 +187,7 @@ class utility(commands.Cog):
                 if self.solve not in interaction.channel.applied_tags:
                     await self.mark_post_as_solved(interaction.channel)
                     one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1) # create a tiem object from 1 hour into the future from now, to be used as timestamp in the message
-                    unsolve_id = await self.get_unsolve_id()
-                    await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{unsolve_id}> to cancel.")
+                    await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
                 else:
                     await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
             else: # post has ndr, send confirmation message
@@ -195,8 +195,7 @@ class utility(commands.Cog):
                 async def on_confirm_button_click(Interaction: discord.Interaction):
                     await self.mark_post_as_solved(interaction.channel)
                     one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
-                    unsolve_id = await self.get_unsolve_id()
-                    await Interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{unsolve_id}> to cancel.")
+                    await Interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
                 button.callback = on_confirm_button_click # declare the callback for the button as the function above
                 view = ui.View() # construct an empty view item
                 view.add_item(button) # add the item to the view
