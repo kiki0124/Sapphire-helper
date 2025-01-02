@@ -15,39 +15,52 @@ class readthedamnrules(commands.Cog):
     def __init__(self, client) -> None:
         self.client: commands.Bot = client
     
-    async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
-        messages_to_move: list[discord.Message] = [reference_message] # declare a list of the messages to move to the new post
+    async def get_messages_to_move(reference_message: discord.Message) -> list[discord.Message]:
+        """  
+        Get a list[Message] for all messages that should be used in the new post
+        """
+        messages_to_move: list[discord.Message] = [reference_message]
         async for msg in reference_message.channel.history(limit=None, after=reference_message.created_at):
             if msg.author == reference_message.author:
-                messages_to_move.append(msg) # add the message to the list of messages to move as its author is the author of the reply message
+                messages_to_move.append(msg)
             else:
-                break # break the loop as the message author is any other user
-        files = [] # declare a list of initial attachments to add to the post's starter message
-        for msg in messages_to_move: # start a for loop for all of the messages in messages_to_move list
-            for attachment in msg.attachments: files.append(await attachment.to_file())
-        content = ''.join(m.content+"\n" for m in messages_to_move)
+                break
+        return messages_to_move
+
+    async def get_files(messages: list[discord.Message]) -> list[discord.File]:
+        """  
+        Returns list[File] for all attachments (files) that should be used in the new post 
+        """
+        files = []
+        for msg in messages:
+            files.append(await attachment.to_file() for attachment in msg.attachments)
+
+    async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
+        messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
+        files = await self.get_files(messages_to_move)
+        content = ''.join(msg.content+"\n" for msg in messages_to_move)
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         title = f"Support for {reference_message.author.name}"
-        if message: title = message.content.removeprefix(message.guild.me.mention)# message may be none if system is triggered by reaction, if it's not None set the post title to the message content without the bot mention
+        if message: title = message.content.removeprefix(self.client.user.mention)
         post_data = await support.create_thread(
             name=title,
             files=files,
             content=f"**Original message:**\n```\n{content}```\n\n{reference_message.author.mention} please provide any additional information here so we can give you the best help.\n-# Created by {user.name}"
         )
-        await add_post_to_rtdr(post_id=post_data[0].id, user_id=reference_message.author.id) # add the post to the db with the user that it was created for
-        return post_data[0] # return the post that was created for it to be mentioned in the reply message
+        await add_post_to_rtdr(post_id=post_data[0].id, user_id=reference_message.author.id)
+        return post_data[0]
 
     @commands.Cog.listener('on_message')
     async def redirect_to_support(self, message: discord.Message):
         if not message.author.bot:
-            if message.channel.id == GENERAL_CHANNEL_ID and message.reference and message.content.startswith(self.client.user.mention): # make sure the message is in general channel, is a reply to some message and pings the bot
+            if message.channel.id == GENERAL_CHANNEL_ID and message.reference and message.content.startswith(self.client.user.mention):
                 experts = message.guild.get_role(EXPERTS_ROLE_ID)
                 moderators = message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in message.author.roles or moderators in message.author.roles:
                     replied_message = await message.channel.fetch_message(message.reference.message_id)
-                    if not replied_message.author == message.author: # prevent the system from being used when replying to your own message
+                    if not replied_message.author == message.author:
                         message_reference = await message.channel.fetch_message(message.reference.message_id)
-                        post = await self.handle_request(reference_message=message_reference, user=message.author, message=message) # handle the request
+                        post = await self.handle_request(reference_message=message_reference, user=message.author, message=message)
                         await message.reply(content=f"Post created at {post.mention}", mention_author=False, delete_after=5)
                 else:
                     return
@@ -56,11 +69,11 @@ class readthedamnrules(commands.Cog):
     async def reaction_redirect_to_support(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         if reaction.message.channel.id == GENERAL_CHANNEL_ID:
             reactions = ["❓", "❔"] # allowed reactions, all other reactions will be ignored in this context
-            if reaction.message.author != user and reaction.emoji in reactions: # make sure the user isn't adding a reaction to their own message and the reaction is an allowed reaction
+            if reaction.message.author != user and reaction.emoji in reactions:
                 experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
                 mods = reaction.message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in user.roles or mods in user.roles:
-                    await self.handle_request(reaction.message, user=user) # handle the request with the reaction message
+                    await self.handle_request(reaction.message, user=user)
                     await reaction.remove(user)
 
 async def setup(client):
