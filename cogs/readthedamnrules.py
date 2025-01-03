@@ -38,7 +38,7 @@ class readthedamnrules(commands.Cog):
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
         files = await self.get_files(messages_to_move)
-        content = ''.join(msg.content+"\n" for msg in messages_to_move)
+        content = '\n'.join([msg.content for msg in messages_to_move])
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         title = f"Support for {reference_message.author.name}"
         if message: title = message.content.removeprefix(self.client.user.mention)

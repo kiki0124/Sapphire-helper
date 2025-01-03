@@ -19,6 +19,7 @@ CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 NDR_CHANNEL_ID = int(os.getenv('NDR_CHANNEL_ID'))
+ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 
 class need_dev_review_buttons(ui.View):
     def __init__(self):
@@ -49,7 +50,10 @@ class ndr_options_buttons(ui.View):
         tags = [ndr]
         cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
         if cb in interaction.channel.applied_tags: tags.append(cb)
-        await interaction.channel.edit(applied_tags=tags, reason=f"ID: {generate_random_id}.Post marked as needs-dev-review with /needs-dev-review")
+        action_id = generate_random_id()
+        alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
+        await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}")
         channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
 
@@ -76,6 +80,12 @@ class utility(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
         self.get_tags.start()
+
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag]):
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        await alerts_thread.send(
+            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}"
+        )
 
     @cached()
     async def get_unsolve_id(self) -> int:
@@ -115,7 +125,7 @@ class utility(commands.Cog):
         Used with asyncio.create_task to close the given post after an hour of delay.
         """
         await asyncio.sleep(3600) # wait for 1 hour
-        await post.edit(archived=True, reason=f"ID: {generate_random_id()}.Auto archive solved post after 1 hour")
+        await post.edit(archived=True, reason=f"Auto archive solved post after 1 hour")
         self.close_tasks.pop(post)
         await remove_post_from_rtdr(post.id)
 
@@ -128,7 +138,9 @@ class utility(commands.Cog):
         self.close_tasks[post] = task
         tags = [self.solve]
         if self.cb in post.applied_tags: tags.append(self.cb)
-        await post.edit(applied_tags=tags, reason=f"ID: {generate_random_id()}.Post marked as solved with /solved")
+        action_id = generate_random_id()
+        await post.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as solved with /solved")
+        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags)
         return task
 
     async def unsolve_post(self, post: discord.Thread) -> None:
@@ -140,7 +152,9 @@ class utility(commands.Cog):
             self.close_tasks.pop(post)
         tags = [self.not_solved]
         if self.cb in post.applied_tags: tags.append(self.cb)
-        await post.edit(applied_tags=tags, reason=f"ID: {generate_random_id()}. Post unsolved with /unsolve")
+        action_id = generate_random_id()
+        await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post unsolved with /unsolve")
+        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags)
 
     @staticmethod
     async def one_of_mod_expert_op(interaction: discord.Interaction):

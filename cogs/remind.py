@@ -18,11 +18,11 @@ EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 
-reminder_not_sent_posts: dict[int, int] = {} # declare a dictionary of post ids: the amount of tries
+reminder_not_sent_posts: dict[int, int] = {} # dictionary of post ids: the amount of tries
 class CloseNow(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-    
+        
     @ui.button(label="Issue already solved? Close post now", custom_id="remind-close-now", style=discord.ButtonStyle.grey)
     async def on_close_now_click(self, interaction: discord.Interaction, button: ui.Button):
         experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
@@ -32,7 +32,10 @@ class CloseNow(ui.View):
             tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
             if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
                 tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-            await interaction.channel.edit(applied_tags=tags, archived=True, reason=f"ID: {generate_random_id()}. {interaction.user.name} Clicked close now button")
+            action_id = generate_random_id()
+            await interaction.channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
+            alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
+            await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}")
             await remove_post_from_pending(interaction.channel.id)
         else:
             await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
@@ -52,6 +55,10 @@ class remind(commands.Cog):
         self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
         self.solved = support.get_tag(SOLVED_TAG_ID)
         self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
+
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag]):
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}")
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -95,6 +102,7 @@ class remind(commands.Cog):
                     await alerts_thread.send(
                         content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: `{e.status}`"
                     )
+                    reminder_not_sent_posts[post.id] += 1
                     continue
                 if check_time_more_than_day(message.created_at.timestamp()):
                     await add_post_to_pending(post.id, datetime.datetime.now())
@@ -151,7 +159,9 @@ class remind(commands.Cog):
                     if await check_post_last_message_time(post_id):
                         tags = [self.solved]
                         if self.cb in post.applied_tags: tags.append(self.cb)
-                        await post.edit(archived=True, reason=f"ID: {generate_random_id()}.Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
+                        action_id = generate_random_id()
+                        await post.edit(archived=True, reason=f"ID: {action_id}.Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
+                        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags)
                         await remove_post_from_pending(post.id)
                         await remove_post_from_rtdr(post.id)
                     else:

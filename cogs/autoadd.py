@@ -15,6 +15,7 @@ SUPPORT_CHANNEL_ID = int(os.getenv('SUPPORT_CHANNEL_ID'))
 NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
+ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 
 class autoadd(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -35,6 +36,10 @@ class autoadd(commands.Cog):
                 else:
                     continue
         return solved_id
+
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag]):
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}")
 
     @tasks.loop(seconds=1, count=1)
     async def get_tags(self):
@@ -62,7 +67,9 @@ class autoadd(commands.Cog):
     async def on_thread_create(self, thread: discord.Thread):
         tags = thread.applied_tags
         tags.append(self.unanswered)
-        await thread.edit(applied_tags=tags, reason=f"ID: {generate_random_id()}.Auto-add unanswered tag to a new post.")
+        action_id = generate_random_id()
+        await thread.edit(applied_tags=tags, reason=f"ID: {action_id}.Auto-add unanswered tag to a new post.")
+        await self.send_action_log(action_id=action_id, post_mention=thread.mention, tags=tags)
         if (thread.starter_message.content and len(thread.starter_message.content) < 15) or not thread.starter_message.content: # Check if the amount of characters in the starting message is smaller than 15 or if the starter message doesn't have content- attachment(s) only
             greets = ["Hi", "Hey", "Hello", "Hi there"]
             await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
@@ -83,7 +90,9 @@ class autoadd(commands.Cog):
             if (message.author != message.channel.owner) or (message.channel.id in await get_rtdr_posts() and message.author.id == await get_post_creator_id(message.channel)):
                 tags = [self.not_solved]
                 if self.cb in message.channel.applied_tags: tags.append(self.cb)
-                await message.channel.edit(applied_tags=tags, reason=f"ID: {generate_random_id()}. Auto-remove unanswered tag and replace with not solved tag")
+                action_id = generate_random_id()
+                await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
+                await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags)
 
     @tasks.loop(hours=1)
     async def close_abandoned_posts(self):
@@ -95,7 +104,9 @@ class autoadd(commands.Cog):
                         if not post.owner:
                             tags = [self.solved]
                             if self.cb in post.applied_tags: tags.append(self.cb)
-                            await post.edit(archived=True, reason=f"ID: {generate_random_id}. User left server, auto close post", applied_tags=tags)
+                            action_id = generate_random_id()
+                            await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
+                            await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags)
 
     @close_abandoned_posts.before_loop
     @get_tags.before_loop
