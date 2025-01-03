@@ -16,9 +16,9 @@ async def on_ready():
 
 @client.event
 async def setup_hook():
-    for filename in os.listdir('./cogs'): # List all files in cogs folder
-        if filename.endswith('.py'): # Check if file is a Python file
-            await client.load_extension(f"cogs.{filename[:-3]}") # Load the file as an extension/cog
+    for filename in os.listdir('./cogs'):
+        if filename.endswith('.py'):
+            await client.load_extension(f"cogs.{filename[:-3]}")
             print(f"Loaded extension {filename[:-3]}")
         else:
             print(f"Skipped loading {filename[:-3]}")

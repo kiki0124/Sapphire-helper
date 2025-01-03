@@ -1,13 +1,16 @@
-import datetime # python module for using datetime objects
-import aiosqlite as sql # asynchronous, sqlite based, database wrapper for Python
+import datetime
+import aiosqlite as sql
+from string import ascii_letters, digits
+import random
 
-
-async def main(): # main function, create the table, should only be called once
-    async with sql.connect("data.db") as conn: # create an asynchronous connection with the db
-        async with conn.cursor() as cu: # create an asynchronous connection with the db cursor
-            await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER UNIQUE NOT NULL PRIMARY KEY, timestamp INTEGER NOT NULL)") # execute given command
+async def main():
+    async with sql.connect("data.db") as conn: 
+        async with conn.cursor() as cu:
+            await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER UNIQUE NOT NULL PRIMARY KEY, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER UNIQUE NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
-            await conn.commit() # commit changes
+            await conn.commit()
+
+# reminder system related functions
 
 async def add_post_to_pending(post_id: int, timestamp) -> None:
     """
@@ -15,7 +18,7 @@ async def add_post_to_pending(post_id: int, timestamp) -> None:
     """
     async with sql.connect('data.db') as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES ({post_id}, {timestamp})") # insert post id and timestamp
+            await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES ({post_id}, {timestamp})")
             await conn.commit()
 
 async def get_pending_posts() -> list[int]:
@@ -24,8 +27,8 @@ async def get_pending_posts() -> list[int]:
     """
     async with sql.connect('data.db') as conn:
         async with conn.cursor() as cu:
-            await cu.execute("SELECT post_id FROM pending_posts") # select all post_ids from pending posts table
-            return [int(post_id[0]) for post_id in await cu.fetchall()] # change the return type to list[int]
+            await cu.execute("SELECT post_id FROM pending_posts")
+            return [int(post_id[0]) for post_id in await cu.fetchall()]
 
 async def remove_post_from_pending(post_id: int) -> None:
     """  
@@ -33,16 +36,16 @@ async def remove_post_from_pending(post_id: int) -> None:
     """
     async with sql.connect('data.db') as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"DELETE FROM pending_posts WHERE post_id={post_id}") # delete a post with the given id from db
+            await cu.execute(f"DELETE FROM pending_posts WHERE post_id={post_id}")
             await conn.commit()
 
 def check_time_more_than_day(timestamp: int) -> bool:
     """  
     Check if the given time is more than a day ago
     """
-    time = datetime.datetime.fromtimestamp(timestamp, tz=datetime.datetime.now().astimezone().tzinfo) # turn the time from timestamp (int) to an aware datetime object
-    one_day_ago = datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo) - datetime.timedelta(days=1) # define a datetime object that is 1 day ago
-    return not one_day_ago <= time # check if the time (from given timestamp) is "more or equal to" (before) 1 day ago datetime object
+    time = datetime.datetime.fromtimestamp(timestamp, tz=datetime.datetime.now().astimezone().tzinfo)
+    one_day_ago = datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo) - datetime.timedelta(days=1)
+    return not one_day_ago <= time 
 
 async def check_post_last_message_time(post_id: int) -> bool:
     """
@@ -50,10 +53,10 @@ async def check_post_last_message_time(post_id: int) -> bool:
     """
     async with sql.connect('data.db') as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"SELECT timestamp FROM pending_posts WHERE post_id={post_id}") # get the timestamp of the post with the given id
+            await cu.execute(f"SELECT timestamp FROM pending_posts WHERE post_id={post_id}")
             result = await cu.fetchone()
-            timestamp = result[0] # result is tuple, select the first item
-            return check_time_more_than_day(timestamp) # check if the time is more than a day with the timestamp
+            timestamp = result[0]
+            return check_time_more_than_day(timestamp)
 
 # readthedamnrules system related functions
 
@@ -63,7 +66,7 @@ async def add_post_to_rtdr(post_id: int, user_id: int) -> None:
     """
     async with sql.connect('data.db') as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES ({post_id}, {user_id})") # insert the post to the table with the post id and user/author id
+            await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES ({post_id}, {user_id})")
             await conn.commit()
 
 async def get_post_creator_id(post_id: int) -> int|None:
@@ -72,10 +75,10 @@ async def get_post_creator_id(post_id: int) -> int|None:
     """
     async with sql.connect('data.db') as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"SELECT user_id FROM readthedamnrules WHERE post_id={post_id}") # select only the user id (as thats what needed to return)
+            await cu.execute(f"SELECT user_id FROM readthedamnrules WHERE post_id={post_id}")
             result = None
-            result = await cu.fetchone() # there should only be one returned result, so fetchone
-            return result[0] if result else None # .fetchone() returns a tuple, return the first item or None if there isn't a first item
+            result = await cu.fetchone()
+            return result[0] if result else None
 
 async def remove_post_from_rtdr(post_id: int) -> None:
     """  
@@ -85,3 +88,19 @@ async def remove_post_from_rtdr(post_id: int) -> None:
         async with conn.cursor() as cu:
             await cu.execute(f"DELETE FROM readthedamnrules WHERE post_id={post_id}")
             await conn.commit()
+        
+async def get_rtdr_posts() -> list[int]:
+    """  
+    Returns a list of all post ids in rtdr system
+    """
+    async with sql.connect('data.db') as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT post_id FROM readthedamnrules")
+            result = await cu.fetchall()
+            return [post_id for post_id in result[0] if result[0]]
+
+# other functions
+
+def generate_random_id() -> str:
+    characters = ascii_letters + digits
+    return ''.join(random.choice(characters) for _ in range(6))
