@@ -34,7 +34,7 @@ class CloseNow(ui.View):
                 tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
-            alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
+            alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}")
             await remove_post_from_pending(interaction.channel.id)
         else:
@@ -74,7 +74,7 @@ class remind(commands.Cog):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         to_remove = []
         for post_id, tries in reminder_not_sent_posts.items():
-            post = support.guild.get_thread(post_id)
+            post = support.get_thread(post.id)
             if tries < 24:
                 try:
                     message: discord.Message|None = await post.fetch_message(post.last_message_id)
@@ -98,7 +98,7 @@ class remind(commands.Cog):
                 try:
                     message = await post.fetch_message(post.last_message_id)
                 except discord.HTTPException as e:
-                    alerts_thread = post.guild.get_thread(ALERTS_THREAD_ID)
+                    alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
                     await alerts_thread.send(
                         content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: `{e.status}`"
                     )
@@ -127,7 +127,7 @@ class remind(commands.Cog):
                                 reminder_not_sent_posts[post.id] = 1
                                 continue
                             except discord.HTTPException as e:
-                                alerts = post.guild.get_thread(ALERTS_THREAD_ID)
+                                alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
                                 await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
                                 continue
                             if message.author != post.owner:

@@ -51,7 +51,7 @@ class ndr_options_buttons(ui.View):
         cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
         if cb in interaction.channel.applied_tags: tags.append(cb)
         action_id = generate_random_id()
-        alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
+        alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
         await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
         await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}")
         channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
