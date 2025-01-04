@@ -187,7 +187,9 @@ class utility(commands.Cog):
                 async def on_confirm_button_click(Interaction: discord.Interaction):
                     await self.mark_post_as_solved(interaction.channel)
                     one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
-                    await Interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
+                    await Interaction.response.defer(ephemeral=True)
+                    await Interaction.delete_original_response()
+                    await Interaction.channel.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
                 button.callback = on_confirm_button_click
                 view = ui.View() # construct an empty view item
                 view.add_item(button)
