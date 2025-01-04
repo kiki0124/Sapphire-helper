@@ -35,7 +35,7 @@ class CloseNow(ui.View):
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
             alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
-            await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}")
+            await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: Close now button clicked")
             await remove_post_from_pending(interaction.channel.id)
         else:
             await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
@@ -56,9 +56,9 @@ class remind(commands.Cog):
         self.solved = support.get_tag(SOLVED_TAG_ID)
         self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
 
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag]):
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}")
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: {context}")
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -160,8 +160,8 @@ class remind(commands.Cog):
                         tags = [self.solved]
                         if self.cb in post.applied_tags: tags.append(self.cb)
                         action_id = generate_random_id()
-                        await post.edit(archived=True, reason=f"ID: {action_id}.Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
-                        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags)
+                        await post.edit(archived=True, reason=f"ID: {action_id}. Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
+                        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
                         await remove_post_from_pending(post.id)
                         await remove_post_from_rtdr(post.id)
                     else:

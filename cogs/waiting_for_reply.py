@@ -18,7 +18,7 @@ class waiting_for_reply(commands.Cog):
         self.client: commands.Bot = client
         self.get_tags.start()
 
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag]):
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         await alerts_thread.send(
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}"
@@ -40,8 +40,8 @@ class waiting_for_reply(commands.Cog):
         applied_tags.append(self.waiting_for_reply)
         if not self.solved in post.applied_tags and not self.ndr in post.applied_tags and not post.archived:
             action_id = generate_random_id()
-            await post.edit(applied_tags=applied_tags, reason=f"ID: {action_id}.Waiting for reply system")
-            await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=applied_tags)
+            await post.edit(applied_tags=applied_tags, reason=f"ID: {action_id}. Waiting for reply system")
+            await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=applied_tags, context="Add Waiting for reply")
             self.posts.pop(post.id)
 
     @commands.Cog.listener('on_message')
@@ -63,7 +63,7 @@ class waiting_for_reply(commands.Cog):
                             tags.remove(self.waiting_for_reply)
                             action_id = generate_random_id()
                             await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag as last message author isn't OP")
-                            await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags)
+                            await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
 
     @get_tags.before_loop
     async def wait_until_ready(self):

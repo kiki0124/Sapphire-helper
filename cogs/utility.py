@@ -53,7 +53,7 @@ class ndr_options_buttons(ui.View):
         action_id = generate_random_id()
         alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
         await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}")
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: /needs-dev-review command used")
         channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
 
@@ -81,10 +81,10 @@ class utility(commands.Cog):
         self.client: commands.Bot = client
         self.get_tags.start()
 
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag]):
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         await alerts_thread.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}"
+            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: {context}"
         )
 
     @cached()
@@ -139,8 +139,8 @@ class utility(commands.Cog):
         tags = [self.solve]
         if self.cb in post.applied_tags: tags.append(self.cb)
         action_id = generate_random_id()
-        await post.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as solved with /solved")
-        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags)
+        await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as solved with /solved")
+        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
         return task
 
     async def unsolve_post(self, post: discord.Thread) -> None:
@@ -154,7 +154,7 @@ class utility(commands.Cog):
         if self.cb in post.applied_tags: tags.append(self.cb)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post unsolved with /unsolve")
-        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags)
+        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/unsolve used")
 
     @staticmethod
     async def one_of_mod_expert_op(interaction: discord.Interaction):
