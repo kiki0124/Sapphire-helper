@@ -34,15 +34,16 @@ class waiting_for_reply(commands.Cog):
 
     posts: dict[int, asyncio.Task] = {}
 
-    async def add_waiting_tag(self, post: discord.Thread) -> None:
+    async def add_waiting_tag(self, post_id: int) -> None:
         await asyncio.sleep(600) # wait for 10 minutes to prevent rate limits
+        post = self.client.get_channel(post_id)
         applied_tags = post.applied_tags
         applied_tags.append(self.waiting_for_reply)
         if not self.solved in post.applied_tags and not self.ndr in post.applied_tags and not post.archived:
             action_id = generate_random_id()
             await post.edit(applied_tags=applied_tags, reason=f"ID: {action_id}. Waiting for reply system")
             await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=applied_tags, context="Add Waiting for reply")
-            self.posts.pop(post.id)
+            self.posts.pop(post_id)
 
     @commands.Cog.listener('on_message')
     async def add_remove_waiting_for_reply(self, message: discord.Message):
@@ -54,7 +55,7 @@ class waiting_for_reply(commands.Cog):
                     if not self.ndr in tags and not self.solved in tags and not self.unanswered in message.channel.applied_tags:
                         if not self.waiting_for_reply in tags:
                             if message.author == message.channel.owner and not channel_id in self.posts:
-                                task = asyncio.create_task(self.add_waiting_tag(post=message.channel))
+                                task = asyncio.create_task(self.add_waiting_tag(post_id=message.channel.id))
                                 self.posts[channel_id] = task
                             elif message.author != message.channel.owner and channel_id in self.posts:
                                 self.posts[channel_id].cancel()
@@ -64,6 +65,14 @@ class waiting_for_reply(commands.Cog):
                             action_id = generate_random_id()
                             await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag as last message author isn't OP")
                             await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
+
+    @commands.command()
+    async def check(self, ctx, post: discord.Thread):
+        await ctx.reply(post.id in self.posts)
+
+    @commands.command()
+    async def data(self, ctx):
+        print(self.posts)
 
     @get_tags.before_loop
     async def wait_until_ready(self):
