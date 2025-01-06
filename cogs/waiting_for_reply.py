@@ -66,14 +66,6 @@ class waiting_for_reply(commands.Cog):
                             await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag as last message author isn't OP")
                             await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
 
-    @commands.command()
-    async def check(self, ctx, post: discord.Thread):
-        await ctx.reply(post.id in self.posts)
-
-    @commands.command()
-    async def data(self, ctx):
-        print(self.posts)
-
     @get_tags.before_loop
     async def wait_until_ready(self):
         await self.client.wait_until_ready()
