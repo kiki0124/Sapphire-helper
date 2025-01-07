@@ -33,12 +33,13 @@ class readthedamnrules(commands.Cog):
         """
         files = []
         for msg in messages:
-            files.append(await attachment.to_file() for attachment in msg.attachments)
+            for attachment in msg.attachments:
+                files.append(await attachment.to_file())
         return files
 
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
-        files = await self.get_files(messages_to_move)
+        files = await self.get_files(messages=messages_to_move)
         content = '\n'.join([msg.content for msg in messages_to_move])
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         title = message.content.removeprefix(self.client.user.mention) or f"Support for {reference_message.author.name}"
