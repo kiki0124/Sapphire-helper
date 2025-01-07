@@ -15,7 +15,7 @@ class readthedamnrules(commands.Cog):
     def __init__(self, client) -> None:
         self.client: commands.Bot = client
     
-    async def get_messages_to_move(reference_message: discord.Message) -> list[discord.Message]:
+    async def get_messages_to_move(self, reference_message: discord.Message) -> list[discord.Message]:
         """  
         Get a list[Message] for all messages that should be used in the new post
         """
@@ -27,13 +27,14 @@ class readthedamnrules(commands.Cog):
                 break
         return messages_to_move
 
-    async def get_files(messages: list[discord.Message]) -> list[discord.File]:
+    async def get_files(self, messages: list[discord.Message]) -> list[discord.File]:
         """  
         Returns list[File] for all attachments (files) that should be used in the new post 
         """
         files = []
         for msg in messages:
             files.append(await attachment.to_file() for attachment in msg.attachments)
+        return files
 
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
