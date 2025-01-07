@@ -40,8 +40,7 @@ class readthedamnrules(commands.Cog):
         files = await self.get_files(messages_to_move)
         content = '\n'.join([msg.content for msg in messages_to_move])
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        title = f"Support for {reference_message.author.name}"
-        if message: title = message.content.removeprefix(self.client.user.mention)
+        title = message.content.removeprefix(self.client.user.mention) or f"Support for {reference_message.author.name}"
         post_data = await support.create_thread(
             name=title,
             files=files,
