@@ -35,3 +35,6 @@ pip install -r requirements.txt
     - If message matches the regex `(solved|^ty|\sty|thanks|work|fixed)` suggest to use /solved, and add the post to a list of ignored posts for this regex (list cleared on bot restart)
     - If the post has unanswered tag, and the message of the author isn't the creator of the post- replace it with not solved.
   ## functions.py- Functions to add/remove/view data from/to the database- Doesn't directly communicate with discord, these functions are used in the files that do communicate with discord though.
+
+### Function tests:
+  To run the tests (only tests functions.check_time_more_than_day) run test_functions.py
