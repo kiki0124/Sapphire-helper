@@ -48,6 +48,20 @@ class remind(commands.Cog):
         self.close_pending_posts.start()
         self.check_exception_posts.start()
 
+    async def reminders_filter(self, thread: discord.Thread):
+        """  
+        Filter function for posts in reminder system, returns true if all of the following criteria are met:
+        * Not locked, not archived
+        * Doesn't have needs dev review & solved
+        * Is in #support (parent_id==SUPPORT_CHANNEL_ID)
+        """
+        ndr = not self.ndr in thread.applied_tags
+        solved = not self.solved in thread.applied_tags
+        archived = not thread.archived
+        locked = not thread.locked
+        support = thread.parent_id == SUPPORT_CHANNEL_ID
+        return ndr and solved and archived and locked and support
+
     @tasks.loop(seconds=1, count=1)
     async def get_tags(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
@@ -117,27 +131,25 @@ class remind(commands.Cog):
     async def send_reminders(self):
         channel = self.client.get_channel(SUPPORT_CHANNEL_ID)
         for post in await channel.guild.active_threads():
-            if post.parent_id==SUPPORT_CHANNEL_ID:
-                if not post.locked:
-                    if self.ndr not in post.applied_tags and self.solved not in post.applied_tags:
-                        if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
-                            try:
-                                message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
-                            except discord.NotFound: # message id could be for a message that was already deleted
-                                reminder_not_sent_posts[post.id] = 1
-                                continue
-                            except discord.HTTPException as e:
-                                alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
-                                await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
-                                continue
-                            if message.author != post.owner:
-                                if check_time_more_than_day(message.created_at.timestamp()):
-                                    if post.owner: # make sure post owner isn't None- still in server
-                                        greetings = ["Hi", "Hello", "Hey", "Hi there"]
-                                        post_author_id = await get_post_creator_id(post.id) or post.owner_id
-                                        await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
-                                        await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
-        
+            if await self.reminders_filter(post):
+                if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
+                    try:
+                        message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
+                    except discord.NotFound: # message id could be for a message that was already deleted
+                        reminder_not_sent_posts[post.id] = 1
+                        continue
+                    except discord.HTTPException as e:
+                        alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+                        await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
+                        continue
+                    if message.author != post.owner:
+                        if check_time_more_than_day(message.created_at.timestamp()):
+                            if post.owner: # make sure post owner isn't None- still in server
+                                greetings = ["Hi", "Hello", "Hey", "Hi there"]
+                                post_author_id = await get_post_creator_id(post.id) or post.owner_id
+                                await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
+                                await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
+
     async def pending_posts_listener(self, message: discord.Message):
         if message.channel.id in await get_pending_posts():
             if message.author == message.channel.owner:
