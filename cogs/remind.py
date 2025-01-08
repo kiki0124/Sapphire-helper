@@ -44,7 +44,7 @@ class remind(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
         self.get_tags.start()
-        self.close_pending_posts.start()
+        self.check_for_pending_posts.start()
         self.close_pending_posts.start()
         self.check_exception_posts.start()
 
