@@ -175,8 +175,10 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     async def solved(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):
-            if self.ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower():
-                if self.solve not in interaction.channel.applied_tags:
+            not_ndr = self.ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower()
+            not_solved = self.solved not in interaction.channel.applied_tags
+            if not_ndr:
+                if not_solved:
                     await self.mark_post_as_solved(interaction.channel)
                     one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
                     await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
