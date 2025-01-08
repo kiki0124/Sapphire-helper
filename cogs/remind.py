@@ -151,14 +151,14 @@ class remind(commands.Cog):
                                 await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
             
     @commands.Cog.listener('on_message')
-    async def on_message(self, message: discord.Message):
-        if not message.author == self.client.user:
+    async def remove_pending_posts(self, message: discord.Message):
+        if message.author != self.client.user:
             channel_filter = isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID
-            others_filter = not message.channel.locked and not self.ndr in message.channel.applied_tags
-            if channel_filter and others_filter:
+            if channel_filter:
+                others_filter = not message.channel.locked and not self.ndr in message.channel.applied_tags
                 message_author = message.author == message.channel.owner
                 in_pending_post = message.channel.id in await get_pending_posts()
-                if message_author and in_pending_post:
+                if message_author and in_pending_post and others_filter:
                     await remove_post_from_pending(message.channel.id)
                 
     @tasks.loop(hours=1)
