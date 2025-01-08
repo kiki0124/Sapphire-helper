@@ -17,7 +17,7 @@ async def on_ready():
 
 @client.event
 async def setup_hook():
-    await main() # function that creates the db table if they don't already exist
+    await main() # function that creates the db tables if they don't already exist
     for filename in os.listdir('./cogs'):
         if filename.endswith('.py'):
             await client.load_extension(f"cogs.{filename[:-3]}")
