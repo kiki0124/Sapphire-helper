@@ -44,7 +44,7 @@ class remind(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
         self.get_tags.start()
-        self.send_reminders.start()
+        self.close_pending_posts.start()
         self.close_pending_posts.start()
         self.check_exception_posts.start()
 
@@ -79,7 +79,7 @@ class remind(commands.Cog):
         self.client.add_view(CloseNow())
 
     async def cog_unload(self):
-        self.send_reminders.cancel()
+        self.check_for_pending_posts.cancel()
         self.close_pending_posts.cancel()
         self.check_exception_posts.cancel()
 
