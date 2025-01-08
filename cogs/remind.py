@@ -166,18 +166,17 @@ class remind(commands.Cog):
         for post_id in await get_pending_posts():
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
-                if self.ndr not in post.applied_tags:
-                    if await check_post_last_message_time(post_id):
-                        tags = [self.solved]
-                        if self.cb in post.applied_tags: tags.append(self.cb)
-                        action_id = generate_random_id()
-                        await post.edit(archived=True, reason=f"ID: {action_id}. Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
-                        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
-                        await remove_post_from_pending(post.id)
-                        await remove_post_from_rtdr(post.id)
-                    else:
-                        continue
-                else:
+                ndr = self.ndr not in post.applied_tags
+                last_message_time = await check_post_last_message_time(post_id)
+                if ndr and last_message_time:
+                    tags = [self.solved]
+                    if self.cb in post.applied_tags: tags.append(self.cb)
+                    action_id = generate_random_id()
+                    await post.edit(archived=True, reason=f"ID: {action_id}. Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
+                    await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
+                    await remove_post_from_pending(post.id)
+                    await remove_post_from_rtdr(post.id)
+            else:
                     await remove_post_from_pending(post_id)
                     continue
 
