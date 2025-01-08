@@ -20,9 +20,10 @@ def check_time_more_than_day(timestamp: int) -> bool:
     """  
     Check if the given time is more than a day ago
     """
-    time = datetime.datetime.fromtimestamp(timestamp, tz=datetime.datetime.now().astimezone().tzinfo)
-    one_day_ago = datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo) - datetime.timedelta(days=1)
-    return not one_day_ago <= time 
+    tz_info = datetime.datetime.now().astimezone().tzinfo
+    time = datetime.datetime.fromtimestamp(timestamp, tz=tz_info)
+    one_day_ago = datetime.datetime.now(tz=tz_info) - datetime.timedelta(days=1)
+    return not one_day_ago < time 
 
 
 # reminder system related functions
