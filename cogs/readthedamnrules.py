@@ -37,21 +37,40 @@ class readthedamnrules(commands.Cog):
                 files.append(await attachment.to_file())
         return files
 
+    async def get_content(self, messages: list[discord.Message]) -> str:
+        """  
+        Returns a string of messages that should be used in the content of the post in this format
+        ```
+        first message content
+        second message content
+        ...
+        ```
+        or "No message content found" if all messages don't have content (only have attachments)
+        """
+        content = 'No message content found'
+        messages_content: list[discord.Message] = []
+        for message in messages:
+            if message.content:
+                messages_content.append(message.content)
+        if messages_content:
+            content = '\n'.join(messages_content)
+        return content
+
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
-        messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
+        messages_to_move: str = await self.get_messages_to_move(reference_message)
         files = await self.get_files(messages=messages_to_move)
-        content = '\n'.join([msg.content for msg in messages_to_move])
+        content = await self.get_content(messages_to_move)
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         title = f"Support for {reference_message.author.name}"
-        if message:
+        if message and message.content.removeprefix(self.client.user.mention): # make sure the message has a content beyond @sapphire helper
             title = message.content.removeprefix(self.client.user.mention) 
-        post_data = await support.create_thread(
+        post = await support.create_thread(
             name=title,
             files=files,
             content=f"**Original message:**\n```\n{content}```\n\n{reference_message.author.mention} please provide any additional information here so we can give you the best help.\n-# Created by {user.name}"
         )
-        await add_post_to_rtdr(post_id=post_data[0].id, user_id=reference_message.author.id)
-        return post_data[0]
+        await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
+        return post[0]
 
     @commands.Cog.listener('on_message')
     async def redirect_to_support(self, message: discord.Message):
