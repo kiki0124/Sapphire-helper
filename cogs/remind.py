@@ -128,10 +128,10 @@ class remind(commands.Cog):
             reminder_not_sent_posts.pop(post_id)
 
     @tasks.loop(hours=1)
-    async def send_reminders(self):
+    async def check_for_pending_posts(self):
         channel = self.client.get_channel(SUPPORT_CHANNEL_ID)
         for post in await channel.guild.active_threads():
-            if await self.reminders_filter(post):
+            if await self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
                 if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
                     try:
                         message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
@@ -149,19 +149,18 @@ class remind(commands.Cog):
                                 post_author_id = await get_post_creator_id(post.id) or post.owner_id
                                 await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
                                 await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
-
-    async def pending_posts_listener(self, message: discord.Message):
-        if message.channel.id in await get_pending_posts():
-            if message.author == message.channel.owner:
-                await remove_post_from_pending(message.channel.id)
-                
-    @commands.Cog.listener()
+            
+    @commands.Cog.listener('on_message')
     async def on_message(self, message: discord.Message):
         if not message.author == self.client.user:
-            if isinstance(message.channel, discord.Thread) and  message.channel.parent_id == SUPPORT_CHANNEL_ID:
-                if not message.channel.locked and not self.ndr in message.channel.applied_tags:
-                    await self.pending_posts_listener(message)
-
+            channel_filter = isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID
+            others_filter = not message.channel.locked and not self.ndr in message.channel.applied_tags
+            if channel_filter and others_filter:
+                message_author = message.author == message.channel.owner
+                in_pending_post = message.channel.id in await get_pending_posts()
+                if message_author and in_pending_post:
+                    await remove_post_from_pending(message.channel.id)
+                
     @tasks.loop(hours=1)
     async def close_pending_posts(self):
         for post_id in await get_pending_posts():
@@ -182,7 +181,7 @@ class remind(commands.Cog):
                     await remove_post_from_pending(post_id)
                     continue
 
-    @send_reminders.before_loop
+    @check_for_pending_posts.before_loop
     @close_pending_posts.before_loop
     @check_exception_posts.before_loop
     @get_tags.before_loop
