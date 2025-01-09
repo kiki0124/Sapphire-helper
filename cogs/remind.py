@@ -85,10 +85,9 @@ class remind(commands.Cog):
 
     @tasks.loop(hours=1)
     async def check_exception_posts(self):
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         to_remove = []
         for post_id, tries in reminder_not_sent_posts.items():
-            post = support.get_thread(post.id)
+            post = self.client.get_channel(post_id)
             if tries < 24:
                 try:
                     message: discord.Message|None = await post.fetch_message(post.last_message_id)
@@ -167,8 +166,8 @@ class remind(commands.Cog):
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
                 ndr = self.ndr not in post.applied_tags
-                last_message_time = await check_post_last_message_time(post_id)
-                if ndr and last_message_time:
+                more_than_24_hours = await check_post_last_message_time(post_id)
+                if ndr and more_than_24_hours:
                     tags = [self.solved]
                     if self.cb in post.applied_tags: tags.append(self.cb)
                     action_id = generate_random_id()
@@ -186,6 +185,10 @@ class remind(commands.Cog):
     @get_tags.before_loop
     async def loops_before_loop(self):
         await self.client.wait_until_ready() # only start the loop when the bot's cache is ready
+
+    @commands.command()
+    async def check_post_pending(self, ctx: commands.Context, post: discord.Thread):
+        await ctx.reply(post.id in await get_pending_posts())
 
 async def setup(client):
     await client.add_cog(remind(client))
