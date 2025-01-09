@@ -240,7 +240,8 @@ class utility(commands.Cog):
             if experts in user.roles:
                 await reaction.message.delete()
             else:
-                if f"@{user.name}" in reaction.message.embeds[len(reaction.message.embeds)-1].footer.text: # check if @user_name is in the footer of the last embed
+                last_embed_footer = reaction.message.embeds[len(reaction.message.embeds)-1].footer.text
+                if last_embed_footer == f"Sent by @{user.name}" or last_embed_footer == f"Recommended by @{user.name}": # check if @user_name is in the footer of the last embed
                     await reaction.message.delete()
 
 
