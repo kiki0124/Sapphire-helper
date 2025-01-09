@@ -25,7 +25,6 @@ def check_time_more_than_day(timestamp: int) -> bool:
     one_day_ago = datetime.datetime.now(tz=tz_info) - datetime.timedelta(days=1)
     return not one_day_ago < time 
 
-
 # reminder system related functions
 
 async def add_post_to_pending(post_id: int, timestamp) -> None:
