@@ -27,7 +27,7 @@ def check_time_more_than_day(timestamp: int) -> bool:
 
 # reminder system related functions
 
-async def add_post_to_pending(post_id: int, timestamp) -> None:
+async def add_post_to_pending(post_id: int, timestamp: int) -> None:
     """
     Add the post with the given id and timestamp to pending db
     """
