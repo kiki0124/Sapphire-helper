@@ -102,7 +102,7 @@ class remind(commands.Cog):
                     if post.owner: # make sure the post owner is not None- still in server
                         greetings = ["Hi", "Hello", "Hey", "Hi there"]
                         await message.channel.send(content=f"{random.choices(greetings)[0]} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
-                        await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
+                        await add_post_to_pending(post_id=post.id, timestamp=datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo).timestamp())
                         to_remove.append(post.id)
                         continue
                     else:
@@ -121,7 +121,7 @@ class remind(commands.Cog):
                     reminder_not_sent_posts[post.id] += 1
                     continue
                 if check_time_more_than_day(message.created_at.timestamp()):
-                    await add_post_to_pending(post.id, datetime.datetime.now())
+                    await add_post_to_pending(post.id, datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo).timestamp())
                     continue
                 else:
                     to_remove.append(post.id)
@@ -144,13 +144,14 @@ class remind(commands.Cog):
                         alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
                         await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
                         continue
-                    if message.author != post.owner:
-                        if check_time_more_than_day(message.created_at.timestamp()):
-                            if post.owner: # make sure post owner isn't None- still in server
-                                greetings = ["Hi", "Hello", "Hey", "Hi there"]
-                                post_author_id = await get_post_creator_id(post.id) or post.owner_id
-                                await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
-                                await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
+                    author_not_owner = message.author != post.owner
+                    more_than_day = check_time_more_than_day(message.created_at.timestamp())
+                    if author_not_owner and more_than_day:
+                        if post.owner: # make sure post owner isn't None- still in server
+                            greetings = ["Hi", "Hello", "Hey", "Hi there"]
+                            post_author_id = await get_post_creator_id(post.id) or post.owner_id
+                            await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
+                            await add_post_to_pending(post_id=post.id, timestamp=datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo).timestamp())
             
     @commands.Cog.listener('on_message')
     async def remove_pending_posts(self, message: discord.Message):
