@@ -1,7 +1,6 @@
 import unittest
 from functions import check_time_more_than_day
 from datetime import datetime, timedelta
-import asyncio
 
 class test_functions(unittest.TestCase):
 
