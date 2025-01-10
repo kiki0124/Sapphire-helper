@@ -235,7 +235,7 @@ class utility(commands.Cog):
         from_sapphire = reaction.message.author.id == 678344927997853742 # Sapphire's user id
         allowed_reactions = ["🗑️", "❌"]
         reaction_allowed = reaction.emoji in allowed_reactions
-        if in_support and from_sapphire and reaction_allowed:
+        if in_support and from_sapphire and reaction_allowed and reaction.message.interaction_metadata:
             experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
             if experts in user.roles:
                 await reaction.message.delete()
