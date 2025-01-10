@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
+from functions import main
 
 load_dotenv()
 
@@ -16,6 +17,7 @@ async def on_ready():
 
 @client.event
 async def setup_hook():
+    await main() # function that creates the db tables if they don't already exist
     for filename in os.listdir('./cogs'):
         if filename.endswith('.py'):
             await client.load_extension(f"cogs.{filename[:-3]}")

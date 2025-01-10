@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 from functions import remove_post_from_rtdr, get_post_creator_id, generate_random_id
 from aiocache import cached
+from typing import Union
 
 load_dotenv()
 
@@ -175,8 +176,10 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     async def solved(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):
-            if self.ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower():
-                if self.solve not in interaction.channel.applied_tags:
+            not_ndr = self.ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower()
+            not_solved = self.solved not in interaction.channel.applied_tags
+            if not_ndr:
+                if not_solved:
                     await self.mark_post_as_solved(interaction.channel)
                     one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
                     await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
@@ -225,6 +228,21 @@ class utility(commands.Cog):
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
             
+    @commands.Cog.listener('on_reaction_add')
+    async def delete_accidental_qr(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
+        in_support = isinstance(reaction.message.channel, discord.Thread) \
+            and reaction.message.channel.parent_id == SUPPORT_CHANNEL_ID
+        from_sapphire = reaction.message.author.id == 678344927997853742 # Sapphire's user id
+        allowed_reactions = ["🗑️", "❌"]
+        reaction_allowed = reaction.emoji in allowed_reactions
+        if in_support and from_sapphire and reaction_allowed and reaction.message.interaction_metadata:
+            experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
+            if experts in user.roles:
+                await reaction.message.delete()
+            else:
+                if reaction.message.interaction_metadata and reaction.message.interaction_metadata.user == user:
+                    await reaction.message.delete()
+
     @get_tags.before_loop
     async def wait_until_ready(self):
         await self.client.wait_until_ready()

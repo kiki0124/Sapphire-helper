@@ -1,6 +1,9 @@
 import discord
 from discord.ext import commands, tasks
-from functions import add_post_to_pending, remove_post_from_pending, get_pending_posts, check_post_last_message_time, check_time_more_than_day, get_post_creator_id, remove_post_from_rtdr, generate_random_id
+from functions import add_post_to_pending, \
+    remove_post_from_pending, get_pending_posts, \
+    check_post_last_message_time, check_time_more_than_day, \
+    get_post_creator_id, remove_post_from_rtdr, generate_random_id
 import random
 from discord import ui
 import datetime
@@ -44,9 +47,23 @@ class remind(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
         self.get_tags.start()
-        self.send_reminders.start()
+        self.check_for_pending_posts.start()
         self.close_pending_posts.start()
         self.check_exception_posts.start()
+
+    async def reminders_filter(self, thread: discord.Thread):
+        """  
+        Filter function for posts in reminder system, returns true if all of the following criteria are met:
+        * Not locked, not archived
+        * Doesn't have needs dev review & solved
+        * Is in #support (parent_id==SUPPORT_CHANNEL_ID)
+        """
+        ndr = not self.ndr in thread.applied_tags
+        solved = not self.solved in thread.applied_tags
+        archived = not thread.archived
+        locked = not thread.locked
+        support = thread.parent_id == SUPPORT_CHANNEL_ID
+        return ndr and solved and archived and locked and support
 
     @tasks.loop(seconds=1, count=1)
     async def get_tags(self):
@@ -65,16 +82,15 @@ class remind(commands.Cog):
         self.client.add_view(CloseNow())
 
     async def cog_unload(self):
-        self.send_reminders.cancel()
+        self.check_for_pending_posts.cancel()
         self.close_pending_posts.cancel()
         self.check_exception_posts.cancel()
 
     @tasks.loop(hours=1)
     async def check_exception_posts(self):
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         to_remove = []
         for post_id, tries in reminder_not_sent_posts.items():
-            post = support.get_thread(post.id)
+            post = self.client.get_channel(post_id)
             if tries < 24:
                 try:
                     message: discord.Message|None = await post.fetch_message(post.last_message_id)
@@ -86,7 +102,7 @@ class remind(commands.Cog):
                     if post.owner: # make sure the post owner is not None- still in server
                         greetings = ["Hi", "Hello", "Hey", "Hi there"]
                         await message.channel.send(content=f"{random.choices(greetings)[0]} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
-                        await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
+                        await add_post_to_pending(post_id=post.id, timestamp=datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo).timestamp())
                         to_remove.append(post.id)
                         continue
                     else:
@@ -105,7 +121,7 @@ class remind(commands.Cog):
                     reminder_not_sent_posts[post.id] += 1
                     continue
                 if check_time_more_than_day(message.created_at.timestamp()):
-                    await add_post_to_pending(post.id, datetime.datetime.now())
+                    await add_post_to_pending(post.id, datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo).timestamp())
                     continue
                 else:
                     to_remove.append(post.id)
@@ -114,68 +130,69 @@ class remind(commands.Cog):
             reminder_not_sent_posts.pop(post_id)
 
     @tasks.loop(hours=1)
-    async def send_reminders(self):
+    async def check_for_pending_posts(self):
         channel = self.client.get_channel(SUPPORT_CHANNEL_ID)
         for post in await channel.guild.active_threads():
-            if post.parent_id==SUPPORT_CHANNEL_ID:
-                if not post.locked:
-                    if self.ndr not in post.applied_tags and self.solved not in post.applied_tags:
-                        if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
-                            try:
-                                message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
-                            except discord.NotFound: # message id could be for a message that was already deleted
-                                reminder_not_sent_posts[post.id] = 1
-                                continue
-                            except discord.HTTPException as e:
-                                alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
-                                await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
-                                continue
-                            if message.author != post.owner:
-                                if check_time_more_than_day(message.created_at.timestamp()):
-                                    if post.owner: # make sure post owner isn't None- still in server
-                                        greetings = ["Hi", "Hello", "Hey", "Hi there"]
-                                        post_author_id = await get_post_creator_id(post.id) or post.owner_id
-                                        await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
-                                        await add_post_to_pending(post_id=post.id, timestamp=message.created_at.timestamp())
-        
-    async def pending_posts_listener(self, message: discord.Message):
-        if message.channel.id in await get_pending_posts():
-            if message.author == message.channel.owner:
-                await remove_post_from_pending(message.channel.id)
+            if await self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
+                if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
+                    try:
+                        message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
+                    except discord.NotFound: # message id could be for a message that was already deleted
+                        reminder_not_sent_posts[post.id] = 1
+                        continue
+                    except discord.HTTPException as e:
+                        alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+                        await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
+                        continue
+                    author_not_owner = message.author != post.owner
+                    more_than_day = check_time_more_than_day(message.created_at.timestamp())
+                    if author_not_owner and more_than_day:
+                        if post.owner: # make sure post owner isn't None- still in server
+                            greetings = ["Hi", "Hello", "Hey", "Hi there"]
+                            post_author_id = await get_post_creator_id(post.id) or post.owner_id
+                            await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
+                            await add_post_to_pending(post_id=post.id, timestamp=datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo).timestamp())
+            
+    @commands.Cog.listener('on_message')
+    async def remove_pending_posts(self, message: discord.Message):
+        if message.author != self.client.user:
+            channel_filter = isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID
+            if channel_filter:
+                others_filter = not message.channel.locked and not self.ndr in message.channel.applied_tags
+                message_author = message.author == message.channel.owner
+                in_pending_post = message.channel.id in await get_pending_posts()
+                if message_author and in_pending_post and others_filter:
+                    await remove_post_from_pending(message.channel.id)
                 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if not message.author == self.client.user:
-            if isinstance(message.channel, discord.Thread) and  message.channel.parent_id == SUPPORT_CHANNEL_ID:
-                if not message.channel.locked and not self.ndr in message.channel.applied_tags:
-                    await self.pending_posts_listener(message)
-
     @tasks.loop(hours=1)
     async def close_pending_posts(self):
         for post_id in await get_pending_posts():
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
-                if self.ndr not in post.applied_tags:
-                    if await check_post_last_message_time(post_id):
-                        tags = [self.solved]
-                        if self.cb in post.applied_tags: tags.append(self.cb)
-                        action_id = generate_random_id()
-                        await post.edit(archived=True, reason=f"ID: {action_id}. Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
-                        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
-                        await remove_post_from_pending(post.id)
-                        await remove_post_from_rtdr(post.id)
-                    else:
-                        continue
-                else:
+                ndr = self.ndr not in post.applied_tags
+                more_than_24_hours = await check_post_last_message_time(post_id)
+                if ndr and more_than_24_hours:
+                    tags = [self.solved]
+                    if self.cb in post.applied_tags: tags.append(self.cb)
+                    action_id = generate_random_id()
+                    await post.edit(archived=True, reason=f"ID: {action_id}. Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
+                    await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
+                    await remove_post_from_pending(post.id)
+                    await remove_post_from_rtdr(post.id)
+            else:
                     await remove_post_from_pending(post_id)
                     continue
 
-    @send_reminders.before_loop
+    @check_for_pending_posts.before_loop
     @close_pending_posts.before_loop
     @check_exception_posts.before_loop
     @get_tags.before_loop
     async def loops_before_loop(self):
         await self.client.wait_until_ready() # only start the loop when the bot's cache is ready
+
+    @commands.command()
+    async def check_post_pending(self, ctx: commands.Context, post: discord.Thread):
+        await ctx.reply(post.id in await get_pending_posts())
 
 async def setup(client):
     await client.add_cog(remind(client))

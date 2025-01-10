@@ -3,6 +3,8 @@ import aiosqlite as sql
 from string import ascii_letters, digits
 import random
 
+# other functions
+
 async def main():
     async with sql.connect("data.db") as conn: 
         async with conn.cursor() as cu:
@@ -10,9 +12,22 @@ async def main():
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER UNIQUE NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await conn.commit()
 
+def generate_random_id() -> str:
+    characters = ascii_letters + digits
+    return ''.join(random.choice(characters) for _ in range(6))
+
+def check_time_more_than_day(timestamp: int) -> bool:
+    """  
+    Check if the given time is more than a day ago
+    """
+    tz_info = datetime.datetime.now().astimezone().tzinfo
+    time = datetime.datetime.fromtimestamp(timestamp, tz=tz_info)
+    one_day_ago = datetime.datetime.now(tz=tz_info) - datetime.timedelta(days=1)
+    return not one_day_ago < time 
+
 # reminder system related functions
 
-async def add_post_to_pending(post_id: int, timestamp) -> None:
+async def add_post_to_pending(post_id: int, timestamp: int) -> None:
     """
     Add the post with the given id and timestamp to pending db
     """
@@ -38,14 +53,6 @@ async def remove_post_from_pending(post_id: int) -> None:
         async with conn.cursor() as cu:
             await cu.execute(f"DELETE FROM pending_posts WHERE post_id={post_id}")
             await conn.commit()
-
-def check_time_more_than_day(timestamp: int) -> bool:
-    """  
-    Check if the given time is more than a day ago
-    """
-    time = datetime.datetime.fromtimestamp(timestamp, tz=datetime.datetime.now().astimezone().tzinfo)
-    one_day_ago = datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo) - datetime.timedelta(days=1)
-    return not one_day_ago <= time 
 
 async def check_post_last_message_time(post_id: int) -> bool:
     """
@@ -102,8 +109,3 @@ async def get_rtdr_posts() -> list[int]:
             else:
                 return []
             
-# other functions
-
-def generate_random_id() -> str:
-    characters = ascii_letters + digits
-    return ''.join(random.choice(characters) for _ in range(6))
