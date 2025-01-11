@@ -190,9 +190,5 @@ class remind(commands.Cog):
     async def loops_before_loop(self):
         await self.client.wait_until_ready() # only start the loop when the bot's cache is ready
 
-    @commands.command()
-    async def check_post_pending(self, ctx: commands.Context, post: discord.Thread):
-        await ctx.reply(post.id in await get_pending_posts())
-
 async def setup(client):
     await client.add_cog(remind(client))
