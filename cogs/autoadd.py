@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 from functions import get_post_creator_id, get_rtdr_posts, generate_random_id
 from aiocache import cached
+from discord import ui
 
 load_dotenv()
 
@@ -16,12 +17,50 @@ NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
+EXPERTS_ROLE_ID = int(os.getenv('EXPERTS_ROLE_ID'))
+MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
+WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
+
+class reopen_button(ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    
+    @ui.button(label="Click here to re-open post", custom_id="auto-close-reopen", style=discord.ButtonStyle.grey)
+    async def on_reopen_click(self, interaction: discord.Interaction, button: ui.Button):
+        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
+        mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
+        is_expert_or_mode = experts in interaction.user.roles or mods \
+        in interaction.user.roles
+        if is_expert_or_mode or interaction.user == interaction.channel.owner \
+            and not interaction.channel.locked:
+            not_solved = interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)
+            wfr = interaction.channel.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
+            tags = [not_solved, wfr]
+            cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+            if cb in interaction.channel.applied_tags:
+                tags.append(cb)
+            action_id = generate_random_id()
+            await interaction.channel.edit(applied_tags=tags, archived=False, reason=f"ID: {action_id}. re-open button clicked")
+            await interaction.response.defer(ephemeral=True)
+            #await interaction.delete_original_response()
+            await interaction.message.edit(content=f"{interaction.message.content}\n-# Post re-opened by {interaction.user.mention}", view=None)
+            alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+            await alerts_thread.send(
+                content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Re-open button clicked"
+            )
+        else:
+            await interaction.response.send_message(content="Only Moderators, Community Experts and the Post Creator can use this!", ephemeral=True)
+            await interaction.channel.edit(archived=True)
 
 class autoadd(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
         self.get_tags.start()
         self.close_abandoned_posts.start()
+
+    @commands.Cog.listener('on_ready')
+    async def add_persistent_view(self):
+        self.client.add_view(reopen_button())
 
     def cog_unload(self):
         self.close_abandoned_posts.cancel()
@@ -70,7 +109,8 @@ class autoadd(commands.Cog):
         action_id = generate_random_id()
         await thread.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-add unanswered tag to a new post.")
         await self.send_action_log(action_id=action_id, post_mention=thread.mention, tags=tags, context="Auto add unanswered tag")
-        if (thread.starter_message.content and len(thread.starter_message.content) < 15) or not thread.starter_message.content: # Check if the amount of characters in the starting message is smaller than 15 or if the starter message doesn't have content- attachment(s) only
+        start_msg = thread.starter_message
+        if start_msg.content and (len(start_msg.content) < 15 or start_msg.content.casefold() == thread.name.casefold()) or not start_msg.content:
             greets = ["Hi", "Hey", "Hello", "Hi there"]
             await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
 
@@ -107,6 +147,27 @@ class autoadd(commands.Cog):
                             action_id = generate_random_id()
                             await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
                             await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
+
+    @commands.Cog.listener('on_raw_message_delete')
+    async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
+        message_channel = self.client.get_channel(payload.channel_id)
+        is_in_support = isinstance(message_channel, discord.Thread) \
+        and message_channel.parent_id == SUPPORT_CHANNEL_ID
+        is_starter_message = payload.message_id == payload.channel_id
+        if is_in_support and is_starter_message:
+            not_ndr = self.ndr not in message_channel.applied_tags
+            other_filters = not message_channel.locked and not message_channel.archived
+            if not_ndr and other_filters:
+                await message_channel.send(
+                    content=f"**Post automatically marked as solved**\nIt seems like this post's starter message was deleted so the post was automatically marked as solved.",
+                    view=reopen_button()
+                )
+                tags = [self.solved]
+                if self.cb in message_channel.applied_tags:
+                    tags.append(self.cb)
+                action_id = generate_random_id()
+                await message_channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. Starter message deleted, automatically mark post as solved.")
+                await self.send_action_log(action_id=action_id, post_mention=message_channel.mention, tags=tags, context="Starter message deleted, automatically mark post as solved")
 
     @close_abandoned_posts.before_loop
     @get_tags.before_loop
