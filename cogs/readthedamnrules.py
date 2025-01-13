@@ -121,8 +121,12 @@ class readthedamnrules(commands.Cog):
                         await message.reply(content=f"Post created at {post.mention}", mention_author=False, delete_after=5)
                         await self.send_debug_message("replied with post created message")
                 else:
+                    await self.send_debug_message("user isn't expert/mod, ignore")
                     return
-        
+            else:
+                await self.send_debug_message("Message not in general, isn't a reply to another message or doesn't start with a mention of the bot, ignore")
+        await self.send_debug_message("Message author is bot, ignore")
+
     @commands.Cog.listener('on_reaction_add')
     async def reaction_redirect_to_support(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         await self.send_debug_message("on reaction add triggered")
