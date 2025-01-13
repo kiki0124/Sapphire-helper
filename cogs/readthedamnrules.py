@@ -134,12 +134,18 @@ class readthedamnrules(commands.Cog):
             await self.send_debug_message("reaction channel is general")
             reactions = ["❓", "❔"] # allowed reactions, all other reactions will be ignored in this context
             if reaction.message.author != user and reaction.emoji in reactions:
-                await self.send_debug_message("")
+                await self.send_debug_message("reaction message isn't the user, reaction is valid")
                 experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
                 mods = reaction.message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in user.roles or mods in user.roles:
                     await self.handle_request(reaction.message, user=user)
                     await reaction.remove(user)
+                else:
+                    await self.send_debug_message("reaction- user not expert or not mod, ignroe")
+            else:
+                await self.send_debug_message("reaction message author is the user or reaction isn't valid")
+        else:
+            await self.send_debug_message("reaction message channel isn't general")
 
 async def setup(client):
     await client.add_cog(readthedamnrules(client))
