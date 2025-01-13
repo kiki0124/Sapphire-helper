@@ -16,7 +16,13 @@ class readthedamnrules(commands.Cog):
     def __init__(self, client) -> None:
         self.client: commands.Bot = client
     
+    @commands.command()
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    async def test(self, ctx: commands.Context):
+        await ctx.reply("FIle recognised")
+
     async def send_debug_message(self, text: str) -> None:
+        print(text)
         thread = self.client.get_channel(ALERTS_THREAD_ID)
         await thread.send(
             content=text
@@ -119,9 +125,12 @@ class readthedamnrules(commands.Cog):
         
     @commands.Cog.listener('on_reaction_add')
     async def reaction_redirect_to_support(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
+        await self.send_debug_message("on reaction add triggered")
         if reaction.message.channel.id == GENERAL_CHANNEL_ID:
+            await self.send_debug_message("reaction channel is general")
             reactions = ["❓", "❔"] # allowed reactions, all other reactions will be ignored in this context
             if reaction.message.author != user and reaction.emoji in reactions:
+                await self.send_debug_message("")
                 experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
                 mods = reaction.message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in user.roles or mods in user.roles:
