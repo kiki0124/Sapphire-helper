@@ -1,0 +1,5 @@
+_.env
+.vscode
+README.md
+test_functions.py
+docker-readme.md
