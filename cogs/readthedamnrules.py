@@ -81,8 +81,7 @@ class readthedamnrules(commands.Cog):
                 if experts in message.author.roles or moderators in message.author.roles:
                     replied_message = await message.channel.fetch_message(message.reference.message_id)
                     if not replied_message.author == message.author:
-                        message_reference = await message.channel.fetch_message(message.reference.message_id)
-                        post = await self.handle_request(reference_message=message_reference, user=message.author, message=message)
+                        post = await self.handle_request(reference_message=replied_message, user=message.author, message=message)
                         await message.reply(content=f"Post created at {post.mention}", mention_author=False, delete_after=5)
                 else:
                     return
