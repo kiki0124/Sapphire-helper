@@ -21,6 +21,7 @@ EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 NDR_CHANNEL_ID = int(os.getenv('NDR_CHANNEL_ID'))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
+QR_LOG_THREAD_ID = int(os.getenv("QR_LOG_THREAD_ID"))
 
 class need_dev_review_buttons(ui.View):
     def __init__(self):
@@ -82,17 +83,25 @@ class utility(commands.Cog):
         self.client: commands.Bot = client
         self.get_tags.start()
 
+    #prefix_messages: dict[int, int] = {}
+
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         await alerts_thread.send(
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: {context}"
         )
 
+    async def send_qr_log(self, user: discord.Member, channel: discord.Thread):
+        qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID)
+        await qr_logs_thread.send(
+            content=f"Message deleted by `@{user.name}` (`{user.id}`) in {channel.mention}"
+        )
+
     @cached()
     async def get_unsolve_id(self) -> int:
         """  
         Get the id of /unsolve command.
-        This fetches the 
+        This fetches the command from discord and caches the result
         """
         unsolve_id = 1281211280618950708
         for command in await self.client.tree.fetch_commands():
@@ -227,7 +236,14 @@ class utility(commands.Cog):
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
-            
+    """ 
+    delete accidental prefix commands- not implemented yet
+    @commands.Cog.listener('on_message')
+    async def cache_command_messages(self, message: discord.Message):
+        is_support = isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID
+        is_prefix_command = message.content.startswith(("s!", "!", "<@678344927997853742>")) and not message.author.bot
+        if is_support and is_prefix_command:
+            pass"""
     @commands.Cog.listener('on_reaction_add')
     async def delete_accidental_qr(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         in_support = isinstance(reaction.message.channel, discord.Thread) \
@@ -239,9 +255,12 @@ class utility(commands.Cog):
             experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
             if experts in user.roles:
                 await reaction.message.delete()
+                await self.send_qr_log(user=user, channel=reaction.message.channel)
+                return
             else:
                 if reaction.message.interaction_metadata and reaction.message.interaction_metadata.user == user:
                     await reaction.message.delete()
+                    await self.send_qr_log(use=user, channel=reaction.message.channel)
 
     @get_tags.before_loop
     async def wait_until_ready(self):
