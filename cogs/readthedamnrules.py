@@ -16,11 +16,6 @@ class readthedamnrules(commands.Cog):
     def __init__(self, client) -> None:
         self.client: commands.Bot = client
     
-    @commands.command()
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    async def test(self, ctx: commands.Context):
-        await ctx.reply("FIle recognised")
-
     async def send_debug_message(self, text: str) -> None:
         print(text)
         thread = self.client.get_channel(ALERTS_THREAD_ID)
