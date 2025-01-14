@@ -3,7 +3,7 @@ import aiosqlite as sql
 from string import ascii_letters, digits
 import random
 
-DB_PATH = "/app/database/data.db"
+DB_PATH = "app/database/data.db"
 
 # other functions
 
@@ -110,4 +110,3 @@ async def get_rtdr_posts() -> list[int]:
                 return [post_id for post_id in result[0]]
             else:
                 return []
-            
