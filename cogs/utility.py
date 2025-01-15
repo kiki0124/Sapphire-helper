@@ -240,17 +240,17 @@ class utility(commands.Cog):
                 is_in_support = isinstance(m.channel, discord.Thread) and m.channel.parent_id == SUPPORT_CHANNEL_ID
                 if is_in_support and m.author.id == 678344927997853742: # Sapphire's user id
                     is_replying = m.reference and m.reference.message_id == message.id
-                    is_in_same_channel = m.channel.id == message.channel.id
+                    is_in_same_channel = m.channel.id == message.channel.id # a message from sapphire in the same channel within 3 seconds is very likely to be a command response
                     is_in_footer = False
                     if m.embeds:
-                        is_in_footer = m.embeds[len(m.embeds)-1].footer.text == f"Recommended by @{message.author.name}"
+                        is_in_footer = m.embeds[len(m.embeds)-1].footer.text == f"Recommended by @{message.author.name}" # check text of last/lowest embed
                     return is_replying or is_in_same_channel or is_in_footer
                 else: 
                     return False
             try:
-                msg = await self.client.wait_for('message', check=check, timeout=3) # returns the message if the check above returns True
+                msg = await self.client.wait_for('message', check=check, timeout=3) # returns the message if the check above returns True, only waits for up to 3 seconds
                 self.prefix_messages[msg.id] = message.author.id
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError: # 3 seconds have passed with no message from Sapphire
                 return
 
     async def send_qr_log_remove_from_cache(self, message: discord.Message, user: discord.Member):
@@ -259,7 +259,7 @@ class utility(commands.Cog):
             content=f"Message deleted by `@{user.name}` (`{user.id}`) in {message.channel.mention}"
         )
         try:
-            self.prefix_messages.pop(message.id)
+            self.prefix_messages.pop(message.id) # remove from cache
         except KeyError:
             return
 
@@ -280,7 +280,7 @@ class utility(commands.Cog):
                 elif reaction.message.interaction_metadata.user == user:
                     await reaction.message.delete()
                     await self.send_qr_log_remove_from_cache(message=reaction.message, user=user)
-            elif reaction.message.id in self.prefix_messages: # the message replies (or was a reply) to another message and the other message id is cached
+            elif reaction.message.id in self.prefix_messages: # the message id is in the cache
                 if self.prefix_messages[reaction.message.id] == user.id or experts in user.roles:
                     await reaction.message.delete()
                     await self.send_qr_log_remove_from_cache(message=reaction.message, user=user)
