@@ -285,10 +285,6 @@ class utility(commands.Cog):
                     await reaction.message.delete()
                     await self.send_qr_log_remove_from_cache(message=reaction.message, user=user)
 
-    @commands.command()
-    async def get_prefix(self, ctx):
-        await ctx.reply(self.prefix_messages)
-
     @get_tags.before_loop
     async def wait_until_ready(self):
         await self.client.wait_until_ready()
