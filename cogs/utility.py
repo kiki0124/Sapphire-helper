@@ -83,19 +83,14 @@ class utility(commands.Cog):
         self.client: commands.Bot = client
         self.get_tags.start()
 
-    #prefix_messages: dict[int, int] = {}
+    prefix_messages: dict[int, int] = {} # id of the command/response message: id of the user that triggered its
 
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         await alerts_thread.send(
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: {context}"
         )
-
-    async def send_qr_log(self, user: discord.Member, channel: discord.Thread):
-        qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID)
-        await qr_logs_thread.send(
-            content=f"Message deleted by `@{user.name}` (`{user.id}`) in {channel.mention}"
-        )
+        
 
     @cached()
     async def get_unsolve_id(self) -> int:
@@ -236,14 +231,49 @@ class utility(commands.Cog):
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
-    """ 
-    delete accidental prefix commands- not implemented yet
+    
     @commands.Cog.listener('on_message')
     async def cache_command_messages(self, message: discord.Message):
+        print("message received")
         is_support = isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID
         is_prefix_command = message.content.startswith(("s!", "!", "<@678344927997853742>")) and not message.author.bot
         if is_support and is_prefix_command:
-            pass"""
+            print("Is in support, is prefix command")
+            # wait for message
+            def check (m: discord.Message):
+                print("check triggered")
+                is_in_support = isinstance(m.channel, discord.Thread) and m.channel.parent_id == SUPPORT_CHANNEL_ID
+                if is_in_support and m.author.id == 678344927997853742: # Sapphire's user id
+                    print("check- in support")
+                    is_replying = m.reference and m.reference.message_id == message.id
+                    is_in_same_channel = m.channel.id == message.channel.id
+                    is_in_footer = False
+                    if m.embeds:
+                        print("m.embeds")
+                        is_in_footer = m.embeds[len(m.embeds)-1].footer.text == f"Recommended by @{message.author.name}"
+                    print(f"Check result {is_replying or is_in_same_channel or is_in_footer}")
+                    return is_replying or is_in_same_channel or is_in_footer
+                else: 
+                    print("Check result: False")
+                    return False
+            try:
+                msg = await self.client.wait_for('message', check=check, timeout=3) # returns the message if the check above returns True
+                print("waited for message")
+                self.prefix_messages[msg.id] = message.author.id
+                print("added message to cache")
+            except asyncio.TimeoutError:
+                return
+
+    async def send_qr_log_remove_from_cache(self, message: discord.Message, user: discord.Member):
+        qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID)
+        await qr_logs_thread.send(
+            content=f"Message deleted by `@{user.name}` (`{user.id}`) in {message.channel.mention}"
+        )
+        try:
+            self.prefix_messages.pop(message.id)
+        except KeyError:
+            return
+
     @commands.Cog.listener('on_reaction_add')
     async def delete_accidental_qr(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         in_support = isinstance(reaction.message.channel, discord.Thread) \
@@ -251,16 +281,31 @@ class utility(commands.Cog):
         from_sapphire = reaction.message.author.id == 678344927997853742 # Sapphire's user id
         allowed_reactions = ["🗑️", "❌"]
         reaction_allowed = reaction.emoji in allowed_reactions
-        if in_support and from_sapphire and reaction_allowed and reaction.message.interaction_metadata:
+        if in_support and from_sapphire and reaction_allowed:
+            print("in support, from sapphire, reaction allowed")
             experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
-            if experts in user.roles:
-                await reaction.message.delete()
-                await self.send_qr_log(user=user, channel=reaction.message.channel)
-                return
-            else:
-                if reaction.message.interaction_metadata and reaction.message.interaction_metadata.user == user:
+            if reaction.message.interaction_metadata:
+                print("interaction metadata")
+                if experts in user.roles:
+                    print("is expert")
                     await reaction.message.delete()
-                    await self.send_qr_log(use=user, channel=reaction.message.channel)
+                    await self.send_qr_log_remove_from_cache(message=reaction.message, user=user)
+                    return
+                elif reaction.message.interaction_metadata.user == user:
+                    print("interaction metadata user is user")
+                    await reaction.message.delete()
+                    await self.send_qr_log_remove_from_cache(message=reaction.message, user=user)
+            elif reaction.message.id in self.prefix_messages: # the message replies (or was a reply) to another message and the other message id is cached
+                print("reaction message id is in prefix messages")
+                if self.prefix_messages[reaction.message.id] == user.id or experts in user.roles:
+                    await reaction.message.delete()
+                    await self.send_qr_log_remove_from_cache(message=reaction.message, user=user)
+            else:
+                print("else")
+
+    @commands.command()
+    async def get_prefix(self, ctx):
+        await ctx.reply(self.prefix_messages)
 
     @get_tags.before_loop
     async def wait_until_ready(self):
