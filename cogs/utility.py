@@ -5,7 +5,7 @@ import asyncio
 import datetime
 import os
 from dotenv import load_dotenv
-from functions import remove_post_from_rtdr, get_post_creator_id, generate_random_id
+from functions import remove_post_from_rtdr, get_post_creator_id, generate_random_id, remove_post_from_pending
 from aiocache import cached
 from typing import Union
 
@@ -132,6 +132,7 @@ class utility(commands.Cog):
         await post.edit(archived=True, reason=f"Auto archive solved post after 1 hour")
         self.close_tasks.pop(post)
         await remove_post_from_rtdr(post.id)
+        await remove_post_from_pending(post.id)
 
     async def mark_post_as_solved(self, post: discord.Thread) -> None:
         """  
