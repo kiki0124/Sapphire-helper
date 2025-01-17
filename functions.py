@@ -8,6 +8,10 @@ DB_PATH = "database\data.db"
 # other functions
 
 async def main():
+    """  
+    Called once whenever the bot is turned on (in setup_hook)
+    Creates DB tables (pending posts and readthedamnrules)
+    """
     async with sql.connect(DB_PATH) as conn: 
         async with conn.cursor() as cu:
             await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER UNIQUE NOT NULL PRIMARY KEY, timestamp INTEGER NOT NULL)")
@@ -15,6 +19,9 @@ async def main():
             await conn.commit()
 
 def generate_random_id() -> str:
+    """  
+    Generates a random 6 letter id made of letters (lower and upper case) and numbers.
+    """
     characters = ascii_letters + digits
     return ''.join(random.choice(characters) for _ in range(6))
 
