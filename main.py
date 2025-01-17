@@ -3,6 +3,7 @@ from discord.ext import commands
 import os
 from dotenv import load_dotenv
 from functions import main
+import unittest, test_functions
 
 load_dotenv()
 
@@ -17,6 +18,7 @@ async def on_ready():
 
 @client.event
 async def setup_hook():
+    unittest.main(test_functions, exit=False)
     await main() # function that creates the db tables if they don't already exist
     for filename in os.listdir('./cogs'):
         if filename.endswith('.py'):
