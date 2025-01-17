@@ -93,15 +93,13 @@ class autoadd(commands.Cog):
 
     @commands.Cog.listener('on_message')
     async def message(self, message: discord.Message):
-        if not message.author == self.client.user: # Check if the message author is Sapphire Helper
-            if isinstance(message.channel, discord.Thread):
-                if message.channel.parent_id == SUPPORT_CHANNEL_ID:
-                    if message.id == message.channel.id:
-                        await self.on_thread_create(message.channel)
-                    if not message.channel.id in self.sent_post_ids:
-                        await self.send_suggestion_message(message)
-                    if message.id != message.channel.id:
-                        await self.replace_unanswered_tag(message)
+        if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
+            if message.id == message.channel.id:
+                await self.on_thread_create(message.channel)
+                if not message.channel.id in self.sent_post_ids:
+                    await self.send_suggestion_message(message)
+                if message.id != message.channel.id:
+                    await self.replace_unanswered_tag(message)
 
     async def on_thread_create(self, thread: discord.Thread):
         tags = thread.applied_tags
@@ -115,7 +113,7 @@ class autoadd(commands.Cog):
             await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id): # Checks if the message author is the post creator
+        if message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id):
             if self.solved not in message.channel.applied_tags and self.ndr not in message.channel.applied_tags: 
                 if not message == message.channel.starter_message:
                     pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
@@ -127,7 +125,7 @@ class autoadd(commands.Cog):
 
     async def replace_unanswered_tag(self, message: discord.Message):
         if self.unanswered in message.channel.applied_tags:
-            if (message.author != message.channel.owner) or (message.channel.id in await get_rtdr_posts() and message.author.id == await get_post_creator_id(message.channel)):
+            if (message.author != message.channel.owner) or (message.channel.id in await get_rtdr_posts() and message.author.id != await get_post_creator_id(message.channel)):
                 tags = [self.not_solved]
                 if self.cb in message.channel.applied_tags: tags.append(self.cb)
                 action_id = generate_random_id()
