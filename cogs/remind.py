@@ -136,7 +136,7 @@ class remind(commands.Cog):
             if await self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
                 if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
                     try:
-                        message: discord.Message|None = await post.fetch_message(post.last_message_id) # try to fetch the message
+                        message: discord.Message|None = await post.fetch_message(post.last_message_id)
                     except discord.NotFound: # message id could be for a message that was already deleted
                         reminder_not_sent_posts[post.id] = 1
                         continue
@@ -156,10 +156,9 @@ class remind(commands.Cog):
     @commands.Cog.listener('on_message')
     async def remove_pending_posts(self, message: discord.Message):
         if message.author != self.client.user:
-            channel_filter = isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID
-            if channel_filter:
+            if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
                 others_filter = not message.channel.locked and not self.ndr in message.channel.applied_tags
-                message_author = message.author == message.channel.owner
+                message_author = message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id)
                 in_pending_post = message.channel.id in await get_pending_posts()
                 if message_author and in_pending_post and others_filter:
                     await remove_post_from_pending(message.channel.id)
