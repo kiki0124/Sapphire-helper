@@ -96,10 +96,10 @@ class autoadd(commands.Cog):
         if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
             if message.id == message.channel.id:
                 await self.on_thread_create(message.channel)
-                if not message.channel.id in self.sent_post_ids:
-                    await self.send_suggestion_message(message)
-                if message.id != message.channel.id:
-                    await self.replace_unanswered_tag(message)
+            if not message.channel.id in self.sent_post_ids:
+                await self.send_suggestion_message(message)
+            if message.id != message.channel.id:
+                await self.replace_unanswered_tag(message)
 
     async def on_thread_create(self, thread: discord.Thread):
         tags = thread.applied_tags
@@ -124,7 +124,7 @@ class autoadd(commands.Cog):
                             self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
-        if self.unanswered in message.channel.applied_tags:
+        if self.unanswered in message.channel.applied_tags and not message.author == self.client.user:
             if (message.author != message.channel.owner) or (message.channel.id in await get_rtdr_posts() and message.author.id != await get_post_creator_id(message.channel)):
                 tags = [self.not_solved]
                 if self.cb in message.channel.applied_tags: tags.append(self.cb)
