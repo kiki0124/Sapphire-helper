@@ -88,6 +88,9 @@ class utility(commands.Cog):
         self.cb = discord.Object(CUSTOM_BRANDING_TAG_ID)
         self.not_solved = discord.Object(NOT_SOLVED_TAG_ID)
 
+    async def get_tag_ids(self, post: discord.Thread):
+        return [tag.id for tag in post.applied_tags]
+
     prefix_messages: dict[int, int] = {} # id of the command/response message: id of the user that triggered its
 
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.Object], context: str):
@@ -153,8 +156,9 @@ class utility(commands.Cog):
         if post in self.close_tasks: 
             self.close_tasks[post].cancel()
             self.close_tasks.pop(post)
+        applied_tags = await self.get_tag_ids(post)
         tags = [self.not_solved]
-        if self.cb in post.applied_tags: tags.append(self.cb)
+        if self.cb.id in applied_tags: tags.append(self.cb)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post unsolved with /unsolve")
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/unsolve used")
@@ -178,8 +182,9 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     async def solved(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):
-            not_ndr = self.ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower()
-            not_solved = self.solve not in interaction.channel.applied_tags
+            applied_tags = await self.get_tag_ids(interaction.channel)
+            not_ndr = self.ndr.id not in applied_tags and "forwarded" not in interaction.channel.name.casefold()
+            not_solved = self.solve.id not in applied_tags
             if not_ndr:
                 if not_solved:
                     await self.mark_post_as_solved(interaction.channel)
@@ -208,13 +213,15 @@ class utility(commands.Cog):
         if await self.is_in_support(interaction):
             await interaction.channel.remove_user(user)
             await interaction.response.send_message(content=f"Successfully removed {user.name} from this post.", ephemeral=True)
-        
+            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+            await alerts_thread.send(f"`@{interaction.user.name}` ({interaction.user.id}) removed `@{user.name}` (`{user.id}` from {interaction.channel.mention}).")
+
     @app_commands.command(name="unsolve", description="Cancel the post from being closed")
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
     async def unsolved(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):        
-            if interaction.channel in self.close_tasks or self.solve.id in [tag.id for tag in interaction.channel.applied_tags]:
+            if interaction.channel in self.close_tasks or self.solve.id in await self.get_tag_ids(interaction.channel):
                 await self.unsolve_post(interaction.channel)
                 await interaction.response.send_message(content="Post successfully unsolved")
             else:
