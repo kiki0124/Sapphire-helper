@@ -16,22 +16,25 @@ ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 class waiting_for_reply(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
-        self.get_tags.start()
+        self.unanswered = discord.Object(UNANSWERED_TAG_ID)
+        self.ndr = discord.Object(NEED_DEV_REVIEW_TAG_ID)
+        self.solved = discord.Object(SOLVED_TAG_ID)
+        self.waiting_for_reply = discord.Object(WAITING_FOR_REPLY_TAG_ID)
 
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
+    async def get_tag_ids(self, post: discord.Thread):
+        """  
+        Returns a list of the ids of all tags applied in the given post
+        """
+        return [tag.id for tag in post.applied_tags]
+
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.Object], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        tag_names = [support.get_tag(tag.id).name for tag in tags]
         await alerts_thread.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: {context}"
+            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join(tag_names)}\nContext: {context}"
         )
-
-    @tasks.loop(seconds=1, count=1)
-    async def get_tags(self):
-        support = await self.client.fetch_channel(SUPPORT_CHANNEL_ID)
-        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
-        self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        self.solved = support.get_tag(SOLVED_TAG_ID)
-        self.waiting_for_reply = support.get_tag(WAITING_FOR_REPLY_TAG_ID)
-
+        
     posts: dict[int, asyncio.Task] = {}
 
     async def add_waiting_tag(self, post_id: int) -> None:
@@ -51,13 +54,13 @@ class waiting_for_reply(commands.Cog):
         in_support = isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID
         if not message.author == self.client.user:
             if in_support:
+                applied_tags = await self.get_tag_ids(message.channel)
                 start_message = message.id == message.channel.id # a thread id is always equal to the starter message id
-                tags = message.channel.applied_tags
-                tags_filters =   not self.ndr in tags,\
-                                not self.unanswered in tags,\
-                                not self.solved in tags
+                tags_filters =   not self.ndr.id in applied_tags and\
+                                not self.unanswered.id in applied_tags and\
+                                not self.solved.id in applied_tags
                 message_author_is_owner = message.author == message.channel.owner
-                has_wfr = self.waiting_for_reply in tags
+                has_wfr = self.waiting_for_reply.id in applied_tags
                 if not start_message and tags_filters:
                     if not has_wfr:
                         if message_author_is_owner and not channel_id in self.posts:
@@ -67,14 +70,10 @@ class waiting_for_reply(commands.Cog):
                             self.posts[channel_id].cancel()
                             self.posts.pop(channel_id)
                     elif not message_author_is_owner and has_wfr:
-                        tags.remove(self.waiting_for_reply)
+                        applied_tags.remove(self.waiting_for_reply)
                         action_id = generate_random_id()
-                        await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag as last message author isn't OP")
-                        await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
-
-    @get_tags.before_loop
-    async def wait_until_ready(self):
-        await self.client.wait_until_ready()
+                        await message.channel.edit(applied_tags=applied_tags, reason=f"ID: {action_id}. Remove waiting for reply tag as last message author isn't OP")
+                        await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=applied_tags, context="Remove waiting for reply tag")
 
 async def setup(client):
     await client.add_cog(waiting_for_reply(client))

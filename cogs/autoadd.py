@@ -30,9 +30,9 @@ class reopen_button(ui.View):
         experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
         mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
         is_expert_or_mode = experts in interaction.user.roles or mods \
-        in interaction.user.roles
+                            in interaction.user.roles
         if is_expert_or_mode or interaction.user == interaction.channel.owner \
-            and not interaction.channel.locked:
+                                            and not interaction.channel.locked:
             not_solved = interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)
             wfr = interaction.channel.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
             tags = [not_solved, wfr]
@@ -42,7 +42,6 @@ class reopen_button(ui.View):
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, archived=False, reason=f"ID: {action_id}. re-open button clicked")
             await interaction.response.defer(ephemeral=True)
-            #await interaction.delete_original_response()
             await interaction.message.edit(content=f"{interaction.message.content}\n-# Post re-opened by {interaction.user.mention}", view=None)
             alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
             await alerts_thread.send(
@@ -62,6 +61,11 @@ class autoadd(commands.Cog):
         self.not_solved = discord.Object(NOT_SOLVED_TAG_ID)
         self.cb = discord.Object(CUSTOM_BRANDING_TAG_ID)
 
+    async def get_tag_ids(self, post: discord.Thread):
+        """  
+        Returns a list of the ids of all tags applied in the given post
+        """
+        return [tag.id for tag in post.applied_tags]
 
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):
@@ -122,10 +126,11 @@ class autoadd(commands.Cog):
                             self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
-        if self.unanswered in message.channel.applied_tags and not message.author == self.client.user:
+        applied_tags = await self.get_tag_ids(message.channel)
+        if self.unanswered.id in applied_tags and not message.author == self.client.user:
             if (message.author != message.channel.owner) or (message.channel.id in await get_rtdr_posts() and message.author.id != await get_post_creator_id(message.channel)):
                 tags = [self.not_solved]
-                if self.cb in message.channel.applied_tags: tags.append(self.cb)
+                if self.cb.id in applied_tags: tags.append(self.cb)
                 action_id = generate_random_id()
                 await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
                 await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
@@ -139,7 +144,7 @@ class autoadd(commands.Cog):
                     if self.ndr not in post.applied_tags:
                         if not post.owner:
                             tags = [self.solved]
-                            if self.cb in post.applied_tags: tags.append(self.cb)
+                            if self.cb.id in await self.get_tag_ids(post): tags.append(self.cb)
                             action_id = generate_random_id()
                             await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
                             await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
@@ -148,10 +153,11 @@ class autoadd(commands.Cog):
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
         message_channel = self.client.get_channel(payload.channel_id)
         is_in_support = isinstance(message_channel, discord.Thread) \
-        and message_channel.parent_id == SUPPORT_CHANNEL_ID
+                    and message_channel.parent_id == SUPPORT_CHANNEL_ID
         is_starter_message = payload.message_id == payload.channel_id
         if is_in_support and is_starter_message:
-            not_ndr = self.ndr not in message_channel.applied_tags
+            applied_tags = await self.get_tag_ids(message_channel)
+            not_ndr = self.ndr.id not in applied_tags
             other_filters = not message_channel.locked and not message_channel.archived
             if not_ndr and other_filters:
                 await message_channel.send(
@@ -159,7 +165,7 @@ class autoadd(commands.Cog):
                     view=reopen_button()
                 )
                 tags = [self.solved]
-                if self.cb in message_channel.applied_tags:
+                if self.cb.id in applied_tags:
                     tags.append(self.cb)
                 action_id = generate_random_id()
                 await message_channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. Starter message deleted, automatically mark post as solved.")

@@ -22,6 +22,7 @@ ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 
 reminder_not_sent_posts: dict[int, int] = {} # dictionary of post ids: the amount of tries
+
 class CloseNow(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -54,6 +55,11 @@ class remind(commands.Cog):
         self.solved = discord.Object(id=SOLVED_TAG_ID)
         self.cb = discord.Object(CUSTOM_BRANDING_TAG_ID)
 
+    async def get_tag_ids(self, post: discord.Thread):
+        """  
+        Returns a list of the ids of all tags applied in the given post
+        """
+        return [tag.id for tag in post.applied_tags]
 
     async def reminders_filter(self, thread: discord.Thread):
         """  
@@ -62,8 +68,9 @@ class remind(commands.Cog):
         * Doesn't have needs dev review & solved
         * Is in #support (parent_id==SUPPORT_CHANNEL_ID)
         """
-        ndr = not self.needs_dev_review in thread.applied_tags
-        solved = not self.solved in thread.applied_tags
+        applied_tags = await self.get_tag_ids(thread)
+        ndr = not self.needs_dev_review.id in applied_tags
+        solved = not self.solved.id in applied_tags
         archived = not thread.archived
         locked = not thread.locked
         support = thread.parent_id == SUPPORT_CHANNEL_ID
@@ -155,7 +162,7 @@ class remind(commands.Cog):
     async def remove_pending_posts(self, message: discord.Message):
         if message.author != self.client.user:
             if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
-                others_filter = not message.channel.locked and not self.needs_dev_review in message.channel.applied_tags
+                others_filter = not message.channel.locked and not self.needs_dev_review.id in await self.get_tag_ids(message.channel)
                 message_author = message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id)
                 in_pending_post = message.channel.id in await get_pending_posts()
                 if message_author and in_pending_post and others_filter:
@@ -166,11 +173,12 @@ class remind(commands.Cog):
         for post_id in await get_pending_posts():
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
-                ndr = self.needs_dev_review in post.applied_tags
+                applied_tags = await self.get_tag_ids(post)
+                ndr = self.needs_dev_review.id in applied_tags
                 more_than_24_hours = await check_post_last_message_time(post_id)
                 if ndr and more_than_24_hours:
                     tags = [self.solved]
-                    if self.cb in post.applied_tags: tags.append(self.cb)
+                    if self.cb.id in applied_tags: tags.append(self.cb)
                     action_id = generate_random_id()
                     await post.edit(archived=True, reason=f"ID: {action_id}. Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
                     await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
