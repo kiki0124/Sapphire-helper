@@ -181,7 +181,10 @@ class utility(commands.Cog):
     async def solved(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):
             not_ndr = self.ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.lower()
-            not_solved = self.solved not in interaction.channel.applied_tags
+            not_solved = self.solve not in interaction.channel.applied_tags or not interaction.channel in self.close_tasks
+            print(not_solved)
+            print(self.solve not in interaction.channel.applied_tags)
+            print(interaction.channel in self.close_tasks)
             if not_ndr:
                 if not_solved:
                     await self.mark_post_as_solved(interaction.channel)
