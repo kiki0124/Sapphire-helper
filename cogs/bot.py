@@ -4,6 +4,7 @@ import datetime
 from discord import app_commands
 import os
 from dotenv import load_dotenv
+from traceback import print_exception
 
 load_dotenv()
 
@@ -12,15 +13,14 @@ MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 
 class bot(commands.Cog):
-    def __init__(self, client):
+    def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
 
     def cog_load(self):
-        tree = self.client.tree
-        tree.on_error = self.tree_on_error
+        self.client.tree.on_error = self.tree_on_error
     
-    async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, guild: discord.Guild) -> None:
-        alerts_thread = guild.get_channel_or_thread(ALERTS_THREAD_ID)
+    async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError) -> None:
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         await alerts_thread.send(content=f"Unhandled error: `{error}`\n<@1105414178937774150>")
 
     @commands.command(name="ping")
@@ -63,7 +63,7 @@ class bot(commands.Cog):
         elif isinstance(error, commands.CommandOnCooldown):
             await ctx.reply(content="Command currently on cooldown, try again later...", mention_author=False)
         else:
-            await self.send_unhandled_error(error=error, guild=ctx.guild) # send error to #sapphire-helper-alerts thread under sapphire-experts channel
+            await self.send_unhandled_error(error=error) # send error to #sapphire-helper-alerts thread under sapphire-experts channel
             raise error
 
     async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
@@ -74,8 +74,8 @@ class bot(commands.Cog):
         elif isinstance(error, app_commands.NoPrivateMessage):
             await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
         else:
-            await self.send_unhandled_error(error=error, guild=interaction.guild)
-            raise error
+            await self.send_unhandled_error(error=error)
+            print_exception(error)
 
 async def setup(client: commands.Bot):
     await client.add_cog(bot(client))
