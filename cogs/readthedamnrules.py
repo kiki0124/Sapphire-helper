@@ -84,7 +84,8 @@ class readthedamnrules(commands.Cog):
                     if not replied_message.author == message.author:
                         post = await self.handle_request(reference_message=replied_message, user=message.author, message=message)
                         await message.reply(content=f"Post created at {post.mention}", mention_author=False, delete_after=5)
-            
+                        await message.delete(delay=5) # delete the trigger message when the reply message with the post was sent
+
     @commands.Cog.listener('on_reaction_add')
     async def reaction_redirect_to_support(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         if reaction.message.channel.id == GENERAL_CHANNEL_ID:
