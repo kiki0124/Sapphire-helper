@@ -55,8 +55,13 @@ class reopen_button(ui.View):
 class autoadd(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
-        self.get_tags.start()
         self.close_abandoned_posts.start()
+        self.unanswered = discord.Object(UNANSWERED_TAG_ID)
+        self.ndr = discord.Object(NEED_DEV_REVIEW_TAG_ID)
+        self.solved = discord.Object(SOLVED_TAG_ID)
+        self.not_solved = discord.Object(NOT_SOLVED_TAG_ID)
+        self.cb = discord.Object(CUSTOM_BRANDING_TAG_ID)
+
 
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):
@@ -78,17 +83,10 @@ class autoadd(commands.Cog):
 
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: {context}")
-
-    @tasks.loop(seconds=1, count=1)
-    async def get_tags(self):
-        support = await self.client.fetch_channel(SUPPORT_CHANNEL_ID)
-        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
-        self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        self.solved = support.get_tag(SOLVED_TAG_ID)
-        self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
-        self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        tag_names = [support.get_tag(tag.id).name for tag in tags]
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join(tag_names)}\nContext: {context}")
+    
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
     @commands.Cog.listener('on_message')
@@ -168,7 +166,6 @@ class autoadd(commands.Cog):
                 await self.send_action_log(action_id=action_id, post_mention=message_channel.mention, tags=tags, context="Starter message deleted, automatically mark post as solved")
 
     @close_abandoned_posts.before_loop
-    @get_tags.before_loop
     async def wait_until_ready(self):
         await self.client.wait_until_ready()
 

@@ -48,14 +48,15 @@ class ndr_options_buttons(ui.View):
         self.Interaction = Interaction
     
     async def mark_post_as_ndr(self, interaction: discord.Interaction):
-        ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+        ndr = interaction.channel.get_tag(NEED_DEV_REVIEW_TAG_ID)
         tags = [ndr]
-        cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        cb = interaction.channel.get_tag(CUSTOM_BRANDING_TAG_ID)
         if cb in interaction.channel.applied_tags: tags.append(cb)
         action_id = generate_random_id()
         alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
         await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: /needs-dev-review command used")
+        tag_names = [interaction.channel.get_tag(tag.id).name for tag in tags]
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join(tag_names)}\nContext: /needs-dev-review command used")
         channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
 
@@ -81,14 +82,20 @@ class ndr_options_buttons(ui.View):
 class utility(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
-        self.get_tags.start()
+        self.unanswered = discord.Object(UNANSWERED_TAG_ID)
+        self.ndr = discord.Object(NEED_DEV_REVIEW_TAG_ID)
+        self.solve = discord.Object(SOLVED_TAG_ID)
+        self.cb = discord.Object(CUSTOM_BRANDING_TAG_ID)
+        self.not_solved = discord.Object(NOT_SOLVED_TAG_ID)
 
     prefix_messages: dict[int, int] = {} # id of the command/response message: id of the user that triggered its
 
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.Object], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        tag_names = [support.get_tag(tag.id).name for tag in tags]
         await alerts_thread.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: {context}"
+            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join(tag_names)}\nContext: {context}"
         )
 
     @cached()
@@ -105,15 +112,6 @@ class utility(commands.Cog):
             else:
                 continue
         return unsolve_id
-
-    @tasks.loop(seconds=1, count=1)
-    async def get_tags(self):
-        support = await self.client.fetch_channel(SUPPORT_CHANNEL_ID)
-        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
-        self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        self.solve = support.get_tag(SOLVED_TAG_ID)
-        self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-        self.not_solved = support.get_tag(NOT_SOLVED_TAG_ID)
 
     async def is_in_support(self, interaction: discord.Interaction) -> bool:
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
@@ -216,7 +214,7 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     async def unsolved(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):        
-            if interaction.channel in self.close_tasks or self.solve in interaction.channel.applied_tags:
+            if interaction.channel in self.close_tasks or self.solve.id in [tag.id for tag in interaction.channel.applied_tags]:
                 await self.unsolve_post(interaction.channel)
                 await interaction.response.send_message(content="Post successfully unsolved")
             else:
@@ -286,7 +284,6 @@ class utility(commands.Cog):
                     await reaction.message.delete()
                     await self.send_qr_log_remove_from_cache(message=reaction.message, user=user)
 
-    @get_tags.before_loop
     async def wait_until_ready(self):
         await self.client.wait_until_ready()
 

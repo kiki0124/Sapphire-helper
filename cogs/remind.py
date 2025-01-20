@@ -32,9 +32,9 @@ class CloseNow(ui.View):
         mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
         if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
             await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
-            tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
-            if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+            tags = [interaction.channel.get_tag(SOLVED_TAG_ID)]
+            if interaction.channel.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                tags.append(interaction.channel.get_tag(CUSTOM_BRANDING_TAG_ID))
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
             alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
@@ -46,10 +46,14 @@ class CloseNow(ui.View):
 class remind(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
-        self.get_tags.start()
         self.check_for_pending_posts.start()
         self.close_pending_posts.start()
         self.check_exception_posts.start()
+        self.unanswered = discord.Object(id=UNANSWERED_TAG_ID)
+        self.needs_dev_review = discord.Object(id=NEED_DEV_REVIEW_TAG_ID)
+        self.solved = discord.Object(id=SOLVED_TAG_ID)
+        self.cb = discord.Object(CUSTOM_BRANDING_TAG_ID)
+
 
     async def reminders_filter(self, thread: discord.Thread):
         """  
@@ -58,24 +62,18 @@ class remind(commands.Cog):
         * Doesn't have needs dev review & solved
         * Is in #support (parent_id==SUPPORT_CHANNEL_ID)
         """
-        ndr = not self.ndr in thread.applied_tags
+        ndr = not self.needs_dev_review in thread.applied_tags
         solved = not self.solved in thread.applied_tags
         archived = not thread.archived
         locked = not thread.locked
         support = thread.parent_id == SUPPORT_CHANNEL_ID
         return ndr and solved and archived and locked and support
-
-    @tasks.loop(seconds=1, count=1)
-    async def get_tags(self):
-        support = await self.client.fetch_channel(SUPPORT_CHANNEL_ID)
-        self.unanswered = support.get_tag(UNANSWERED_TAG_ID)
-        self.ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        self.solved = support.get_tag(SOLVED_TAG_ID)
-        self.cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
+    
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.Object], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: {context}")
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        tag_names = [support.get_tag(tag.id).name for tag in tags]
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join(tag_names)}\nContext: {context}")
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -157,7 +155,7 @@ class remind(commands.Cog):
     async def remove_pending_posts(self, message: discord.Message):
         if message.author != self.client.user:
             if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
-                others_filter = not message.channel.locked and not self.ndr in message.channel.applied_tags
+                others_filter = not message.channel.locked and not self.needs_dev_review in message.channel.applied_tags
                 message_author = message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id)
                 in_pending_post = message.channel.id in await get_pending_posts()
                 if message_author and in_pending_post and others_filter:
@@ -168,7 +166,7 @@ class remind(commands.Cog):
         for post_id in await get_pending_posts():
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
-                ndr = self.ndr not in post.applied_tags
+                ndr = self.needs_dev_review in post.applied_tags
                 more_than_24_hours = await check_post_last_message_time(post_id)
                 if ndr and more_than_24_hours:
                     tags = [self.solved]
@@ -185,7 +183,6 @@ class remind(commands.Cog):
     @check_for_pending_posts.before_loop
     @close_pending_posts.before_loop
     @check_exception_posts.before_loop
-    @get_tags.before_loop
     async def loops_before_loop(self):
         await self.client.wait_until_ready() # only start the loop when the bot's cache is ready
 
