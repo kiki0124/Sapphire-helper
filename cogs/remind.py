@@ -32,9 +32,9 @@ class CloseNow(ui.View):
         mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
         if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
             await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
-            tags = [interaction.channel.get_tag(SOLVED_TAG_ID)]
-            if interaction.channel.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                tags.append(interaction.channel.get_tag(CUSTOM_BRANDING_TAG_ID))
+            tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
+            if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
+                tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
             alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
