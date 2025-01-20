@@ -174,7 +174,7 @@ class remind(commands.Cog):
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
                 applied_tags = await self.get_tag_ids(post)
-                ndr = self.needs_dev_review.id in applied_tags
+                ndr = self.needs_dev_review.id not in applied_tags
                 more_than_24_hours = await check_post_last_message_time(post_id)
                 if ndr and more_than_24_hours:
                     tags = [self.solved]
