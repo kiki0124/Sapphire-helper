@@ -114,6 +114,6 @@ async def get_rtdr_posts() -> list[int]:
             await cu.execute("SELECT post_id FROM readthedamnrules")
             result = await cu.fetchall()
             if result:
-                return [post_id for post_id in result[0]]
+                return [post_id[0] for post_id in result]
             else:
                 return []
