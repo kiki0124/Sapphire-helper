@@ -5,7 +5,8 @@ import asyncio
 import datetime
 import os
 from dotenv import load_dotenv
-from functions import remove_post_from_rtdr, get_post_creator_id, generate_random_id, remove_post_from_pending
+from functions import remove_post_from_rtdr, get_post_creator_id, \
+                    generate_random_id, remove_post_from_pending
 from aiocache import cached
 from typing import Union
 
@@ -55,8 +56,7 @@ class ndr_options_buttons(ui.View):
         action_id = generate_random_id()
         alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
         await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
-        tag_names = [interaction.channel.parent.get_tag(tag.id).name for tag in tags]
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join(tag_names)}\nContext: /needs-dev-review command used")
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: /needs-dev-review command used")
         channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
 
@@ -91,7 +91,7 @@ class utility(commands.Cog):
     async def get_tag_ids(self, post: discord.Thread):
         return [tag.id for tag in post.applied_tags]
 
-    prefix_messages: dict[int, int] = {} # id of the command/response message: id of the user that triggered its
+    prefix_messages: dict[int, int] = {} # id of the command/response message: id of the user that triggered it
 
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.Object], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
@@ -143,7 +143,7 @@ class utility(commands.Cog):
         task =  asyncio.create_task(self.close_post(post=post))
         self.close_tasks[post] = task
         tags = [self.solve]
-        if self.cb in post.applied_tags: tags.append(self.cb)
+        if self.cb.id in await self.get_tag_ids(post): tags.append(self.cb)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as solved with /solved")
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
@@ -232,7 +232,7 @@ class utility(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def need_dev_review(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):
-            if self.ndr not in interaction.channel.applied_tags:
+            if self.ndr.id not in await self.get_tag_ids(interaction.channel):
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
