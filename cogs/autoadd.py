@@ -29,9 +29,9 @@ class reopen_button(ui.View):
     async def on_reopen_click(self, interaction: discord.Interaction, button: ui.Button):
         experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
         mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
-        is_expert_or_mode = experts in interaction.user.roles or mods \
-                            in interaction.user.roles
-        if is_expert_or_mode or interaction.user == interaction.channel.owner \
+        is_expert_or_mod = experts in interaction.user.roles or \
+                            mods in interaction.user.roles
+        if is_expert_or_mod or interaction.user == interaction.channel.owner \
                                             and not interaction.channel.locked:
             not_solved = interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)
             wfr = interaction.channel.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
@@ -115,10 +115,10 @@ class autoadd(commands.Cog):
             await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if not message.author == self.client.user and (message.author == message.channel.owner) or (message.author.id == await get_post_creator_id(message.channel.id)):
+        if message.author != self.client.user and (message.author == message.channel.owner) or (message.author.id == await get_post_creator_id(message.channel.id)):
             applied_tags = await self.get_tag_ids(message.channel)
             if self.solved.id not in applied_tags and self.ndr.id not in applied_tags: 
-                if not message == message.channel.starter_message:
+                if not message.id == message.channel.id:
                     pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
                     negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?"
                     if not re.search(negative_pattern, message.content, re.IGNORECASE):
@@ -128,7 +128,7 @@ class autoadd(commands.Cog):
 
     async def replace_unanswered_tag(self, message: discord.Message):
         applied_tags = await self.get_tag_ids(message.channel)
-        if self.unanswered.id in applied_tags and not message.author == self.client.user:
+        if self.unanswered.id in applied_tags and message.author != self.client.user:
             if (message.author != message.channel.owner) or (message.channel.id in await get_rtdr_posts() and message.author.id != await get_post_creator_id(message.channel)):
                 tags = [self.not_solved]
                 if self.cb.id in applied_tags: tags.append(self.cb)
@@ -142,10 +142,11 @@ class autoadd(commands.Cog):
         for post in await support.guild.active_threads():
             if post.parent_id == SUPPORT_CHANNEL_ID:
                 if not post.locked:
-                    if self.ndr not in post.applied_tags:
-                        if not post.owner:
+                    applied_tags = await self.get_tag_ids(post)
+                    if self.ndr.id not in applied_tags:
+                        if not post.owner: # post owner/creator will be None if they left the server
                             tags = [self.solved]
-                            if self.cb.id in await self.get_tag_ids(post): tags.append(self.cb)
+                            if self.cb.id in applied_tags: tags.append(self.cb)
                             action_id = generate_random_id()
                             await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
                             await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
