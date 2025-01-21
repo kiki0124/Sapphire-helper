@@ -2,8 +2,9 @@ import discord
 from discord.ext import commands, tasks
 from functions import add_post_to_pending, \
     remove_post_from_pending, get_pending_posts, \
-    check_post_last_message_time, check_time_more_than_day, \
-    get_post_creator_id, remove_post_from_rtdr, generate_random_id
+    check_post_last_message_time, check_time_more_than_day,\
+    get_post_creator_id, remove_post_from_rtdr, generate_random_id, \
+    get_rtdr_posts
 import random
 from discord import ui
 import datetime
@@ -50,9 +51,9 @@ class remind(commands.Cog):
         self.check_for_pending_posts.start()
         self.close_pending_posts.start()
         self.check_exception_posts.start()
-        self.unanswered = discord.Object(id=UNANSWERED_TAG_ID)
-        self.needs_dev_review = discord.Object(id=NEED_DEV_REVIEW_TAG_ID)
-        self.solved = discord.Object(id=SOLVED_TAG_ID)
+        self.unanswered = discord.Object(UNANSWERED_TAG_ID)
+        self.needs_dev_review = discord.Object(NEED_DEV_REVIEW_TAG_ID)
+        self.solved = discord.Object(SOLVED_TAG_ID)
         self.cb = discord.Object(CUSTOM_BRANDING_TAG_ID)
 
     async def get_tag_ids(self, post: discord.Thread):
@@ -150,6 +151,8 @@ class remind(commands.Cog):
                         await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
                         continue
                     author_not_owner = message.author != post.owner
+                    if post.id in await get_rtdr_posts():
+                        author_not_owner = message.author.id != await get_post_creator_id(post.id)
                     more_than_day = check_time_more_than_day(message.created_at.timestamp())
                     if author_not_owner and more_than_day:
                         if post.owner: # make sure post owner isn't None- still in server
