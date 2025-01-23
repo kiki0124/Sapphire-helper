@@ -36,13 +36,13 @@ def check_time_more_than_day(timestamp: int) -> bool:
 
 # reminder system related functions
 
-async def add_post_to_pending(post_id: int, timestamp: int) -> None:
+async def add_post_to_pending(post_id: int) -> None:
     """
     Add the post with the given id and timestamp to pending db
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES ({post_id}, {timestamp})")
+            await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES ({post_id}, {datetime.datetime.now().timestamp()})")
             await conn.commit()
 
 async def get_pending_posts() -> list[int]:

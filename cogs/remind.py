@@ -108,7 +108,7 @@ class remind(commands.Cog):
                     if post.owner: # make sure the post owner is not None- still in server
                         greetings = ["Hi", "Hello", "Hey", "Hi there"]
                         await message.channel.send(content=f"{random.choices(greetings)[0]} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
-                        await add_post_to_pending(post_id=post.id, timestamp=datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo).timestamp())
+                        await add_post_to_pending(post_id=post.id)
                         to_remove.append(post.id)
                         continue
                     else:
@@ -127,7 +127,7 @@ class remind(commands.Cog):
                     reminder_not_sent_posts[post.id] += 1
                     continue
                 if check_time_more_than_day(message.created_at.timestamp()):
-                    await add_post_to_pending(post.id, datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo).timestamp())
+                    await add_post_to_pending(post.id)
                     continue
                 else:
                     to_remove.append(post.id)
@@ -159,7 +159,7 @@ class remind(commands.Cog):
                             greetings = ["Hi", "Hello", "Hey", "Hi there"]
                             post_author_id = await get_post_creator_id(post.id) or post.owner_id
                             await message.channel.send(content=f"{random.choices(greetings)[0]} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
-                            await add_post_to_pending(post_id=post.id, timestamp=datetime.datetime.now(tz=datetime.datetime.now().astimezone().tzinfo).timestamp())
+                            await add_post_to_pending(post_id=post.id)
             
     @commands.Cog.listener('on_message')
     async def remove_pending_posts(self, message: discord.Message):
