@@ -262,7 +262,7 @@ class utility(commands.Cog):
     async def send_qr_log_remove_from_cache(self, message: discord.Message, user: discord.Member):
         qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID)
         await qr_logs_thread.send(
-            content=f"Message deleted by `@{user.name}` (`{user.id}`) in {message.channel.mention}"
+            content=f"Message deleted by `@{user.name}` (`{user.id}`) in {message.channel.mention}\nMessage id: `{message.id}`"
         )
         try:
             self.prefix_messages.pop(message.id) # remove from cache
