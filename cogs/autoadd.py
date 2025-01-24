@@ -147,7 +147,10 @@ class autoadd(commands.Cog):
                 if not post.locked:
                     applied_tags = await self.get_tag_ids(post)
                     if self.ndr.id not in applied_tags:
-                        if not post.owner: # post owner/creator will be None if they left the server
+                        owner = post.owner
+                        if post.id in await get_rtdr_posts():
+                            owner = post.guild.get_member(await get_post_creator_id(post.id))
+                        if not owner: # post owner/creator will be None if they left the server
                             tags = [self.solved]
                             if self.cb.id in applied_tags: tags.append(self.cb)
                             action_id = generate_random_id()
