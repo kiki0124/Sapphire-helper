@@ -42,7 +42,9 @@ async def add_post_to_pending(post_id: int) -> None:
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES ({post_id}, {datetime.datetime.now().timestamp()})")
+            timestamp = int(datetime.datetime.now().timestamp())
+            print(post_id, timestamp)
+            await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES ({post_id}, {timestamp})")
             await conn.commit()
 
 async def get_pending_posts() -> list[int]:
@@ -52,7 +54,8 @@ async def get_pending_posts() -> list[int]:
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             await cu.execute("SELECT post_id FROM pending_posts")
-            return [int(post_id[0]) for post_id in await cu.fetchall()]
+            result = await cu.fetchall()
+            return [post_id[0] for post_id in result]
 
 async def remove_post_from_pending(post_id: int) -> None:
     """  
