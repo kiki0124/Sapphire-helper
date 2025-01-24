@@ -154,7 +154,7 @@ class remind(commands.Cog):
                     if post.id in await get_rtdr_posts():
                         author_not_owner = message.author.id != await get_post_creator_id(post.id)
                     more_than_day = check_time_more_than_day(message.created_at.timestamp())
-                    if author_not_owner and more_than_day:
+                    if author_not_owner and more_than_day and message.author != self.client.user:
                         if post.owner: # make sure post owner isn't None- still in server
                             greetings = ["Hi", "Hello", "Hey", "Hi there"]
                             post_author_id = await get_post_creator_id(post.id) or post.owner_id
