@@ -5,6 +5,7 @@ from discord import app_commands
 import os
 from dotenv import load_dotenv
 from traceback import print_exception
+import functions
 
 load_dotenv()
 
@@ -76,6 +77,23 @@ class bot(commands.Cog):
         else:
             await self.send_unhandled_error(error=error)
             print_exception(error)
+
+    @app_commands.command(name="debug", description="Debug for various systems")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    async def debug(self, interaction: discord.Interaction, debug: str, post: discord.Thread = None):
+        if debug == "last message id":
+            await interaction.response.send_message(content=post.last_message_id)
+        elif debug == "in db":
+            await interaction.response.send_message(content=post.id in await functions.get_pending_posts())
+        elif debug == "timestamp":
+            await interaction.response.send_message(content=await functions.get_post_timestamp(post.id))
+        elif debug == "more than 24 hours":
+            await interaction.response.send_message(content=await functions.check_post_last_message_time(post.id))
+        elif debug.startswith(("eval sql", "execute sql",)):
+            command = debug.removeprefix('eval sql ')
+            await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
+        else:
+            await interaction.response.send_message(content="Debug not found...")
 
 async def setup(client: commands.Bot):
     await client.add_cog(bot(client))

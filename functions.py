@@ -36,6 +36,19 @@ def check_time_more_than_day(timestamp: int) -> bool:
 
 # reminder system related functions
 
+async def execute_sql(cmd: str) -> tuple|None:
+    """  
+    Execute the given sql command and return the result or None if there is no result
+    """
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            try:
+                await cu.execute(cmd)
+            except Exception as e: # could be an invalid command or any other sql error
+                return e
+            await conn.commit()
+            return await cu.fetchall()
+
 async def add_post_to_pending(post_id: int) -> None:
     """
     Add the post with the given id and timestamp to pending db
@@ -43,8 +56,7 @@ async def add_post_to_pending(post_id: int) -> None:
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             timestamp = int(datetime.datetime.now().timestamp())
-            print(post_id, timestamp)
-            await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES ({post_id}, {timestamp})")
+            await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, timestamp,))
             await conn.commit()
 
 async def get_pending_posts() -> list[int]:
@@ -63,19 +75,28 @@ async def remove_post_from_pending(post_id: int) -> None:
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"DELETE FROM pending_posts WHERE post_id={post_id}")
+            await cu.execute(f"DELETE FROM pending_posts WHERE post_id=?", (post_id,))
             await conn.commit()
+
+async def get_post_timestamp(post_id: int) -> int|None:
+    """  
+    Returns the saved timestamp for the post with given id or None if its not in the db
+    """
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute(f"SELECT timestamp FROM pending_posts WHERE post_id=?", (post_id,))
+            result = await cu.fetchone()
+            if result:
+                return result[0]
+            else:
+                return None
 
 async def check_post_last_message_time(post_id: int) -> bool:
     """
     Returns if the timestamp of a post (from db) is more than one day ago (24 hours).
     """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute(f"SELECT timestamp FROM pending_posts WHERE post_id={post_id}")
-            result = await cu.fetchone()
-            timestamp = result[0]
-            return check_time_more_than_day(timestamp)
+    timestamp = await get_post_timestamp(post_id)
+    return check_time_more_than_day(timestamp)
 
 # readthedamnrules system related functions
 
@@ -85,7 +106,7 @@ async def add_post_to_rtdr(post_id: int, user_id: int) -> None:
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES ({post_id}, {user_id})")
+            await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, user_id,))
             await conn.commit()
 
 async def get_post_creator_id(post_id: int) -> int|None:
@@ -94,7 +115,7 @@ async def get_post_creator_id(post_id: int) -> int|None:
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"SELECT user_id FROM readthedamnrules WHERE post_id={post_id}")
+            await cu.execute(f"SELECT user_id FROM readthedamnrules WHERE post_id=?", (post_id,))
             result = None
             result = await cu.fetchone()
             return result[0] if result else None
@@ -105,7 +126,7 @@ async def remove_post_from_rtdr(post_id: int) -> None:
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"DELETE FROM readthedamnrules WHERE post_id={post_id}")
+            await cu.execute(f"DELETE FROM readthedamnrules WHERE post_id=?", (post_id,))
             await conn.commit()
         
 async def get_rtdr_posts() -> list[int]:
