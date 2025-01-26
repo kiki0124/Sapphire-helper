@@ -4,11 +4,13 @@ from discord import app_commands
 import os
 from dotenv import load_dotenv
 import datetime
+from functions import get_post_creator_id
 
 load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
+SUPPORT_CHANNEL_ID = int(os.getenv("SUPPORT_CHANNEL_ID"))
 
 class epi(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -75,6 +77,16 @@ class epi(commands.Cog):
             )
         else:
             await interaction.followup.send(content="EPI mode is not currently enabled... Try again later.")
+
+    @commands.Cog.listener('on_thread_create')
+    async def send_epi_info(self, thread: discord.Thread):
+        if thread.parent_id == SUPPORT_CHANNEL_ID and self.epi_data[0]:
+            owner_id = await get_post_creator_id(thread.id) or thread.owner_id
+            msg_or_txt = self.epi_data[0][0]
+            started_at_timestamp = round(self.epi_data[0][1].timestamp())
+            if isinstance(msg_or_txt, discord.Message):
+                msg_or_txt = msg_or_txt.jump_url
+            await thread.send(content=f"Hey <@{owner_id}>, Sapphire is currently having some issues...\nInfo: {msg_or_txt}. Issues started at: <t:{started_at_timestamp}:F> (<t:{started_at_timestamp}:R>). Thank you for your patience :)")
 
 async def setup(client):
     await client.add_cog(epi(client))
