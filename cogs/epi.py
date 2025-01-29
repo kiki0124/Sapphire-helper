@@ -47,7 +47,7 @@ class epi(commands.Cog):
                 try:
                     message = await status_channel.fetch_message(int(info))
                 except discord.NotFound or discord.HTTPException as exc:
-                    return await interaction.response.send_message(content=f"Unable to fetch message from {status_channel.mention} with ID of `{info}`.\n`{exc.status}`, `{exc.text}`, `{exc.response}`")
+                    return await interaction.response.send_message(content=f"Unable to fetch message from {status_channel.mention} with ID of `{info}`.\n`{exc.status}`, `{exc.text}`")
                 self.epi_data[message] = []
                 await interaction.response.send_message(content=f"Successfully enabled EPI mode with {message.jump_url}")
         else:
@@ -58,7 +58,7 @@ class epi(commands.Cog):
                 url_or_text = url_or_text.jump_url
             await interaction.response.send_message(content=f"EPI Mode is already enabled!\n{url_or_text}", ephemeral=True)
     
-    @group.command(name="disable", description="Disable EPI mode")
+    @group.command(name="disable", description="Disable EPI mode- mark the issue as solved & ping all users that asked to be pinged")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
     @app_commands.describe(post="In what post should Sapphire Helper ping all users that clicked get notified button?")
     async def epi_disable(self, interaction: discord.Interaction, post: discord.Thread):
@@ -74,8 +74,8 @@ class epi(commands.Cog):
                 await i.delete_original_response()
                 index = list(self.epi_data)[0]
                 for message in self.epi_data[index]:
-                    content = f"{message.content}\n-# This issue was fixed at <t:{int(i.created_at.timestamp())}:T>" 
-                    await message.edit(view=None, content=content)
+                    edited_content = f"{message.content}\n-# This issue was fixed at <t:{int(i.created_at.timestamp())}:T>" 
+                    await message.edit(view=None, content=edited_content)
                 mentions = [user.mention for user in epi_users]
                 if mentions:
                     mentions_separated = ','.join(mentions)
@@ -84,6 +84,8 @@ class epi(commands.Cog):
                     mentioned = True
                 else:
                     mentioned = False
+                self.epi_data = [] # remove all messages
+                self.epi_data.clear() # remove the custom status/message
                 await interaction.channel.send(content=f"EPI mode successfully disabled by {interaction.user.mention}.\nMentioned users: {mentioned}")
             button.callback = on_button_click
             view = discord.ui.View()
@@ -100,8 +102,12 @@ class epi(commands.Cog):
             msg_or_txt = list(self.epi_data.keys())[0]
             if isinstance(msg_or_txt, discord.Message):
                 msg_or_txt = msg_or_txt.jump_url
+            if epi_users: # there's at least one user that clicked the 'get notified' button
+                mentions_separated = ','.join([user.mention for user in epi_users])
+            else:
+                mentions_separated = "No users clicked the get notified button"
             await interaction.followup.send(
-                content=f"Current EPI mode info: `{msg_or_txt}`",
+                content=f"Current EPI mode info: `{msg_or_txt}`\nUsers: {mentions_separated}",
                 ephemeral=True
             )
         else:
@@ -130,10 +136,10 @@ class epi(commands.Cog):
                 async with aiohttp.ClientSession() as cs:
                     async with cs.post(url=f"https://discord.com/api/v9/channels/{thread.id}/messages", json=json, headers=headers) as req:
                         if req.ok:
-                            return
+                            pass
                         else:
                             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-                            await alerts_thread.send(f"<@1105414178937774150> Forward request failed (status >= 400).\nStatus: {req.status}. JSON: {await req.json()}. {await req.text(encoding='UTF-8')}")
+                            await alerts_thread.send(f"<@1105414178937774150> Forward request failed (status >= 400).\nStatus: `{req.status}` ```json\n{await req.json()}```")
             self.epi_data[msg_or_txt].append(message)
 
 async def setup(client):
