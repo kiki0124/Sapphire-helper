@@ -23,15 +23,12 @@ class get_notified(ui.View):
     
     @ui.button(label="Notify me when this issue is resolved", custom_id="epi-get-notified", style=discord.ButtonStyle.grey)
     async def on_get_notified_click(self, interaction: discord.Interaction, button: ui.button):
-        epi_log_thread = interaction.guild.get_thread(EPI_LOG_THREAD_ID)
         if interaction.user not in epi_users:
             epi_users.append(interaction.user)
             await interaction.response.send_message(content="You will now be notified when this issue is fixed!", ephemeral=True)
-            await epi_log_thread.send(content=f"`{interaction.user.name}` `({interaction.user.id})` will be notified when the current EPI mode is disabled")
         else:
             epi_users.remove(interaction.user)
             await interaction.response.send_message(content="You will no longer be notified for this issue!", ephemeral=True)
-            await epi_log_thread.send(content=f"`{interaction.user.name}` `({interaction.user.id})` will not be notified when the current EPI mode is disabled.")
 
 class epi(commands.Cog):
     def __init__(self, client: commands.Bot):
