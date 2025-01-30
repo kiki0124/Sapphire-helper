@@ -142,20 +142,21 @@ class autoadd(commands.Cog):
     @tasks.loop(hours=1)
     async def close_abandoned_posts(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        for post in await support.guild.active_threads():
-            if post.parent_id == SUPPORT_CHANNEL_ID:
-                if not post.locked:
-                    applied_tags = await self.get_tag_ids(post)
-                    if self.ndr.id not in applied_tags:
-                        owner = post.owner
-                        if post.id in await get_rtdr_posts():
-                            owner = post.guild.get_member(await get_post_creator_id(post.id))
-                        if not owner: # post owner/creator will be None if they left the server
-                            tags = [self.solved]
-                            if self.cb.id in applied_tags: tags.append(self.cb)
-                            action_id = generate_random_id()
-                            await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
-                            await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
+        if support:
+            for post in await support.guild.active_threads():
+                if post.parent_id == SUPPORT_CHANNEL_ID:
+                    if not post.locked:
+                        applied_tags = await self.get_tag_ids(post)
+                        if self.ndr.id not in applied_tags:
+                            owner = post.owner
+                            if post.id in await get_rtdr_posts():
+                                owner = post.guild.get_member(await get_post_creator_id(post.id))
+                            if not owner: # post owner/creator will be None if they left the server
+                                tags = [self.solved]
+                                if self.cb.id in applied_tags: tags.append(self.cb)
+                                action_id = generate_random_id()
+                                await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
+                                await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
 
     @commands.Cog.listener('on_raw_message_delete')
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
