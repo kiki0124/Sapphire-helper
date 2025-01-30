@@ -123,9 +123,9 @@ class epi(commands.Cog):
     @commands.Cog.listener('on_thread_create')
     async def send_epi_info(self, thread: discord.Thread):
         if thread.parent_id == SUPPORT_CHANNEL_ID and self.epi_data:
+            await asyncio.sleep(3) # wait 3 seconds to make sure that epi messages will be sent last (after more info message)
             owner_id = await get_post_creator_id(thread.id) or thread.owner_id
             msg_or_txt = list(self.epi_data.keys())[0]
-            await asyncio.sleep(3) # wait 3 seconds to make sure that epi messages will be sent last (after more info message)
             if isinstance(msg_or_txt, str):
                 message = await thread.send(content=f"Hey <@{owner_id}>, the following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_txt}", view=get_notified())                
             elif isinstance(msg_or_txt, discord.Message):
