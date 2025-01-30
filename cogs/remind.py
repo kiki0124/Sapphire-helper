@@ -7,7 +7,6 @@ from functions import add_post_to_pending, \
     get_rtdr_posts
 import random
 from discord import ui
-import datetime
 import os
 from dotenv import load_dotenv
 

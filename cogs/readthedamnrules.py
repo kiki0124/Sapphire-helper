@@ -70,6 +70,10 @@ class readthedamnrules(commands.Cog):
             files=files,
             content=f"**Original message:**\n```\n{content}```\n\n{reference_message.author.mention} please provide any additional information here so we can give you the best help.\n-# Created by {user.name}"
         )
+        new_message_content = post[1].content
+        new_message_content = new_message_content.removesuffix(user.name)
+        new_message_content += user.mention
+        await post[1].edit(content=new_message_content) # replace the name of the initiator at the end of the message with a ping of them to add them to the post without it actually pinging them
         await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
         return post[0]
 

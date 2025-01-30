@@ -28,7 +28,7 @@ class bot(commands.Cog):
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def ping(self, ctx: commands.Context):
         now = datetime.datetime.now()
-        message = await ctx.reply(content=f"Pong! v1.2\nClient latency: {str(self.client.latency)[:4]}s")
+        message = await ctx.reply(content=f"Pong! v2\nClient latency: {str(self.client.latency)[:4]}s")
         latency = datetime.datetime.now() - now
         await message.edit(content=f"{message.content}\nDiscord latency: {str(latency.total_seconds())[:4]}s")
 
@@ -69,9 +69,9 @@ class bot(commands.Cog):
 
     async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingAnyRole):
-            await interaction.response.send_message(content=f"Only Moderators and Community Experts can use this command!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.CheckFailure): # raised when a user tries to use a command that only mods/experts/op can use, eg /solved
-            await interaction.response.send_message(content=f"Only Moderators, Community Experts and the OP can use this command!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> and the OP can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.NoPrivateMessage):
             await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
         else:
