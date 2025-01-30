@@ -74,12 +74,14 @@ class epi(commands.Cog):
                 await i.delete_original_response()
                 index = list(self.epi_data)[0]
                 for message in self.epi_data[index]:
-                    edited_content = f"{message.content}\n-# This issue was fixed at <t:{int(i.created_at.timestamp())}:T>" 
-                    await message.edit(view=None, content=edited_content)
+                    await message.edit(view=None)
+                    await message.reply(
+                        content="Hey, this issue is fixed now!\n-# Thank you for your patience."
+                    )
                 mentions = [user.mention for user in epi_users]
                 if mentions:
-                    mentions_separated = ','.join(mentions)
-                    await post.send(content=f"Hey {mentions_separated},\nthe issue is now fixed!\n-# Thank you for your patience.")
+                    mentions_separated = ', '.join(mentions)
+                    await post.send(content=f"Hey, the issue is now solved!\n-# Thank you for your patience.\n{mentions_separated}")
                     epi_users.clear()
                     mentioned = True
                 else:
@@ -103,7 +105,7 @@ class epi(commands.Cog):
             if isinstance(msg_or_txt, discord.Message):
                 msg_or_txt = msg_or_txt.jump_url
             if epi_users: # there's at least one user that clicked the 'get notified' button
-                mentions_separated = ','.join([user.mention for user in epi_users])
+                mentions_separated = ', '.join([user.mention for user in epi_users])
             else:
                 mentions_separated = "No users clicked the get notified button"
             await interaction.followup.send(
