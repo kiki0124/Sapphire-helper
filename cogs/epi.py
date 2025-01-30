@@ -13,6 +13,7 @@ MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 SUPPORT_CHANNEL_ID = int(os.getenv("SUPPORT_CHANNEL_ID"))
 TOKEN = os.getenv("BOT_TOKEN")
+EPI_LOG_THREAD_ID = int(os.getenv("EPI_LOG_THREAD_ID"))
 
 epi_users: list[discord.Member|discord.User] = []
 
@@ -22,12 +23,15 @@ class get_notified(ui.View):
     
     @ui.button(label="Notify me when this issue is resolved", custom_id="epi-get-notified", style=discord.ButtonStyle.grey)
     async def on_get_notified_click(self, interaction: discord.Interaction, button: ui.button):
+        epi_log_thread = interaction.guild.get_thread(EPI_LOG_THREAD_ID)
         if interaction.user not in epi_users:
             epi_users.append(interaction.user)
             await interaction.response.send_message(content="You will now be notified when this issue is fixed!", ephemeral=True)
+            await epi_log_thread.send(content=f"`{interaction.user.name}` `({interaction.user.id})` will be notified when the current EPI mode is disabled")
         else:
             epi_users.remove(interaction.user)
             await interaction.response.send_message(content="You will no longer be notified for this issue!", ephemeral=True)
+            await epi_log_thread.send(content=f"`{interaction.user.name}` `({interaction.user.id})` will not be notified when the current EPI mode is disabled.")
 
 class epi(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -35,6 +39,10 @@ class epi(commands.Cog):
     
     epi_data: dict[discord.Message|str, list[discord.Message]] = {} # the custom set message: list of mssages to be edited to remove the get notified button
     group = app_commands.Group(name="epi", description="Commands related to Extra Post Information system")
+
+    async def send_epi_log(self, content: str):
+        epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID)
+        await epi_thread.send(content)
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
@@ -45,6 +53,7 @@ class epi(commands.Cog):
             if not info.isdigit():
                 self.epi_data[info] = []
                 await interaction.followup.send(content=f"Successfully enabled EPI mode with the following text `{info}`", ephemeral=True)
+                await self.send_epi_log(content=f"EPI mode enabled by `{interaction.user.name}` (`{interaction.user.id}`)\n{info}")
             elif info.isdigit():
                 status_channel = discord.utils.get(interaction.guild.channels, name="status")
                 try:
@@ -53,6 +62,7 @@ class epi(commands.Cog):
                     return await interaction.followup.send(content=f"Unable to fetch message from {status_channel.mention} with ID of `{info}`.\n`{exc.status}`, `{exc.text}`", ephemeral=True)
                 self.epi_data[message] = []
                 await interaction.followup.send(content=f"Successfully enabled EPI mode with {message.jump_url}", ephemeral=True)
+                await self.send_epi_log(content=f"EPI mode enabled by `{interaction.user.name}` (`{interaction.user.id}`)\n{message.jump_url}")
         else:
             url_or_text = list(self.epi_data)[0]
             if isinstance(url_or_text, str):
@@ -84,14 +94,15 @@ class epi(commands.Cog):
                 if epi_users:
                     mentions = [user.mention for user in epi_users]
                     mentions_separated = ', '.join(mentions)
-                    await post.send(content=f"Hey, the issue is now solved!\n-# Thank you for your patience.\n{mentions_separated}")
-                    epi_users.clear()
+                    await post.send(content=f"Hey, the issue is now fixed!\n-# Thank you for your patience.\n{mentions_separated}")
                     mentioned = True
                 else:
                     mentioned = False
+                    await post.send(content="Hey, this issue is now fixed!\n-# Thank you for your patience.")
                 epi_users.clear()
                 self.epi_data.clear() # remove the custom status/message
                 await interaction.channel.send(content=f"EPI mode successfully disabled by {interaction.user.name}.\nMentioned users: {mentioned}")
+                await self.send_epi_log(f"EPI mode disabled by `{interaction.user.name}` `({interaction.user.id})`")
             button.callback = on_button_click
             view = discord.ui.View()
             view.add_item(button)
