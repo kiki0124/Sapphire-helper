@@ -50,7 +50,7 @@ class epi(commands.Cog):
             if not info.isdigit():
                 self.epi_data[info] = []
                 await interaction.followup.send(content=f"Successfully enabled EPI mode with the following text `{info}`", ephemeral=True)
-                await self.send_epi_log(content=f"EPI mode enabled by `{interaction.user.name}` (`{interaction.user.id}`)\n{info}")
+                await self.send_epi_log(content=f"EPI mode enabled by `{interaction.user.name}` (`{interaction.user.id}`)\n`{info}`")
             elif info.isdigit():
                 status_channel = discord.utils.get(interaction.guild.channels, name="status")
                 try:
