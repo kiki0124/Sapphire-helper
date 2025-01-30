@@ -70,8 +70,10 @@ class readthedamnrules(commands.Cog):
             files=files,
             content=f"**Original message:**\n```\n{content}```\n\n{reference_message.author.mention} please provide any additional information here so we can give you the best help.\n-# Created by {user.name}"
         )
-        new_message_content = post[0].starter_message.content.removesuffix(user.name).join(user.mention)
-        await post[0].starter_message.edit()
+        new_message_content = post[1].content
+        new_message_content = new_message_content.removesuffix(user.name)
+        new_message_content += user.mention
+        await post[1].edit(content=new_message_content)
         await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
         return post[0]
 
