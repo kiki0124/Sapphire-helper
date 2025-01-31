@@ -135,7 +135,7 @@ class utility(commands.Cog):
         task =  asyncio.create_task(self.close_post(post=post))
         self.close_tasks[post] = task
         tags = [solved]
-        if cb in await post.applied_tags: tags.append(cb)
+        if cb in post.applied_tags: tags.append(cb)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as solved with /solved")
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
@@ -229,7 +229,7 @@ class utility(commands.Cog):
     async def need_dev_review(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):
             ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            if ndr not in interaction.channel.get_tag:
+            if ndr not in interaction.channel.applied_tags:
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)

@@ -59,7 +59,7 @@ class waiting_for_reply(commands.Cog):
                 if not start_message and tags_filters:
                     if not has_wfr:
                         if message_author_is_owner and channel_id not in self.posts:
-                            task = asyncio.create_task(self.add_waiting_tag(post_id=message.channel.id))
+                            task = asyncio.create_task(self.add_waiting_tag(post=message.channel))
                             self.posts[channel_id] = task
                         elif not message_author_is_owner and channel_id in self.posts:
                             self.posts[channel_id].cancel()
