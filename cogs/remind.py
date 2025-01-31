@@ -166,7 +166,7 @@ class remind(commands.Cog):
         for post_id in await get_pending_posts():
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
-                applied_tags = await self.get_tag_ids(post)
+                applied_tags = post.applied_tags
                 ndr = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID) not in applied_tags
                 more_than_24_hours = await check_post_last_message_time(post_id)
                 if ndr and more_than_24_hours:
