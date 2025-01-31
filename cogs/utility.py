@@ -82,23 +82,13 @@ class ndr_options_buttons(ui.View):
 class utility(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
-        self.unanswered = discord.Object(UNANSWERED_TAG_ID)
-        self.ndr = discord.Object(NEED_DEV_REVIEW_TAG_ID)
-        self.solve = discord.Object(SOLVED_TAG_ID)
-        self.cb = discord.Object(CUSTOM_BRANDING_TAG_ID)
-        self.not_solved = discord.Object(NOT_SOLVED_TAG_ID)
-
-    async def get_tag_ids(self, post: discord.Thread):
-        return [tag.id for tag in post.applied_tags]
-
+        
     prefix_messages: dict[int, int] = {} # id of the command/response message: id of the user that triggered it
 
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.Object], context: str):
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        tag_names = [support.get_tag(tag.id).name for tag in tags]
         await alerts_thread.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join(tag_names)}\nContext: {context}"
+            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: {context}"
         )
 
     @cached()
@@ -140,10 +130,12 @@ class utility(commands.Cog):
         Mark the given post as solved- adds tags and create task with delay to archive it.
         Returns the task
         """
+        solved = post.parent.get_tag(SOLVED_TAG_ID)
+        cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
         task =  asyncio.create_task(self.close_post(post=post))
         self.close_tasks[post] = task
-        tags = [self.solve]
-        if self.cb.id in await self.get_tag_ids(post): tags.append(self.cb)
+        tags = [solved]
+        if cb in await post.applied_tags: tags.append(cb)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as solved with /solved")
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
@@ -156,9 +148,10 @@ class utility(commands.Cog):
         if post in self.close_tasks: 
             self.close_tasks[post].cancel()
             self.close_tasks.pop(post)
-        applied_tags = await self.get_tag_ids(post)
-        tags = [self.not_solved]
-        if self.cb.id in applied_tags: tags.append(self.cb)
+        not_solved = post.parent.get_tag(NOT_SOLVED_TAG_ID)
+        cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        tags = [not_solved]
+        if cb in post.applied_tags: tags.append(cb)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post unsolved with /unsolve")
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/unsolve used")
@@ -182,9 +175,11 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     async def solved(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):
-            applied_tags = await self.get_tag_ids(interaction.channel)
-            not_ndr = self.ndr.id not in applied_tags and "forwarded" not in interaction.channel.name.casefold()
-            not_solved = self.solve.id not in applied_tags
+            parent = interaction.channel.parent
+            ndr = parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+            solved = parent.get_tag(SOLVED_TAG_ID)
+            not_ndr = ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.casefold()
+            not_solved = solved not in interaction.channel.applied_tags
             if not_ndr:
                 if not_solved:
                     await self.mark_post_as_solved(interaction.channel)
@@ -220,8 +215,9 @@ class utility(commands.Cog):
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
     async def unsolved(self, interaction: discord.Interaction):
-        if await self.is_in_support(interaction):        
-            if interaction.channel in self.close_tasks or self.solve.id in await self.get_tag_ids(interaction.channel):
+        if await self.is_in_support(interaction):
+            solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)     
+            if interaction.channel in self.close_tasks or solved in interaction.channel.applied_tags:
                 await self.unsolve_post(interaction.channel)
                 await interaction.response.send_message(content="Post successfully unsolved")
             else:
@@ -232,7 +228,8 @@ class utility(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def need_dev_review(self, interaction: discord.Interaction):
         if await self.is_in_support(interaction):
-            if self.ndr.id not in await self.get_tag_ids(interaction.channel):
+            ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+            if ndr not in interaction.channel.get_tag:
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
