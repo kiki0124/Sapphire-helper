@@ -58,15 +58,17 @@ class remind(commands.Cog):
         * Doesn't have needs dev review & solved
         * Is in #support (parent_id==SUPPORT_CHANNEL_ID)
         """
-        parent = thread.parent
-        applied_tags = thread.applied_tags
-        ndr = parent.get_tag(NEED_DEV_REVIEW_TAG_ID) not in applied_tags
-        solved = parent.get_tag(SOLVED_TAG_ID) not in applied_tags
-        archived = not thread.archived
-        locked = not thread.locked
-        support = thread.parent_id == SUPPORT_CHANNEL_ID
-        return ndr and solved and archived and locked and support
-    
+        if thread.parent_id == SUPPORT_CHANNEL_ID:
+            parent = thread.parent
+            applied_tags = thread.applied_tags
+            ndr = parent.get_tag(NEED_DEV_REVIEW_TAG_ID) not in applied_tags
+            solved = parent.get_tag(SOLVED_TAG_ID) not in applied_tags
+            archived = not thread.archived
+            locked = not thread.locked
+            return ndr and solved and archived and locked
+        else:
+            return False
+        
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}")
