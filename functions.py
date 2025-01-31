@@ -14,8 +14,8 @@ async def main():
     """
     async with sql.connect(DB_PATH) as conn: 
         async with conn.cursor() as cu:
-            await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER UNIQUE NOT NULL PRIMARY KEY, timestamp INTEGER NOT NULL)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER UNIQUE NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER NOT NULL PRIMARY KEY, timestamp INTEGER NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -141,3 +141,35 @@ async def get_rtdr_posts() -> list[int]:
                 return [post_id[0] for post_id in result]
             else:
                 return []
+
+async def check_message_has_post(message_id: int) -> bool:
+    """  
+    Return whether a post was already created for the given message id
+    """
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute('SELECT message_id FROM readthedamnrules')
+            result = await cu.fetchall()
+            if result:
+                return message_id in result[0]
+            else:
+                return False
+
+# reminders-redone
+
+async def save_post_as_pending(post_id: int) -> None:
+    """  
+    Adds the given post id with timestamp of 24 hours to the future (now + 24 hours)
+    to pending table in db
+    """
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            day_from_now = datetime.datetime.now() + datetime.timedelta(hours=24)
+            await cu.execute("INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?)", (post_id, day_from_now.timestamp(),))
+            await conn.commit()
+
+async def _remove_post_from_pending(post_id: int):
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("DELETE FROM pending_posts WHERE post_id=?", (post_id,))
+            await conn.commit()

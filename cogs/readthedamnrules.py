@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import os
-from functions import add_post_to_rtdr
+from functions import add_post_to_rtdr, check_message_has_post
 from typing import Union
 
 load_dotenv()
@@ -84,8 +84,8 @@ class readthedamnrules(commands.Cog):
                 experts = message.guild.get_role(EXPERTS_ROLE_ID)
                 moderators = message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in message.author.roles or moderators in message.author.roles:
-                    replied_message = await message.channel.fetch_message(message.reference.message_id)
-                    if not replied_message.author == message.author:
+                    replied_message = message.reference.cached_message or await message.channel.fetch_message(message.reference.message_id)
+                    if not replied_message.author == message.author and not await check_message_has_post(replied_message.id):
                         post = await self.handle_request(reference_message=replied_message, user=message.author, message=message)
                         await message.reply(content=f"Post created at {post.mention}", mention_author=False, delete_after=5)
                         await message.delete(delay=5) # delete the trigger message when the reply message with the post was sent
@@ -97,7 +97,7 @@ class readthedamnrules(commands.Cog):
             if reaction.message.author != user and reaction.emoji in reactions:
                 experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
                 mods = reaction.message.guild.get_role(MODERATORS_ROLE_ID)
-                if experts in user.roles or mods in user.roles:
+                if experts in user.roles or mods in user.roles and not await check_message_has_post(reaction.message.id):
                     await self.handle_request(reaction.message, user=user)
                     await reaction.remove(user)
 
