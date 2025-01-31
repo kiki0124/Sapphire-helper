@@ -29,7 +29,7 @@ class reminders_redone(commands.Cog):
     @commands.Cog.listener('on_message')
     async def reminder_messages_listener(self, message: discord.Message):
         if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
-            raise NotImplemented # to be continued
+            pass
 
 async def setup(client):
     await client.add_cog(reminders_redone(client))
