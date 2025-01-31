@@ -19,10 +19,8 @@ class waiting_for_reply(commands.Cog):
         
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        tag_names = [support.get_tag(tag.id).name for tag in tags]
         await alerts_thread.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join(tag_names)}\nContext: {context}"
+            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}"
         )
         
     posts: dict[int, asyncio.Task] = {}
