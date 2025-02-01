@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 from functions import add_post_to_rtdr, check_message_has_post
 from typing import Union
+import datetime
 
 load_dotenv()
 GENERAL_CHANNEL_ID = int(os.getenv('GENERAL_CHANNEL_ID'))
@@ -21,7 +22,7 @@ class readthedamnrules(commands.Cog):
         Get a list[Message] for all messages that should be used in the new post
         """
         messages_to_move: list[discord.Message] = [reference_message]
-        async for msg in reference_message.channel.history(limit=None, after=reference_message.created_at):
+        async for msg in reference_message.channel.history(limit=100, after=reference_message.created_at):
             if msg.author == reference_message.author:
                 messages_to_move.append(msg)
             else:
@@ -74,7 +75,12 @@ class readthedamnrules(commands.Cog):
         new_message_content = new_message_content.removesuffix(user.name)
         new_message_content += user.mention
         await post[1].edit(content=new_message_content) # replace the name of the initiator at the end of the message with a ping of them to add them to the post without it actually pinging them
-        await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
+        await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id, message_id=reference_message.id)
+        await message.channel.send(content=f'{reference_message.author.mention} asked "{reference_message.content}". A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will be punished.', delete_after=300)
+        after = datetime.datetime.now() - datetime.timedelta(minutes=10)
+        def purge_check(m: discord.Message):
+            return m.author == reference_message.author
+        await message.channel.purge(after=after, check=purge_check, reason=f"@{message.author.name} used rtdr system")
         return post[0]
 
     @commands.Cog.listener('on_message')
@@ -86,8 +92,7 @@ class readthedamnrules(commands.Cog):
                 if experts in message.author.roles or moderators in message.author.roles:
                     replied_message = message.reference.cached_message or await message.channel.fetch_message(message.reference.message_id)
                     if not replied_message.author == message.author and not await check_message_has_post(replied_message.id):
-                        post = await self.handle_request(reference_message=replied_message, user=message.author, message=message)
-                        await message.reply(content=f"Post created at {post.mention}", mention_author=False, delete_after=5)
+                        await self.handle_request(reference_message=replied_message, user=message.author, message=message)
                         await message.delete(delay=5) # delete the trigger message when the reply message with the post was sent
 
     @commands.Cog.listener('on_reaction_add')
