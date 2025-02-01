@@ -100,13 +100,13 @@ async def check_post_last_message_time(post_id: int) -> bool:
 
 # readthedamnrules system related functions
 
-async def add_post_to_rtdr(post_id: int, user_id: int) -> None:
+async def add_post_to_rtdr(post_id: int, user_id: int, message_id: int) -> None:
     """  
     Add post with given id to readthedamnrules table/system
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, user_id,))
+            await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id, message_id) VALUES (?, ?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, user_id, message_id,))
             await conn.commit()
 
 async def get_post_creator_id(post_id: int) -> int|None:
