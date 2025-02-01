@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from functions import save_post_as_pending, _remove_post_from_pending
+from functions import save_post_as_pending, remove_post_from_pending, get_pending_posts
 import datetime, os, asyncio
 from dotenv import load_dotenv
 

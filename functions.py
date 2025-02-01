@@ -167,9 +167,3 @@ async def save_post_as_pending(post_id: int) -> None:
             day_from_now = datetime.datetime.now() + datetime.timedelta(hours=24)
             await cu.execute("INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?)", (post_id, day_from_now.timestamp(),))
             await conn.commit()
-
-async def _remove_post_from_pending(post_id: int):
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("DELETE FROM pending_posts WHERE post_id=?", (post_id,))
-            await conn.commit()
