@@ -36,9 +36,9 @@ def check_time_more_than_day(timestamp: int) -> bool:
 
 # reminder system related functions
 
-async def execute_sql(cmd: str) -> tuple|None:
+async def execute_sql(cmd: str) -> tuple|Exception|None:
     """  
-    Execute the given sql command and return the result or None if there is no result
+    Execute the given sql command and return the result or None if there is no result, if an error was raised when executing the sql command it will be returned
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
@@ -157,13 +157,12 @@ async def check_message_has_post(message_id: int) -> bool:
 
 # reminders-redone
 
-async def save_post_as_pending(post_id: int) -> None:
+async def save_post_as_pending(post_id: int, timestamp: int) -> None:
     """  
     Adds the given post id with timestamp of 24 hours to the future (now + 24 hours)
     to pending table in db
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            day_from_now = datetime.datetime.now() + datetime.timedelta(hours=24)
-            await cu.execute("INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?)", (post_id, day_from_now.timestamp(),))
+            await cu.execute("INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?)", (post_id, timestamp))
             await conn.commit()
