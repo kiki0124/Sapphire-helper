@@ -45,9 +45,9 @@ class reminders_redone(commands.Cog):
         self.client: commands.Bot = client
 
     async def wait_and_send_reminder(self, post: discord.Thread):
-        await asyncio.sleep(24*60*60) # 1 day as asyncio.sleep takes time in seconds
         owner_id = await get_post_creator_id(post.id) or post.owner_id
         greetings = ["Hello", "Hey", "Hi", "Hi there",]
+        await asyncio.sleep(24*60*60) # 1 day as asyncio.sleep takes time in seconds
         await post.send(
             content=f"{random.choices(greetings)[0]} <@{owner_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved."
         )
@@ -93,7 +93,7 @@ class reminders_redone(commands.Cog):
                         except KeyError|IndexError:
                             pass
                 else:
-                    if message.channel.id not in await get_pending_posts() and message.channel.id not in send_reminder_tasks:
+                    if message.channel.id not in await get_pending_posts():
                         task = asyncio.create_task(self.wait_and_send_reminder(message.channel))
                         send_reminder_tasks[message.channel] = task
 
