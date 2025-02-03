@@ -38,12 +38,18 @@ class CloseNow(ui.View):
             await remove_post_from_pending(interaction.channel.id)
             if interaction.channel.id in close_posts_tasks:
                 close_posts_tasks.pop(interaction.channel.id)
+            alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
+            await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Close now button clicked")
         else:
             await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
 
 class reminders_redone(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
+
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}")
 
     async def wait_and_send_reminder(self, post: discord.Thread, time: datetime.datetime = datetime.datetime.now()):
         print("wait and send reminders triggered")
@@ -52,7 +58,7 @@ class reminders_redone(commands.Cog):
         greetings = ["Hello", "Hey", "Hi", "Hi there",]
         #await asyncio.sleep(24*60*60) # 1 day as asyncio.sleep takes time in seconds
         await asyncio.sleep(20) #! Remove this before pushing to main
-        #! Xge or anyone else that sees this comment, if you see this it means that I forgot to remove it, please ping me to remind me to remove it.
+        #! Xge or anyone else that sees this comment, if you see this it means that I forgot to remove it = change the delay to what it should be, please ping me to remind me to remove it.
         print("waited time")
         refreshed_post = self.client.get_channel(post.id) # "refresh" it, for example if tags were changed during thee asyncio.sleep time
         ndr = post.parent.get_tag(NEEDS_DEV_REVIEW_TAG_ID)
@@ -87,8 +93,10 @@ class reminders_redone(commands.Cog):
             tags = [solved]
             if cb in post.applied_tags:
                 tags.append(cb)
-            await post.edit(archived=True, applied_tags=tags, reason="Close pending post")
+            action_id = generate_random_id()
+            await post.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id} .Close pending post")
             print("post edited")
+            await self.send_action_log(action_id, post.mention, tags, "Close pending post")
             await remove_post_from_pending(post.id)
 
     @commands.Cog.listener('on_message')
