@@ -4,6 +4,7 @@ from functions import save_post_as_pending, remove_post_from_pending, get_pendin
 import datetime, os, asyncio, random
 from dotenv import load_dotenv
 from discord import ui
+from typing import Union
 
 load_dotenv()
 
@@ -14,8 +15,8 @@ CB_TAG_ID = int(os.getenv("CUSTOM_BRANDING_TAG_ID"))
 MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
 EXPERTS_ROLE_ID = int(os.getenv('EXPERTS_ROLE_ID'))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
-close_posts_tasks: dict[discord.Thread, asyncio.Task] = {} # for the 24 hours after the reminder was sent task
-send_reminder_tasks: dict[discord.Thread, asyncio.Task] = {} # waiting for 24 hours and sending the reminder tasks
+close_posts_tasks: dict[int, asyncio.Task] = {} # for the 24 hours after the reminder was sent task
+send_reminder_tasks: dict[int, asyncio.Task] = {} # waiting for 24 hours and sending the reminder tasks
 
 class CloseNow(ui.View):
     def __init__(self):
@@ -44,58 +45,101 @@ class reminders_redone(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
 
-    async def wait_and_send_reminder(self, post: discord.Thread):
+    async def wait_and_send_reminder(self, post: discord.Thread, time: datetime.datetime = datetime.datetime.now()):
+        print("wait and send reminders triggered")
         owner_id = await get_post_creator_id(post.id) or post.owner_id
+        print(f"owner id: {owner_id}")
         greetings = ["Hello", "Hey", "Hi", "Hi there",]
-        await asyncio.sleep(24*60*60) # 1 day as asyncio.sleep takes time in seconds
-        await post.send(
-            content=f"{random.choices(greetings)[0]} <@{owner_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved."
-        )
-        timestamp = int((datetime.datetime.now() + datetime.timedelta(hours=24)).timestamp()) # timestamp of when the post should be marked as solved if no message from op is received
-        await save_post_as_pending(post_id=post.id, timestamp=timestamp)
-        task = asyncio.create_task(self.close_post_after_delay(post))
-        close_posts_tasks[post] = task
+        #await asyncio.sleep(24*60*60) # 1 day as asyncio.sleep takes time in seconds
+        await asyncio.sleep(20) #! Remove this before pushing to main
+        #! Xge or anyone else that sees this comment, if you see this it means that I forgot to remove it, please ping me to remind me to remove it.
+        print("waited time")
+        refreshed_post = self.client.get_channel(post.id) # "refresh" it, for example if tags were changed during thee asyncio.sleep time
+        ndr = post.parent.get_tag(NEEDS_DEV_REVIEW_TAG_ID)
+        solved = post.parent.get_tag(SOLVED_TAG_ID)
+        if ndr not in refreshed_post.applied_tags and solved not in refreshed_post.applied_tags and not refreshed_post.locked:
+            await post.send(
+                content=f"{random.choices(greetings)[0]} <@{owner_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved."
+            )
+            print("message sent")
+            timestamp = int((time + datetime.timedelta(hours=24)).timestamp()) # timestamp of when the post should be marked as solved if no message from op is received
+            await save_post_as_pending(post_id=post.id, timestamp=timestamp)
+            print("post saved as pending")
+            task = asyncio.create_task(self.close_post_after_delay(refreshed_post))
+            print("task created with close post after delay")
+            close_posts_tasks[post.id] = task
+            print("task cached")
+            send_reminder_tasks.pop(post.id)
 
-    async def close_post_after_delay(self, post: discord.Thread):
+    async def close_post_after_delay(self, post_id: int):
+        print("close after delay called")
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         ndr = support.get_tag(NEEDS_DEV_REVIEW_TAG_ID)
-        await asyncio.sleep(24*60*60) # 24 hours * 60 minutes an hour * 60 seconds a minute as asyncio.sleep takes the time in seconds
+        #await asyncio.sleep(24*60*60) # 24 hours * 60 minutes an hour * 60 seconds a minute as asyncio.sleep takes the time in seconds
+        await asyncio.sleep(20) #! remove this line before pushing to main.
+        #! Xge (or anyone else that sees this) if this is in main please immediately ping me or just delete this line and remove the comment from the line above this one
+        print("time waited")
+        post = self.client.get_channel(post_id)
         if ndr not in post.applied_tags and not post.locked:
+            print("not ndr, not locked")
             solved = support.get_tag(SOLVED_TAG_ID)
             cb = support.get_tag(CB_TAG_ID)
             tags = [solved]
             if cb in post.applied_tags:
                 tags.append(cb)
             await post.edit(archived=True, applied_tags=tags, reason="Close pending post")
+            print("post edited")
+            await remove_post_from_pending(post.id)
 
     @commands.Cog.listener('on_message')
     async def reminder_messages_listener(self, message: discord.Message):
-        if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
+        if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID and message.author != self.client.user:
+            print("message in #support")
             ndr = message.channel.parent.get_tag(NEEDS_DEV_REVIEW_TAG_ID)
             solved = message.channel.parent.get_tag(SOLVED_TAG_ID)
-            if ndr not in message.channel.applied_tags and solved not in message.channel.applied_tags and not message.channel.locked and message.author != self.client.user:
+            if ndr not in message.channel.applied_tags and solved not in message.channel.applied_tags and not message.channel.locked:
+                print("not ndr, not solved, not locked")
                 owner_is_author = message.author == message.channel.owner
                 if message.channel.id in await get_rtdr_posts():
                     owner_is_author = message.author.id == await get_post_creator_id(message.channel.id)
-                
                 if owner_is_author:
+                    print("owner is author.")
                     if message.channel.id in await get_pending_posts():
+                        print("in get pending posts")
                         await remove_post_from_pending(message.channel.id)
+                        print("removed from pending")
                         try:
                             close_posts_tasks[message.channel.id].cancel()
                             close_posts_tasks.pop(message.channel.id)
                         except KeyError|IndexError:
+                            print("key or index error")
                             pass
                     elif message.channel.id in send_reminder_tasks:
+                        print("in send reminder tasks")
                         try:
-                            send_reminder_tasks[message.channel].cancel()
-                            send_reminder_tasks.pop(message.channel)
+                            send_reminder_tasks[message.channel.id].cancel()
+                            send_reminder_tasks.pop(message.channel.id)
                         except KeyError|IndexError:
-                            pass
+                            print("elif key or index error")
                 else:
-                    if message.channel.id not in await get_pending_posts():
+                    print("else = not author is owner")
+                    if message.channel.id not in await get_pending_posts() and message.channel.id not in close_posts_tasks and message.channel.id not in send_reminder_tasks:
+                        print("channel not in pending posts")
                         task = asyncio.create_task(self.wait_and_send_reminder(message.channel))
-                        send_reminder_tasks[message.channel] = task
+                        print("task created")
+                        send_reminder_tasks[message.channel.id] = task
+                        print("added to cache")
+
+    @commands.Cog.listener("on_reaction_add")
+    async def manually_add_to_pending(self, reaction: discord.Reaction, user: Union[discord.User, discord.Member]):
+        if isinstance(reaction.message.channel, discord.Thread) and reaction.message.channel.parent_id == SUPPORT_CHANNEL_ID:
+            post_owner_id = await get_post_creator_id(reaction.message.channel.id) or reaction.message.channel.owner_id
+            if reaction.message.author.id == post_owner_id and reaction.message.channel.id not in close_posts_tasks:
+                experts = reaction.message.channel.guild.get_role(EXPERTS_ROLE_ID)
+                mods = reaction.message.channel.guild.get_role(MODERATORS_ROLE_ID   )
+                allowed_reactions = ["⏰", "⏳"]
+                if reaction.emoji in allowed_reactions and experts in user.roles or mods in user.roles:
+                    await self.wait_and_send_reminder(post=reaction.message.channel, time=reaction.message.created_at)
 
 async def setup(client):
     await client.add_cog(reminders_redone(client))
