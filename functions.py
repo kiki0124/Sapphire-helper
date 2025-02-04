@@ -170,7 +170,7 @@ async def save_post_as_pending(post_id: int, timestamp: int) -> None:
 
 # reminders redone- reminder_waiting
 
-async def get_waiting_posts() -> dict[int, int]:
+async def get_waiting_posts():
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             await cu.execute("SELECT * FROM reminder_waiting")
