@@ -76,11 +76,9 @@ class readthedamnrules(commands.Cog):
         new_message_content += user.mention
         await post[1].edit(content=new_message_content) # replace the name of the initiator at the end of the message with a ping of them to add them to the post without it actually pinging them
         await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
-        await message.channel.send(content=f'{reference_message.author.mention} asked "{reference_message.content}". A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will be punished.', delete_after=300)
-        after = datetime.datetime.now() - datetime.timedelta(minutes=10)
-        def purge_check(m: discord.Message):
-            return m.author == reference_message.author
-        await message.channel.purge(after=after, check=purge_check, reason=f"@{message.author.name} used rtdr system")
+        await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300)
+        for msg in messages_to_move:
+            await msg.delete()
         return post[0]
 
     @commands.Cog.listener('on_message')
@@ -104,7 +102,6 @@ class readthedamnrules(commands.Cog):
                 mods = reaction.message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in user.roles or mods in user.roles:
                     await self.handle_request(reaction.message, user=user)
-                    await reaction.remove(user)
 
 async def setup(client):
     await client.add_cog(readthedamnrules(client))
