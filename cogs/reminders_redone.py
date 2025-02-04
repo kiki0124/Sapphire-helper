@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from functions import save_post_as_pending, remove_post_from_pending, get_pending_posts, get_post_creator_id, get_rtdr_posts, generate_random_id
 import datetime, os, asyncio, random
 from dotenv import load_dotenv
@@ -18,7 +18,7 @@ ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 close_posts_tasks: dict[int, asyncio.Task] = {} # for the 24 hours after the reminder was sent task
 send_reminder_tasks: dict[int, asyncio.Task] = {} # waiting for 24 hours and sending the reminder tasks
 
-class CloseNow(ui.View):
+class close_now(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         
@@ -51,6 +51,13 @@ class reminders_redone(commands.Cog):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}")
 
+    @tasks.loop(count=1, seconds=1)
+    async def check_db_pending_posts(self):
+        """  
+        If Sapphire Helper was restarted some posts that were waiting to be 
+        """
+        # not implemented yet
+
     async def wait_and_send_reminder(self, post: discord.Thread, time: datetime.datetime = datetime.datetime.now()):
         print("wait and send reminders triggered")
         owner_id = await get_post_creator_id(post.id) or post.owner_id
@@ -65,7 +72,8 @@ class reminders_redone(commands.Cog):
         solved = post.parent.get_tag(SOLVED_TAG_ID)
         if ndr not in refreshed_post.applied_tags and solved not in refreshed_post.applied_tags and not refreshed_post.locked:
             await post.send(
-                content=f"{random.choices(greetings)[0]} <@{owner_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved."
+                content=f"{random.choices(greetings)[0]} <@{owner_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.",
+                view=close_now()
             )
             print("message sent")
             timestamp = int((time + datetime.timedelta(hours=24)).timestamp()) # timestamp of when the post should be marked as solved if no message from op is received
