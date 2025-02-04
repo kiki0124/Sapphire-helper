@@ -71,7 +71,7 @@ class bot(commands.Cog):
         if isinstance(error, app_commands.MissingAnyRole):
             await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.CheckFailure): # raised when a user tries to use a command that only mods/experts/op can use, eg /solved
-            await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> and the OP can use this command!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.NoPrivateMessage):
             await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
         else:
