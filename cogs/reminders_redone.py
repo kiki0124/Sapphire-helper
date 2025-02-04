@@ -97,9 +97,10 @@ class reminders_redone(commands.Cog):
             await save_post_as_pending(post.id, timestamp)
             print("task cached")
             send_reminder_tasks.pop(post.id)
+            print("removed from cache")
             await remove_post_from_waiting(post.id)
             print("removed from waiting")
-            
+
 
     async def close_post_after_delay(self, post_id: int):
         print("close after delay called")
@@ -121,7 +122,10 @@ class reminders_redone(commands.Cog):
             await post.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id} .Close pending post")
             print("post edited")
             await self.send_action_log(action_id, post.mention, tags, "Close pending post")
+            close_posts_tasks.pop(post_id)
+            print("removed from cache")
             await remove_post_from_pending(post.id)
+            print("removed from db")
         else:
             print("close after delay- else")
             await remove_post_from_pending(post_id)
