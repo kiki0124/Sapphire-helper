@@ -16,6 +16,7 @@ async def main():
         async with conn.cursor() as cu:
             await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER NOT NULL PRIMARY KEY, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -165,4 +166,25 @@ async def save_post_as_pending(post_id: int, timestamp: int) -> None:
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             await cu.execute("INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?)", (post_id, timestamp))
+            await conn.commit()
+
+# reminders redone- reminder_waiting
+
+async def get_waiting_posts() -> dict[int, int]:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT * FROM reminder_waiting")
+            return await cu.fetchall()
+
+async def remove_post_from_waiting(post_id: int) -> None:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("DELETE FROM reminder_waiting WHERE post_id=?", (post_id,))
+            await conn.commit()
+
+async def add_post_to_waiting(post_id: int, timestamp: int = None) -> None:
+    if timestamp is None: timestamp = int(datetime.datetime.now().timestamp())
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("INSERT INTO reminder_waiting (post_id, timestamp) VALUES (?, ?)", (post_id, timestamp,))
             await conn.commit()
