@@ -158,14 +158,15 @@ class autoadd(commands.Cog):
                     and message_channel.parent_id == SUPPORT_CHANNEL_ID
         is_starter_message = payload.message_id == payload.channel_id
         if is_in_support and is_starter_message:
-            not_ndr = message_channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID) not in message_channel.applied_tags
+            ndr = message_channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+            solved = message_channel.parent.get_tag(SOLVED_TAG_ID)
+            tag_filters = ndr not in message_channel.applied_tags and solved not in message_channel.applied_tags
             other_filters = not message_channel.locked and not message_channel.archived
-            if not_ndr and other_filters:
+            if tag_filters and other_filters:
                 await message_channel.send(
                     content=f"**Post automatically marked as solved**\nIt seems like this post's starter message was deleted so the post was automatically marked as solved.",
                     view=reopen_button()
                 )
-                solved = message_channel.parent.get_tag(SOLVED_TAG_ID)
                 tags = [solved]
                 cb = message_channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
                 if cb in message_channel.applied_tags:
