@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import os
-from functions import add_post_to_rtdr, check_message_has_post
+from functions import add_post_to_rtdr
 from typing import Union
 import datetime
 
@@ -75,7 +75,7 @@ class readthedamnrules(commands.Cog):
         new_message_content = new_message_content.removesuffix(user.name)
         new_message_content += user.mention
         await post[1].edit(content=new_message_content) # replace the name of the initiator at the end of the message with a ping of them to add them to the post without it actually pinging them
-        await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id, message_id=reference_message.id)
+        await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
         await message.channel.send(content=f'{reference_message.author.mention} asked "{reference_message.content}". A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will be punished.', delete_after=300)
         after = datetime.datetime.now() - datetime.timedelta(minutes=10)
         def purge_check(m: discord.Message):
@@ -91,7 +91,7 @@ class readthedamnrules(commands.Cog):
                 moderators = message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in message.author.roles or moderators in message.author.roles:
                     replied_message = message.reference.cached_message or await message.channel.fetch_message(message.reference.message_id)
-                    if not replied_message.author == message.author and not await check_message_has_post(replied_message.id):
+                    if not replied_message.author == message.author:
                         await self.handle_request(reference_message=replied_message, user=message.author, message=message)
                         await message.delete(delay=5) # delete the trigger message when the reply message with the post was sent
 
@@ -102,7 +102,7 @@ class readthedamnrules(commands.Cog):
             if reaction.message.author != user and reaction.emoji in reactions:
                 experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
                 mods = reaction.message.guild.get_role(MODERATORS_ROLE_ID)
-                if experts in user.roles or mods in user.roles and not await check_message_has_post(reaction.message.id):
+                if experts in user.roles or mods in user.roles:
                     await self.handle_request(reaction.message, user=user)
                     await reaction.remove(user)
 

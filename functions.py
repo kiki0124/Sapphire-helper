@@ -15,7 +15,7 @@ async def main():
     async with sql.connect(DB_PATH) as conn: 
         async with conn.cursor() as cu:
             await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER NOT NULL PRIMARY KEY, timestamp INTEGER NOT NULL)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await conn.commit()
 
@@ -101,13 +101,13 @@ async def check_post_last_message_time(post_id: int) -> bool:
 
 # readthedamnrules system related functions
 
-async def add_post_to_rtdr(post_id: int, user_id: int, message_id: int) -> None:
+async def add_post_to_rtdr(post_id: int, user_id: int) -> None:
     """  
     Add post with given id to readthedamnrules table/system
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id, message_id) VALUES (?, ?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, user_id, message_id,))
+            await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, user_id,))
             await conn.commit()
 
 async def get_post_creator_id(post_id: int) -> int|None:
@@ -142,19 +142,6 @@ async def get_rtdr_posts() -> list[int]:
                 return [post_id[0] for post_id in result]
             else:
                 return []
-
-async def check_message_has_post(message_id: int) -> bool:
-    """  
-    Return whether a post was already created for the given message id
-    """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute('SELECT message_id FROM readthedamnrules')
-            result = await cu.fetchall()
-            if result:
-                return message_id in result[0]
-            else:
-                return False
 
 # reminders-redone
 
