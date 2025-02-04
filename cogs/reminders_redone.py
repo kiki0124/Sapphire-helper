@@ -70,7 +70,7 @@ class reminders_redone(commands.Cog):
                 else:
                     await remove_post_from_waiting(post_id)
 
-    async def wait_and_send_reminder(self, post: discord.Thread, time: datetime.datetime = datetime.datetime.now(), delay: int = 24*60*60):
+    async def wait_and_send_reminder(self, post: discord.Thread, time: datetime.datetime = datetime.datetime.now(), delay: int = 24*60*60, remove_reaction_from: discord.Message = None):
         print("wait and send reminders triggered")
         owner_id = await get_post_creator_id(post.id) or post.owner_id
         print(f"owner id: {owner_id}")
@@ -100,6 +100,8 @@ class reminders_redone(commands.Cog):
             print("removed from cache")
             await remove_post_from_waiting(post.id)
             print("removed from waiting")
+            if remove_reaction_from:
+                await remove_reaction_from.clear_reactions()
 
 
     async def close_post_after_delay(self, post_id: int):
@@ -176,7 +178,7 @@ class reminders_redone(commands.Cog):
     async def manually_add_to_pending(self, reaction: discord.Reaction, user: Union[discord.User, discord.Member]):
         if isinstance(reaction.message.channel, discord.Thread) and reaction.message.channel.parent_id == SUPPORT_CHANNEL_ID:
             post_owner_id = await get_post_creator_id(reaction.message.channel.id) or reaction.message.channel.owner_id
-            if reaction.message.author.id == post_owner_id and reaction.message.channel.id not in close_posts_tasks:
+            if reaction.message.author.id == post_owner_id and reaction.message.channel.id not in close_posts_tasks and reaction.message.channel.id not in send_reminder_tasks:
                 experts = reaction.message.channel.guild.get_role(EXPERTS_ROLE_ID)
                 mods = reaction.message.channel.guild.get_role(MODERATORS_ROLE_ID   )
                 allowed_reactions = ["⏰", "⏳"]
