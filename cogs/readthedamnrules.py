@@ -76,7 +76,7 @@ class readthedamnrules(commands.Cog):
         new_message_content += user.mention
         await post[1].edit(content=new_message_content) # replace the name of the initiator at the end of the message with a ping of them to add them to the post without it actually pinging them
         await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
-        await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300)
+        await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300, silent=True)
         for msg in messages_to_move:
             await msg.delete()
         return post[0]
