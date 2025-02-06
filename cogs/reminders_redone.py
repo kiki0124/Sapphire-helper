@@ -56,17 +56,45 @@ class reminders_redone(commands.Cog):
         """  
         If Sapphire Helper was restarted some posts that were waiting to be 
         """
-        for post_id, timestamp in await get_waiting_posts():
+        await self.client.wait_until_ready()
+        await self.iterate_pending_posts()
+        await self.iterate_waiting_posts()
+        
+    async def iterate_pending_posts(self):
+        for row in await get_pending_posts():
+            post_id = row[0]
+            timestamp = row[1]
             post = self.client.get_channel(post_id)
             if post:
                 solved = post.parent.get_tag(SOLVED_TAG_ID)
                 ndr = post.parent.get_tag(NEEDS_DEV_REVIEW_TAG_ID)
                 if solved not in post.applied_tags and ndr not in post.applied_tags and not post.archived and not post.locked:
                     time = datetime.datetime.fromtimestamp(timestamp)
-                    delay = time - datetime.datetime.now()
-                    task = asyncio.create_task(self.wait_and_send_reminder(post, time, delay))
-                    send_reminder_tasks[post_id] = task
-                    await add_post_to_waiting(post_id, timestamp)
+                    now = datetime.datetime.now()
+                    if time > now:
+                        delay = time - now
+                        task = asyncio.create_task(self.wait_and_send_reminder(post, time, delay))
+                        close_posts_tasks[post_id] = task
+                        await save_post_as_pending(post_id, timestamp)
+                else:
+                    await remove_post_from_pending(post_id)
+
+    async def iterate_waiting_posts(self):
+        for row in await get_waiting_posts():
+            post_id = row[0]
+            timestamp = row[1]
+            post = self.client.get_channel(post_id)
+            if post:
+                solved = post.parent.get_tag(SOLVED_TAG_ID)
+                ndr = post.parent.get_tag(NEEDS_DEV_REVIEW_TAG_ID)
+                if solved not in post.applied_tags and ndr not in post.applied_tags and not post.archived and not post.locked:
+                    time = datetime.datetime.fromtimestamp(timestamp)
+                    now = datetime.datetime.now()
+                    if time > now:
+                        delay = time - now
+                        task = asyncio.create_task(self.wait_and_send_reminder(post, time, delay))
+                        send_reminder_tasks[post_id] = task
+                        await add_post_to_waiting(post_id, timestamp)
                 else:
                     await remove_post_from_waiting(post_id)
 
