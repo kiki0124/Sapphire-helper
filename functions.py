@@ -60,15 +60,14 @@ async def add_post_to_pending(post_id: int) -> None:
             await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, timestamp,))
             await conn.commit()
 
-async def get_pending_posts() -> list[int]:
+async def get_pending_posts():
     """
     Get all posts in pending posts table. Returns a list of integers.
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             await cu.execute("SELECT post_id FROM pending_posts")
-            result = await cu.fetchall()
-            return [post_id[0] for post_id in result]
+            return await cu.fetchall()
 
 async def remove_post_from_pending(post_id: int) -> None:
     """  
