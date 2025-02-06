@@ -89,7 +89,7 @@ class bot(commands.Cog):
             await interaction.response.send_message(content=await functions.get_post_timestamp(post.id))
         elif debug == "more than 24 hours":
             await interaction.response.send_message(content=await functions.check_post_last_message_time(post.id))
-        elif debug.startswith(("eval sql", "execute sql",)):
+        elif debug.startswith("eval sql"):
             command = debug.removeprefix('eval sql ')
             await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
         else:

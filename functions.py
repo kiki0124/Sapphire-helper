@@ -67,7 +67,7 @@ async def get_pending_posts():
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             await cu.execute("SELECT post_id FROM pending_posts")
-            return await cu.fetchall()
+            return [row[0] for row in await cu.fetchall()]
 
 async def remove_post_from_pending(post_id: int) -> None:
     """  
@@ -138,7 +138,7 @@ async def get_rtdr_posts() -> list[int]:
             await cu.execute("SELECT post_id FROM readthedamnrules")
             result = await cu.fetchall()
             if result:
-                return [post_id[0] for post_id in result]
+                return [row[0] for row in result]
             else:
                 return []
 
@@ -154,13 +154,22 @@ async def save_post_as_pending(post_id: int, timestamp: int) -> None:
             await cu.execute("INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?)", (post_id, timestamp))
             await conn.commit()
 
-# reminders redone- reminder_waiting
-
-async def get_waiting_posts():
+async def get_pending_posts_data():
+    """
+    returns the id and timestamp of all pending posts
+    """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            await cu.execute("SELECT * FROM reminder_waiting")
+            await cu.execute('SELECT * FROM pending_posts')
             return await cu.fetchall()
+
+# reminders redone- reminder_waiting
+
+async def get_waiting_posts() -> list[int]:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT post_id FROM reminder_waiting")
+            return [row[0] for row in await cu.fetchall()]
 
 async def remove_post_from_waiting(post_id: int) -> None:
     async with sql.connect(DB_PATH) as conn:
@@ -174,3 +183,9 @@ async def add_post_to_waiting(post_id: int, timestamp: int = None) -> None:
         async with conn.cursor() as cu:
             await cu.execute("INSERT INTO reminder_waiting (post_id, timestamp) VALUES (?, ?)", (post_id, timestamp,))
             await conn.commit()
+
+async def get_waiting_posts_data():
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT * FROM reminder_waiting")
+            return await cu.fetchall()

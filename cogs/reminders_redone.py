@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands, tasks
-from functions import save_post_as_pending, remove_post_from_pending, get_pending_posts, get_post_creator_id, get_rtdr_posts, generate_random_id, get_waiting_posts, add_post_to_waiting, remove_post_from_waiting
+from functions import save_post_as_pending, remove_post_from_pending, get_pending_posts, get_post_creator_id, get_rtdr_posts, generate_random_id, get_waiting_posts, add_post_to_waiting, remove_post_from_waiting, get_pending_posts_data, get_waiting_posts_data
 import datetime, os, asyncio, random
 from dotenv import load_dotenv
 from discord import ui
@@ -46,22 +46,26 @@ class close_now(ui.View):
 class reminders_redone(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
+        self.check_db_pending_posts.start()
 
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}")
 
-    @tasks.loop(count=1, seconds=1)
+    @tasks.loop(count=1, seconds=1) # only be called once after startup
     async def check_db_pending_posts(self):
         """  
         If Sapphire Helper was restarted some posts that were waiting to be 
         """
-        await self.client.wait_until_ready()
         await self.iterate_pending_posts()
         await self.iterate_waiting_posts()
         
+    @check_db_pending_posts.before_loop
+    async def wait_until_ready(self):
+        await self.client.wait_until_ready()
+
     async def iterate_pending_posts(self):
-        for row in await get_pending_posts():
+        for row in await get_pending_posts_data():
             post_id = row[0]
             timestamp = row[1]
             post = self.client.get_channel(post_id)
@@ -80,7 +84,7 @@ class reminders_redone(commands.Cog):
                     await remove_post_from_pending(post_id)
 
     async def iterate_waiting_posts(self):
-        for row in await get_waiting_posts():
+        for row in await get_waiting_posts_data():
             post_id = row[0]
             timestamp = row[1]
             post = self.client.get_channel(post_id)
@@ -122,7 +126,6 @@ class reminders_redone(commands.Cog):
             task = asyncio.create_task(self.close_post_after_delay(refreshed_post))
             print("task created with close post after delay")
             close_posts_tasks[post.id] = task
-            await save_post_as_pending(post.id, timestamp)
             print("task cached")
             send_reminder_tasks.pop(post.id)
             print("removed from cache")
@@ -142,25 +145,27 @@ class reminders_redone(commands.Cog):
         #! Xge (or anyone else that sees this) if this is in main please immediately ping me or just delete this line and remove the comment from the line above this one
         print("time waited")
         post = self.client.get_channel(post_id)
-        if ndr not in post.applied_tags and not post.locked and solved not in post.applied_tags and not post.archived:
-            print("not ndr, not locked")
-            cb = support.get_tag(CB_TAG_ID)
-            tags = [solved]
-            if cb in post.applied_tags:
-                tags.append(cb)
-            action_id = generate_random_id()
-            await post.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id} .Close pending post")
-            print("post edited")
-            await self.send_action_log(action_id, post.mention, tags, "Close pending post")
-            close_posts_tasks.pop(post_id)
-            print("removed from cache")
-            await remove_post_from_pending(post.id)
-            print("removed from db")
+        if post:
+            if ndr not in post.applied_tags and not post.locked and solved not in post.applied_tags and not post.archived:
+                print("not ndr, not locked")
+                cb = support.get_tag(CB_TAG_ID)
+                tags = [solved]
+                if cb in post.applied_tags:
+                    tags.append(cb)
+                action_id = generate_random_id()
+                await post.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id} .Close pending post")
+                print("post edited")
+                await self.send_action_log(action_id, post.mention, tags, "Close pending post")
+                close_posts_tasks.pop(post_id)
+                print("removed from cache")
+                await remove_post_from_pending(post.id)
+                print("removed from db")
+            else:
+                print("close after delay- else")
+                await remove_post_from_pending(post_id)
+                close_posts_tasks.pop(post_id)
         else:
-            print("close after delay- else")
-            await remove_post_from_pending(post_id)
-            close_posts_tasks.pop(post_id)
-
+            print("not post")
 
     @commands.Cog.listener('on_message')
     async def reminder_messages_listener(self, message: discord.Message):
