@@ -185,10 +185,16 @@ class remind(commands.Cog):
                     continue
 
     @check_for_pending_posts.before_loop
-    @close_pending_posts.before_loop
-    @check_exception_posts.before_loop
-    async def loops_before_loop(self):
+    async def cfpp_before_loop(self):
         await self.client.wait_until_ready() # only start the loop when the bot's cache is ready
+
+    @close_pending_posts.before_loop
+    async def cpp_before_loop(self):
+        await self.client.wait_until_ready()
+    
+    @check_exception_posts.before_loop
+    async def cep_before_loop(self):
+        await self.client.wait_until_ready
 
 async def setup(client):
     await client.add_cog(remind(client))
