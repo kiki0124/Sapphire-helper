@@ -50,16 +50,6 @@ class remind(commands.Cog):
         self.check_for_pending_posts.start()
         self.close_pending_posts.start()
         self.check_exception_posts.start()
-        self.unanswered = discord.Object(UNANSWERED_TAG_ID)
-        self.needs_dev_review = discord.Object(NEED_DEV_REVIEW_TAG_ID)
-        self.solved = discord.Object(SOLVED_TAG_ID)
-        self.cb = discord.Object(CUSTOM_BRANDING_TAG_ID)
-
-    async def get_tag_ids(self, post: discord.Thread):
-        """  
-        Returns a list of the ids of all tags applied in the given post
-        """
-        return [tag.id for tag in post.applied_tags]
 
     async def reminders_filter(self, thread: discord.Thread):
         """  
@@ -68,19 +58,20 @@ class remind(commands.Cog):
         * Doesn't have needs dev review & solved
         * Is in #support (parent_id==SUPPORT_CHANNEL_ID)
         """
-        applied_tags = await self.get_tag_ids(thread)
-        ndr = not self.needs_dev_review.id in applied_tags
-        solved = not self.solved.id in applied_tags
-        archived = not thread.archived
-        locked = not thread.locked
-        support = thread.parent_id == SUPPORT_CHANNEL_ID
-        return ndr and solved and archived and locked and support
-    
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.Object], context: str):
+        if thread.parent_id == SUPPORT_CHANNEL_ID:
+            parent = thread.parent
+            applied_tags = thread.applied_tags
+            ndr = parent.get_tag(NEED_DEV_REVIEW_TAG_ID) not in applied_tags
+            solved = parent.get_tag(SOLVED_TAG_ID) not in applied_tags
+            archived = not thread.archived
+            locked = not thread.locked
+            return ndr and solved and archived and locked
+        else:
+            return False
+        
+    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        tag_names = [support.get_tag(tag.id).name for tag in tags]
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join(tag_names)}\nContext: {context}")
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}")
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -165,7 +156,8 @@ class remind(commands.Cog):
     async def remove_pending_posts(self, message: discord.Message):
         if message.author != self.client.user:
             if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
-                others_filter = not message.channel.locked and not self.needs_dev_review.id in await self.get_tag_ids(message.channel)
+                ndr = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+                others_filter = not message.channel.locked and not ndr not in message.channel.applied_tags
                 message_author = message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id)
                 in_pending_post = message.channel.id in await get_pending_posts()
                 if message_author and in_pending_post and others_filter:
@@ -176,12 +168,13 @@ class remind(commands.Cog):
         for post_id in await get_pending_posts():
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
-                applied_tags = await self.get_tag_ids(post)
-                ndr = self.needs_dev_review.id not in applied_tags
+                applied_tags = post.applied_tags
+                ndr = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID) not in applied_tags
                 more_than_24_hours = await check_post_last_message_time(post_id)
                 if ndr and more_than_24_hours:
-                    tags = [self.solved]
-                    if self.cb.id in applied_tags: tags.append(self.cb)
+                    tags = [post.parent.get_tag(SOLVED_TAG_ID)]
+                    cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+                    if cb in applied_tags: tags.append(cb)
                     action_id = generate_random_id()
                     await post.edit(archived=True, reason=f"ID: {action_id}. Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
                     await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
@@ -192,10 +185,16 @@ class remind(commands.Cog):
                     continue
 
     @check_for_pending_posts.before_loop
-    @close_pending_posts.before_loop
-    @check_exception_posts.before_loop
-    async def loops_before_loop(self):
+    async def cfpp_before_loop(self):
         await self.client.wait_until_ready() # only start the loop when the bot's cache is ready
+
+    @close_pending_posts.before_loop
+    async def cpp_before_loop(self):
+        await self.client.wait_until_ready()
+    
+    @check_exception_posts.before_loop
+    async def cep_before_loop(self):
+        await self.client.wait_until_ready
 
 async def setup(client):
     await client.add_cog(remind(client))

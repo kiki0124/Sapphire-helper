@@ -71,7 +71,7 @@ class bot(commands.Cog):
         if isinstance(error, app_commands.MissingAnyRole):
             await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.CheckFailure): # raised when a user tries to use a command that only mods/experts/op can use, eg /solved
-            await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> and the OP can use this command!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.NoPrivateMessage):
             await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
         else:
@@ -89,7 +89,7 @@ class bot(commands.Cog):
             await interaction.response.send_message(content=await functions.get_post_timestamp(post.id))
         elif debug == "more than 24 hours":
             await interaction.response.send_message(content=await functions.check_post_last_message_time(post.id))
-        elif debug.startswith(("eval sql", "execute sql",)):
+        elif debug.startswith("eval sql"):
             command = debug.removeprefix('eval sql ')
             await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
         else:
