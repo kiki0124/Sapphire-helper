@@ -109,7 +109,7 @@ class autoadd(commands.Cog):
             if solved not in applied_tags and ndr not in applied_tags: 
                 if not message.id == message.channel.id:
                     pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
-                    negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?"
+                    negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t"
                     if not re.search(negative_pattern, message.content, re.IGNORECASE):
                         if re.search(pattern, message.content, re.IGNORECASE):
                             await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.get_solved_id()}>")
