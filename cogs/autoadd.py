@@ -132,7 +132,7 @@ class autoadd(commands.Cog):
                 appeal = message.channel.parent.get_tag(APPEAL_GG_TAG_ID)
                 if cb in applied_tags: 
                     tags.append(cb)
-                if appeal in message.channel.applied_tags:
+                if appeal in applied_tags:
                     tags.append(appeal)
                 action_id = generate_random_id()
                 await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
