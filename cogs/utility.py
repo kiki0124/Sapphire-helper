@@ -23,6 +23,7 @@ MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 NDR_CHANNEL_ID = int(os.getenv('NDR_CHANNEL_ID'))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 QR_LOG_THREAD_ID = int(os.getenv("QR_LOG_THREAD_ID"))
+APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 
 class need_dev_review_buttons(ui.View):
     def __init__(self):
@@ -52,7 +53,11 @@ class ndr_options_buttons(ui.View):
         ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
         tags = [ndr]
         cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-        if cb in interaction.channel.applied_tags: tags.append(cb)
+        appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
+        if cb in interaction.channel.applied_tags: 
+            tags.append(cb)
+        if appeal in interaction.channel.applied_tags:
+            tags.append(appeal)
         action_id = generate_random_id()
         alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
         await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
@@ -132,10 +137,14 @@ class utility(commands.Cog):
         """
         solved = post.parent.get_tag(SOLVED_TAG_ID)
         cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        appeal = post.parent.get_tag(APPEAL_GG_TAG_ID)
         task =  asyncio.create_task(self.close_post(post=post))
         self.close_tasks[post] = task
         tags = [solved]
-        if cb in post.applied_tags: tags.append(cb)
+        if cb in post.applied_tags: 
+            tags.append(cb)
+        if appeal in post.applied_tags:
+            tags.append(appeal)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as solved with /solved")
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
@@ -150,8 +159,12 @@ class utility(commands.Cog):
             self.close_tasks.pop(post)
         not_solved = post.parent.get_tag(NOT_SOLVED_TAG_ID)
         cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        appeal = post.parent.get_tag(APPEAL_GG_TAG_ID)
         tags = [not_solved]
-        if cb in post.applied_tags: tags.append(cb)
+        if cb in post.applied_tags: 
+            tags.append(cb)
+        if appeal in post.applied_tags:
+            tags.append(appeal)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post unsolved with /unsolve")
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/unsolve used")

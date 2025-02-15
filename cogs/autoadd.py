@@ -20,6 +20,7 @@ ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 EXPERTS_ROLE_ID = int(os.getenv('EXPERTS_ROLE_ID'))
 MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
 WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
+APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 
 class reopen_button(ui.View):
     def __init__(self):
@@ -32,13 +33,16 @@ class reopen_button(ui.View):
         is_expert_or_mod = experts in interaction.user.roles or \
                             mods in interaction.user.roles
         if is_expert_or_mod or interaction.user == interaction.channel.owner \
-                                            and not interaction.channel.locked:
+                            and not interaction.channel.locked:
             not_solved = interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)
             wfr = interaction.channel.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
             tags = [not_solved, wfr]
             cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+            appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
             if cb in interaction.channel.applied_tags:
                 tags.append(cb)
+            if appeal in interaction.channel.applied_tags:
+                tags.append(appeal)
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, archived=False, reason=f"ID: {action_id}. re-open button clicked")
             await interaction.response.defer(ephemeral=True)
@@ -125,7 +129,11 @@ class autoadd(commands.Cog):
             if author_not_owner:
                 tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                 cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-                if cb in applied_tags: tags.append(cb)
+                appeal = message.channel.parent.get_tag(APPEAL_GG_TAG_ID)
+                if cb in applied_tags: 
+                    tags.append(cb)
+                if appeal in message.channel.applied_tags:
+                    tags.append(appeal)
                 action_id = generate_random_id()
                 await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
                 await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
@@ -146,7 +154,11 @@ class autoadd(commands.Cog):
                             if not owner: # post owner/creator will be None if they left the server
                                 tags = [support.get_tag(SOLVED_TAG_ID)]
                                 cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-                                if cb in applied_tags: tags.append(cb)
+                                appeal = support.get_tag(APPEAL_GG_TAG_ID)
+                                if cb in applied_tags: 
+                                    tags.append(cb)
+                                if appeal in applied_tags:
+                                    tags.append(appeal)
                                 action_id = generate_random_id()
                                 await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
                                 await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
@@ -169,8 +181,11 @@ class autoadd(commands.Cog):
                 )
                 tags = [solved]
                 cb = message_channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+                appeal = message_channel.parent.get_tag(APPEAL_GG_TAG_ID)
                 if cb in message_channel.applied_tags:
                     tags.append(cb)
+                if appeal in message_channel.applied_tags:
+                    tags.append(appeal)
                 action_id = generate_random_id()
                 await message_channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. Starter message deleted, automatically mark post as solved.")
                 await self.send_action_log(action_id=action_id, post_mention=message_channel.mention, tags=tags, context="Starter message deleted, automatically mark post as solved")

@@ -20,6 +20,7 @@ MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
+APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 
 reminder_not_sent_posts: dict[int, int] = {} # dictionary of post ids: the amount of tries
 
@@ -34,8 +35,12 @@ class CloseNow(ui.View):
         if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
             await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
             tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
-            if interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID) in interaction.channel.applied_tags:
-                tags.append(interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+            cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+            appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
+            if cb in interaction.channel.applied_tags:
+                tags.append(cb)
+            if appeal in interaction.channel.applied_tags:
+                tags.append(appeal)
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
             alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
@@ -174,7 +179,11 @@ class remind(commands.Cog):
                 if ndr and more_than_24_hours:
                     tags = [post.parent.get_tag(SOLVED_TAG_ID)]
                     cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-                    if cb in applied_tags: tags.append(cb)
+                    appeal = post.parent.get_tag(APPEAL_GG_TAG_ID)
+                    if cb in applied_tags: 
+                        tags.append(cb)
+                    if appeal in post.applied_tags:
+                        tags.append(appeal)
                     action_id = generate_random_id()
                     await post.edit(archived=True, reason=f"ID: {action_id}. Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
                     await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
