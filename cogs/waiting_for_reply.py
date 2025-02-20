@@ -26,11 +26,12 @@ class waiting_for_reply(commands.Cog):
     posts: dict[int, asyncio.Task] = {}
 
     async def add_waiting_tag(self, post: discord.Thread) -> None:
-        await asyncio.sleep(600) # wait for 10 minutes to prevent rate limits
         solved = post.parent.get_tag(SOLVED_TAG_ID)
         wfr = post.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
         ndr = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        applied_tags = post.applied_tags
+        await asyncio.sleep(600) # wait for 10 minutes to prevent rate limits
+        refreshed_post = self.client.get_channel(post.id)
+        applied_tags = refreshed_post.applied_tags
         if solved not in applied_tags and ndr not in applied_tags and not post.archived:
             action_id = generate_random_id()
             applied_tags.append(wfr)
