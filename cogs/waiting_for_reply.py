@@ -32,7 +32,7 @@ class waiting_for_reply(commands.Cog):
         await asyncio.sleep(600) # wait for 10 minutes to prevent rate limits
         refreshed_post = self.client.get_channel(post.id)
         applied_tags = refreshed_post.applied_tags
-        if solved not in applied_tags and ndr not in applied_tags and not post.archived:
+        if solved not in applied_tags and ndr not in applied_tags and not refreshed_post.archived and not refreshed_post.locked:
             action_id = generate_random_id()
             applied_tags.append(wfr)
             await post.edit(applied_tags=applied_tags, reason=f"ID: {action_id}. Waiting for reply system")
