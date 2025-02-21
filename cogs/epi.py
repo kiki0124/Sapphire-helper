@@ -4,7 +4,6 @@ from discord import app_commands, ui
 import os
 from dotenv import load_dotenv
 from functions import get_post_creator_id
-import aiohttp
 import asyncio
 
 load_dotenv()
@@ -12,7 +11,7 @@ EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 SUPPORT_CHANNEL_ID = int(os.getenv("SUPPORT_CHANNEL_ID"))
-TOKEN = os.getenv("BOT_TOKEN")
+GENERAL_CHANNEL_ID = int(os.getenv('GENERAL_CHANNEL_ID'))
 EPI_LOG_THREAD_ID = int(os.getenv("EPI_LOG_THREAD_ID"))
 
 epi_users: list[discord.Member|discord.User] = []
@@ -36,6 +35,7 @@ class epi(commands.Cog):
     
     epi_data: dict[discord.Message|str, list[discord.Message]] = {} # the custom set message: list of mssages to be edited to remove the get notified button
     group = app_commands.Group(name="epi", description="Commands related to Extra Post Information system")
+    sticky_message: discord.Message|None = None
 
     async def send_epi_log(self, content: str):
         epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID)
@@ -98,6 +98,9 @@ class epi(commands.Cog):
                     await post.send(content="Hey, this issue is now fixed!\n-# Thank you for your patience.")
                 epi_users.clear()
                 self.epi_data.clear() # remove the custom status/message
+                if self.sticky_message:
+                    await self.sticky_message.delete()
+                    self.sticky_message = None
                 await interaction.channel.send(content=f"EPI mode successfully disabled by {interaction.user.name}.\nMentioned users: {mentioned}")
                 await self.send_epi_log(f"EPI mode disabled by `{interaction.user.name}` `({interaction.user.id})`")
             button.callback = on_button_click
@@ -131,32 +134,36 @@ class epi(commands.Cog):
     @commands.Cog.listener('on_thread_create')
     async def send_epi_info(self, thread: discord.Thread):
         if thread.parent_id == SUPPORT_CHANNEL_ID and self.epi_data:
-            await asyncio.sleep(3) # wait 3 seconds to make sure that epi messages will be sent last (after more info message)
+            await asyncio.sleep(3) # make sure that epi messages will be sent last (after more info message)
             owner_id = await get_post_creator_id(thread.id) or thread.owner_id
             msg_or_txt = list(self.epi_data.keys())[0]
             if isinstance(msg_or_txt, str):
                 message = await thread.send(content=f"Hey <@{owner_id}>, the following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_txt}", view=get_notified())                
             elif isinstance(msg_or_txt, discord.Message):
                 message = await thread.send(content=f"Hey <@{owner_id}>, Sapphire is currently having some trouble. Take a look at the message below for more details:\n-# The devs are already on it - thanks for your patience!", view=get_notified())
-                json = {
-                'message_reference': {
-                    'type': 1, # type 1 = message forward
-                    'message_id': msg_or_txt.id,
-                    'channel_id': msg_or_txt.channel.id,
-                    'guild_id': msg_or_txt.guild.id
-                    }
-                }
-                headers = {
-                    'Authorization': f'Bot {TOKEN}'
-                }
-                async with aiohttp.ClientSession() as cs:
-                    async with cs.post(url=f"https://discord.com/api/v9/channels/{thread.id}/messages", json=json, headers=headers) as req:
-                        if req.ok:
-                            pass
-                        else:
-                            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-                            await alerts_thread.send(f"<@1105414178937774150> Forward request failed (status >= 400).\nStatus: `{req.status}` ```json\n{await req.json()}```")
+                await msg_or_txt.forward(thread)
             self.epi_data[msg_or_txt].append(message)
+
+    """ @commands.Cog.listener('on_member_join')
+    async def add_users_role(self, member: discord.Member):
+        if self.epi_data: # only add jr if epi is enabled
+            await asyncio.sleep(5) # wait for a few seconds as in some cases epi is enabled for things like dashboard issues while sapphire itself is fully operational
+            refreshed_member = member.guild.get_member(member.id) # the original member parameter is like a snapshot from when the event was called, refresh the data in a new object/variable
+            users_role = discord.utils.get(member.guild.roles, name="Users")
+            if users_role not in refreshed_member.roles:
+                refreshed_member.add_roles(refreshed_member, reason="Add join roles when EPI is enabled.") """
+
+    @commands.Cog.listener('on_message')
+    async def epi_sticky_message(self, message: discord.Message):
+        if self.epi_data and not message.author.bot and message.channel.id == GENERAL_CHANNEL_ID:
+            if self.sticky_message:
+                await self.sticky_message.delete()
+            msg_or_text = list(self.epi_data.keys())[0]
+            if isinstance(msg_or_text, str):
+                msg = await message.channel.send(f"the following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_text}", view=get_notified())
+            elif isinstance(msg_or_text, discord.Message):
+                msg = await message.channel.send(f"Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}")
+            self.sticky_message = msg
 
 async def setup(client):
     await client.add_cog(epi(client=client))
