@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 import os
 from functions import add_post_to_rtdr
 from typing import Union
-import datetime
 
 load_dotenv()
 GENERAL_CHANNEL_ID = int(os.getenv('GENERAL_CHANNEL_ID'))
