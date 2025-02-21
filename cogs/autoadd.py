@@ -4,7 +4,7 @@ import re
 import random
 import os
 from dotenv import load_dotenv
-from functions import get_post_creator_id, get_rtdr_posts, generate_random_id
+from functions import get_post_creator_id, get_rtdr_posts, generate_random_id, remove_post_from_rtdr
 from aiocache import cached
 from discord import ui
 
@@ -22,38 +22,42 @@ MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
 WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
 APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 
-class reopen_button(ui.View):
+class confirm_close(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
     
-    @ui.button(label="Click here to re-open post", custom_id="auto-close-reopen", style=discord.ButtonStyle.grey)
-    async def on_reopen_click(self, interaction: discord.Interaction, button: ui.Button):
+    @ui.button(label="Confirm", style=discord.ButtonStyle.green, custom_id="auto-close-confirm")
+    async def on_confirm_click(self, interaction: discord.Interaction, button: ui.Button):
         experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
         mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
-        is_expert_or_mod = experts in interaction.user.roles or \
-                            mods in interaction.user.roles
-        if is_expert_or_mod or interaction.user == interaction.channel.owner \
-                            and not interaction.channel.locked:
-            not_solved = interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)
-            wfr = interaction.channel.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
-            tags = [not_solved, wfr]
-            cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
+        if experts in interaction.user.roles or mods in interaction.user.roles or is_owner:
+            await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# {interaction.user.name} clicked the confirm button", allowed_mentions=discord.AllowedMentions.none())
+            solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
             appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
-            if cb in interaction.channel.applied_tags:
-                tags.append(cb)
+            cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+            tags = [solved]
             if appeal in interaction.channel.applied_tags:
                 tags.append(appeal)
+            if cb in interaction.channel.applied_tags:
+                tags.append(cb)
             action_id = generate_random_id()
-            await interaction.channel.edit(applied_tags=tags, archived=False, reason=f"ID: {action_id}. re-open button clicked")
-            await interaction.response.defer(ephemeral=True)
-            await interaction.message.edit(content=f"{interaction.message.content}\n-# Post re-opened by {interaction.user.mention}", view=None)
-            alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
-            await alerts_thread.send(
-                content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Re-open button clicked"
-            )
+            alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
+            await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Post starter message delete and confirm button clicked- mark post as solved")
+            await interaction.channel.edit(archived=True, tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
+            await remove_post_from_rtdr(interaction.channel_id)
         else:
-            await interaction.response.send_message(content="Only Moderators, Community Experts and the Post Creator can use this!", ephemeral=True)
-            await interaction.channel.edit(archived=True)
+            await interaction.response.send_message(content=f"Only {experts.mention}, {mods.mention} and the post creator can use this!", ephemeral=True)
+
+    @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
+    async def on_cancel_click(self, interaction: discord.Interaction, button: ui.Button):
+        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
+        mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
+        is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
+        if experts in interaction.user.roles or mods in interaction.user.roles or is_owner:
+            await interaction.message.edit(content=f"~~{interaction.message.content}~~\n-# {interaction.user.name} has clicked the *cancel* button.", view=None, allowed_mentions=discord.AllowedMentions.none())
+        else:
+            await interaction.response.send_message(content=f"Only {experts.mention}, {mods.mention} and the post creator can use this!", ephemeral=True)
 
 class autoadd(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -62,7 +66,7 @@ class autoadd(commands.Cog):
         
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):
-        self.client.add_view(reopen_button())
+        self.client.add_view(confirm_close())
 
     def cog_unload(self):
         self.close_abandoned_posts.cancel()
@@ -80,7 +84,7 @@ class autoadd(commands.Cog):
 
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: {context}")
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}")
     
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
@@ -175,21 +179,13 @@ class autoadd(commands.Cog):
             tag_filters = ndr not in message_channel.applied_tags and solved not in message_channel.applied_tags
             other_filters = not message_channel.locked and not message_channel.archived
             if tag_filters and other_filters:
+                greetings = ["Hi", "Hey", "Hello", "Hi there"]
+                owner_id = await get_post_creator_id(payload.channel_id) or message_channel.owner_id
                 await message_channel.send(
-                    content=f"**Post automatically marked as solved**\nIt seems like this post's starter message was deleted so the post was automatically marked as solved.",
-                    view=reopen_button()
+                    content=f"{random.choices(greetings)[0]} <@{owner_id}>, it seems like this post's starter message was deleted. Please select one of the options from the buttons below.",
+                    view=confirm_close()
                 )
-                tags = [solved]
-                cb = message_channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-                appeal = message_channel.parent.get_tag(APPEAL_GG_TAG_ID)
-                if cb in message_channel.applied_tags:
-                    tags.append(cb)
-                if appeal in message_channel.applied_tags:
-                    tags.append(appeal)
-                action_id = generate_random_id()
-                await message_channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. Starter message deleted, automatically mark post as solved.")
-                await self.send_action_log(action_id=action_id, post_mention=message_channel.mention, tags=tags, context="Starter message deleted, automatically mark post as solved")
-
+                
     @close_abandoned_posts.before_loop
     async def wait_until_ready(self):
         await self.client.wait_until_ready()
