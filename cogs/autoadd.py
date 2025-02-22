@@ -44,7 +44,7 @@ class confirm_close(ui.View):
             action_id = generate_random_id()
             alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Post starter message delete and confirm button clicked- mark post as solved")
-            await interaction.channel.edit(archived=True, tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
+            await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
             await remove_post_from_rtdr(interaction.channel_id)
         else:
             await interaction.response.send_message(content=f"Only {experts.mention}, {mods.mention} and the post creator can use this!", ephemeral=True)
