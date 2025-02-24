@@ -93,7 +93,7 @@ class bot(commands.Cog):
             command = debug.removeprefix('eval sql ')
             await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
         else:
-            await interaction.response.send_message(content="Debug not found...")
+            await interaction.response.send_message(content="Debug not found...", ephemeral=True)
 
 async def setup(client: commands.Bot):
     await client.add_cog(bot(client))
