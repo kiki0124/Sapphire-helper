@@ -160,9 +160,9 @@ class epi(commands.Cog):
                 await self.sticky_message.delete()
             msg_or_text = list(self.epi_data.keys())[0]
             if isinstance(msg_or_text, str):
-                msg = await message.channel.send(f"the following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_text}", view=get_notified())
+                msg = await message.channel.send(f"The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_text}", view=get_notified())
             elif isinstance(msg_or_text, discord.Message):
-                msg = await message.channel.send(f"Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}")
+                msg = await message.channel.send(f"Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}", view=get_notified())
             self.sticky_message = msg
 
 async def setup(client):
