@@ -43,14 +43,18 @@ class epi(commands.Cog):
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    @app_commands.describe(info="The text to be displayed on a post creation or message id from #status to be forwarded")
-    async def epi_enable(self, interaction: discord.Interaction, info: str):
+    @app_commands.describe(info="The text to be displayed on a post creation or message id from #status to be forwarded", sticky="Should a sticky message be created in #general?")
+    async def epi_enable(self, interaction: discord.Interaction, info: str, sticky: bool):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
             if not info.isdigit():
                 self.epi_data[info] = []
                 await interaction.followup.send(content=f"Successfully enabled EPI mode with the following text `{info}`", ephemeral=True)
                 await self.send_epi_log(content=f"EPI mode enabled by `{interaction.user.name}` (`{interaction.user.id}`)\n`{info}`")
+                if sticky:
+                    general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
+                    msg = await general.send(f"The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {info}", view=get_notified())
+                    self.sticky_message = msg
             elif info.isdigit():
                 status_channel = discord.utils.get(interaction.guild.channels, name="status", type=discord.ChannelType.news)
                 try:
@@ -60,6 +64,10 @@ class epi(commands.Cog):
                 self.epi_data[message] = []
                 await interaction.followup.send(content=f"Successfully enabled EPI mode with {message.jump_url}", ephemeral=True)
                 await self.send_epi_log(content=f"EPI mode enabled by `{interaction.user.name}` (`{interaction.user.id}`)\n{message.jump_url}")
+                if sticky:
+                    general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
+                    msg = await general.send(f"Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {message.jump_url}", view=get_notified())
+                    self.sticky_message = msg
         else:
             url_or_text = list(self.epi_data)[0]
             if isinstance(url_or_text, str):
@@ -155,9 +163,8 @@ class epi(commands.Cog):
 
     @commands.Cog.listener('on_message')
     async def epi_sticky_message(self, message: discord.Message):
-        if self.epi_data and not message.author.bot and message.channel.id == GENERAL_CHANNEL_ID:
-            if self.sticky_message:
-                await self.sticky_message.delete()
+        if self.epi_data and not message.author.bot and message.channel.id == GENERAL_CHANNEL_ID and self.sticky_message:
+            await self.sticky_message.delete()
             msg_or_text = list(self.epi_data.keys())[0]
             if isinstance(msg_or_text, str):
                 msg = await message.channel.send(f"The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_text}", view=get_notified())
