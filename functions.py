@@ -71,7 +71,7 @@ async def get_pending_posts():
 
 async def remove_post_from_pending(post_id: int) -> None:
     """  
-    Remove a post form closing pending db
+    Remove a post from closing pending db
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
