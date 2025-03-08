@@ -84,6 +84,7 @@ class ndr_options_buttons(ui.View):
         await interaction.channel.send(embed=embed, view=need_dev_review_buttons())
         await self.Interaction.delete_original_response()
 
+
 class utility(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
@@ -175,9 +176,12 @@ class utility(commands.Cog):
         Checks if the interaction user is a Moderator or Community Expert or the creator of the post\n
         --Integrated with rtdr system
         """
-        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-        mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
-        return experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel.id)
+        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+            experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
+            mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
+            return experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel.id)
+        else:
+            return False
 
     @commands.Cog.listener()
     async def on_ready(self):
