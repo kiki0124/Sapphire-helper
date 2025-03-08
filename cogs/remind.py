@@ -204,7 +204,7 @@ class remind(commands.Cog):
     
     @check_exception_posts.before_loop
     async def cep_before_loop(self):
-        await self.client.wait_until_ready
+        await self.client.wait_until_ready()
 
 async def setup(client):
     await client.add_cog(remind(client))
