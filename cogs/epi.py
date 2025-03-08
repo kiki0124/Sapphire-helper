@@ -172,5 +172,86 @@ class epi(commands.Cog):
                 msg = await message.channel.send(f"Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}", view=get_notified())
             self.sticky_message = msg
 
+    channel_permissions: dict[discord.TextChannel | discord.ForumChannel, dict[discord.Role|discord.Member|discord.Object, discord.PermissionOverwrite]] = {}
+
+    @app_commands.command(name="lock", description="Lock the given channel. Should only be used in emergencies.")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.describe(channel="The channel to lock.", reason="The reason for locking the channels. This will be shown in the logs.")
+    async def lock(self, interaction: discord.Interaction, channel: discord.TextChannel|discord.ForumChannel, reason: str):
+        await interaction.response.defer(ephemeral=True)
+        if isinstance(channel, discord.TextChannel) or isinstance(channel, discord.ForumChannel):
+            if not channel in self.channel_permissions.keys():
+                if channel.permissions_for(interaction.user).view_channel and channel.permissions_for(interaction.user).send_messages:
+                    self.channel_permissions[channel] = channel.overwrites # save the permission overwritews from before locking the chnanel
+                    permissions = discord.PermissionOverwrite()
+                    permissions.send_messages = False
+                    permissions.create_public_threads = False
+                    permissions.create_private_threads = False
+                    permissions.send_messages_in_threads = False
+                    permissions.view_channel = channel.permissions_for(interaction.guild.default_role).view_channel
+                    overwrites = {
+                        interaction.guild.default_role: permissions
+                    } 
+                    await channel.edit(overwrites=overwrites, reason=f"{interaction.user.name} ({interaction.user.id}) used /lock. Reason: {reason}")
+                    if isinstance(channel, discord.TextChannel):
+                        embed = discord.Embed(
+                        title="Channel locked.",
+                        description=f"> {reason}",
+                        colour=0xFFA800 # Default 'warning' colour in Sapphire's default messages which I find quite like
+                        )
+                        embed.set_footer(text=f"@{interaction.user.name}", icon_url=interaction.user.avatar.url)
+                        await channel.send(embed=embed)
+                    await self.send_epi_log(f"/lock used by `{interaction.user.name}` (`{interaction.user.id}`) for {channel.mention}.\nReason: {reason}")
+                    await interaction.followup.send(content=f"Successfully locked {channel.mention}", ephemeral=True)
+                else:
+                    await interaction.followup.send(content=f"You cannot lock {channel.mention} because you can't view it or can't send messages in it!", ephemeral=True)
+            else:
+                await interaction.followup.send(content=f"{channel.mention} is already locked! Use /unlock to unlock it.", ephemeral=True)
+        else:
+            await interaction.followup.send(content="You can only lock Text and Forum channel!", ephemeral=True)
+
+    @app_commands.command(name="unlock", description="Unlock the given channel. Should only be used in emergencies.")
+    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
+    async def unlock(self, interaction: discord.Interaction, channel: discord.TextChannel|discord.ForumChannel, reason: str):
+        await interaction.response.defer(ephemeral=True)
+        if channel in self.channel_permissions.keys():
+            await channel.edit(overwrites=self.channel_permissions[channel], reason=f"{interaction.user.name} ({interaction.user.id}) used /unlock. Reason: {reason}")
+            embed = discord.Embed(
+                title="Channel unlocked",
+                description=f"> {reason}",
+                colour=0x36CE36
+            )
+            embed.set_footer(text=f"@{interaction.user.name}", icon_url=interaction.user.avatar.url)
+            await channel.send(embed=embed)
+            self.channel_permissions.pop(channel)
+            await self.send_epi_log(f"/unlock used by `{interaction.user.name}` (`{interaction.user.id}` for {channel.mention}.\nReason: {reason})")
+            await interaction.followup.send(content=f"Successfully unlocked {channel.mention}", ephemeral=True)
+        else:
+            await interaction.followup.send(content=f"The given channel wasn't locked by {self.client.user.mention} or it was unlocked already.")
+
+    @app_commands.command(name="slowmode", description="Set a specified slowmode time for the given channel.")
+    @app_commands.describe(channel="What channel?", time="The new slowmode time for the channel, in seconds. Max 21600. Put 0 to disable slowmode.", reason="What's the reason for this slowmode? This will be shown in logs")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    async def slowmode(self, interaction: discord.Interaction, channel: discord.TextChannel|discord.ForumChannel|discord.Thread, time: int, reason: str):
+        await interaction.response.defer(ephemeral=True)
+        if isinstance(channel, discord.ForumChannel) or isinstance(channel, discord.TextChannel) or isinstance(channel, discord.Thread):
+            if channel.permissions_for(interaction.user).view_channel and channel.permissions_for(interaction.user).send_messages:
+                if time <= 21600:
+                    if 0 <= time:
+                        await channel.edit(slowmode_delay=time, reason=f"{interaction.user.name} ({interaction.user.id}) used /slowmode. Reason: {reason}")
+                        await self.send_epi_log(f"`{interaction.user.name}` (`{interaction.user.id}`) used /slowmode for {channel.mention} with a time of `{time}` seconds")
+                        if time > 0:
+                            await interaction.followup.send(content=f"Successfully set a slowmode of `{time}` seconds in {channel.mention}", ephemeral=True)
+                        else:
+                            await interaction.followup.send(content=f"Successfully disabled slowmode for {channel.mention}", ephemeral=True)
+                    else:
+                        await interaction.followup.send("Achievement unlocked: How did we get here?", ephemeral=True)
+                else:
+                    await interaction.followup.send(content=f"The highest slowmode possible is 21600 and you provided `{time}`.")
+            else:
+                await interaction.followup.send(content=f"You must be able to send messages and view {channel.mention} to be able to set a slowmode in it.")
+        else:
+            await interaction.followup.send(content="You can only set a slowmode for Forum channels, Text channels and Threads!", ephemeral=True)
+        # does anyone even read these comments? Ping me with the funniest/weirdest emoji you have (from any server you're in) if you see this...
 async def setup(client):
     await client.add_cog(epi(client=client))
