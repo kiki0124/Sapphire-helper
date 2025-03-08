@@ -68,7 +68,6 @@ class bot(commands.Cog):
             raise error
 
     async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        print("called!")
         if isinstance(error, app_commands.MissingAnyRole):
             await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.CheckFailure): # raised when a user tries to use a command that only mods/experts/op can use, eg /solved
