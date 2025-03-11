@@ -96,14 +96,20 @@ class epi(commands.Cog):
                     await message.reply(
                         content="Hey, this issue is fixed now!\n-# Thank you for your patience."
                     )
+                main_message = await post.send(content="Hey, this issue is now fixed!\n-# Thank you for your patience.")
                 if epi_users:
-                    mentions = [user.mention for user in epi_users]
-                    mentions_separated = ', '.join(mentions)
-                    await post.send(content=f"Hey, the issue is now fixed!\n-# Thank you for your patience.\n{mentions_separated}")
+                    mentions: list[discord.Member|discord.User] = []
+                    for user in epi_users:
+                        if len(", ".join(mentions)) + len(user.mention) + 2 < 2000: # + 2 is for the space and comma (,) next to each mention
+                            mentions.append(user.mention)
+                        else:
+                            await main_message.reply(content=", ".join(mentions))
+                            mentions = [] # reset both for another pinging message
+                    if mentions:
+                        await main_message.reply(content=", ".join(mentions))
                     mentioned = True
                 else:
                     mentioned = False
-                    await post.send(content="Hey, this issue is now fixed!\n-# Thank you for your patience.")
                 epi_users.clear()
                 self.epi_data.clear() # remove the custom status/message
                 if self.sticky_message:
@@ -182,7 +188,7 @@ class epi(commands.Cog):
         if isinstance(channel, discord.TextChannel) or isinstance(channel, discord.ForumChannel):
             if not channel in self.channel_permissions.keys():
                 if channel.permissions_for(interaction.user).view_channel and channel.permissions_for(interaction.user).send_messages:
-                    if len(reason) < 1875: # make sure that it wont attempt to send a message with > 2,000 chars
+                    if len(reason) < 200: # make sure that it wont attempt to send a message with > 2,000 chars
                         self.channel_permissions[channel] = channel.overwrites # save the permission overwritews from before locking the chnanel
                         permissions = discord.PermissionOverwrite()
                         permissions.send_messages = False
@@ -205,7 +211,7 @@ class epi(commands.Cog):
                         await self.send_epi_log(f"/lock used by `{interaction.user.name}` (`{interaction.user.id}`) for {channel.mention}.\nReason: {reason}")
                         await interaction.followup.send(content=f"Successfully locked {channel.mention}", ephemeral=True)
                     else:
-                        await interaction.followup.send(content="The `reason` parameter must be less than 1875 characters!", ephemeral=True)
+                        await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
                 else:
                     await interaction.followup.send(content=f"You cannot lock {channel.mention} because you can't view it or can't send messages in it!", ephemeral=True)
             else:
@@ -218,7 +224,7 @@ class epi(commands.Cog):
     async def unlock(self, interaction: discord.Interaction, channel: discord.TextChannel|discord.ForumChannel, reason: str):
         await interaction.response.defer(ephemeral=True)
         if channel in self.channel_permissions.keys():
-            if len(reason) < 1875:
+            if len(reason) < 200:
                 await channel.edit(overwrites=self.channel_permissions[channel], reason=f"{interaction.user.name} ({interaction.user.id}) used /unlock. Reason: {reason}")
                 if isinstance(channel, discord.TextChannel) or isinstance(channel, discord.Thread):
                     embed = discord.Embed(
@@ -232,7 +238,7 @@ class epi(commands.Cog):
                 await self.send_epi_log(f"/unlock used by `{interaction.user.name}` (`{interaction.user.id}` for {channel.mention}.\nReason: {reason})")
                 await interaction.followup.send(content=f"Successfully unlocked {channel.mention}", ephemeral=True)
             else:
-                await interaction.followup.send(content="The `reason` parameter must be less than 1875 characters!", ephemeral=True)
+                await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
         else:
             await interaction.followup.send(content=f"The given channel wasn't locked by {self.client.user.mention} or it was unlocked already.")
 
@@ -244,7 +250,7 @@ class epi(commands.Cog):
         if isinstance(channel, discord.ForumChannel) or isinstance(channel, discord.TextChannel) or isinstance(channel, discord.Thread):
             if channel.permissions_for(interaction.user).view_channel and channel.permissions_for(interaction.user).send_messages:
                 if time <= 21600:
-                    if len(reason) < 1875:
+                    if len(reason) < 200:
                         if 0 <= time:
                             await channel.edit(slowmode_delay=time, reason=f"{interaction.user.name} ({interaction.user.id}) used /slowmode. Reason: {reason}")
                             await self.send_epi_log(f"`{interaction.user.name}` (`{interaction.user.id}`) used /slowmode for {channel.mention} with a time of `{time}` seconds")
@@ -255,7 +261,7 @@ class epi(commands.Cog):
                         else:
                             await interaction.followup.send("Achievement unlocked: How did we get here?", ephemeral=True)
                     else:
-                        await interaction.followup.send(content="The `reason` parameter must be less than 1875 characters!", ephemeral=True)
+                        await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
                 else:
                     await interaction.followup.send(content=f"The highest slowmode possible is 21600 and you provided `{time}`.")
             else:
