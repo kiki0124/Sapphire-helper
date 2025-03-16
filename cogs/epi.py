@@ -248,14 +248,14 @@ class epi(commands.Cog):
                 await msg_or_txt.forward(thread)
             self.epi_data[msg_or_txt].append(message)
 
-    @commands.Cog.listener('on_member_join')
+    """ @commands.Cog.listener('on_member_join')
     async def add_users_role(self, member: discord.Member):
         if self.epi_data: # only add jr if epi is enabled
             await asyncio.sleep(5) # wait for a few seconds as in some cases epi is enabled for things like dashboard issues while sapphire itself is fully operational
             refreshed_member = member.guild.get_member(member.id) # the original member parameter is like a snapshot from when the event was called, refresh the data in a new object/variable
             users_role = discord.utils.get(member.guild.roles, name="Users")
             if users_role not in refreshed_member.roles:
-                member.add_roles(users_role, reason="Add join roles when EPI is enabled.")
+                member.add_roles(users_role, reason="Add join roles when EPI is enabled.") """
 
     @commands.Cog.listener('on_message')
     async def epi_sticky_message(self, message: discord.Message):
