@@ -17,6 +17,7 @@ async def main():
             await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER NOT NULL PRIMARY KEY, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -169,7 +170,11 @@ async def get_waiting_posts() -> list[int]:
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             await cu.execute("SELECT post_id FROM reminder_waiting")
-            return [row[0] for row in await cu.fetchall()]
+            result = await cu.fetchall()
+            if result:
+                return [row[0] for row in result]
+            else:
+                return []
 
 async def remove_post_from_waiting(post_id: int) -> None:
     async with sql.connect(DB_PATH) as conn:
@@ -189,3 +194,33 @@ async def get_waiting_posts_data():
         async with conn.cursor() as cu:
             await cu.execute("SELECT * FROM reminder_waiting")
             return await cu.fetchall()
+
+# epi - locked channel permissions
+
+async def save_channel_permissions(channel_id: int, allow: int, deny: int) -> None:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("INSERT INTO locked_channels_permissions (channel_id, allow, deny) VALUES (?, ?, ?)", (channel_id, allow, deny,))
+            await conn.commit()
+
+async def get_channel_permissions(channel_id: int) -> tuple[int, int]:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT allow, deny FROM locked_channels_permissions WHERE channel_id=?", (channel_id,))
+            return await cu.fetchone()
+
+async def get_locked_channels() -> list[int]:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT channel_id FROM locked_channels_permissions")
+            result = await cu.fetchall()
+            if result:
+                return [int(row[0]) for row in result]
+            else:
+                return []
+
+async def delete_channel_permissions(channel_id: int) -> None:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("DELETE FROM locked_channels_permissions WHERE channel_id=?", (channel_id,))
+            await conn.commit()
