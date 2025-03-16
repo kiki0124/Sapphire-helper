@@ -295,7 +295,7 @@ class epi(commands.Cog):
             await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
 
     @app_commands.command(name="slowmode", description="Set a specified slowmode time for the given channels. Should only be used in emergencies")
-    @app_commands.describe(time="The new slowmode time for the channel, in seconds. Max 21600. Put 0 to disable slowmode.", reason="What's the reason for this slowmode? This will be shown in logs")
+    @app_commands.describe(time="The new slowmode time for the channel, in seconds. Max 21600. Put 0 to disable slowmode.", reason="What's the reason for this slowmode?")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def slowmode(self, interaction: discord.Interaction, time: int, reason: str):
         await interaction.response.defer(ephemeral=True)
