@@ -168,8 +168,7 @@ class epi(commands.Cog):
     
     @group.command(name="disable", description="Disable EPI mode- mark the issue as solved & ping all users that asked to be pinged")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
-    @app_commands.describe(post="In what post should Sapphire Helper ping all users that clicked get notified button?")
-    async def epi_disable(self, interaction: discord.Interaction, post: discord.Thread):
+    async def epi_disable(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
             button = discord.ui.Button(
@@ -182,11 +181,13 @@ class epi(commands.Cog):
                 await i.delete_original_response()
                 index = list(self.epi_data)[0]
                 for message in self.epi_data[index]:
+                    await message.channel.edit(archived=False)
                     await message.edit(view=None)
                     await message.reply(
                         content="Hey, this issue is fixed now!\n-# Thank you for your patience."
                     )
-                main_message = await post.send(content="Hey, this issue is now fixed!\n-# Thank you for your patience.")
+                general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
+                main_message = await general.send(content="Hey, this issue is now fixed!\n-# Thank you for your patience.")
                 if epi_users:
                     mentions: list[discord.Member|discord.User] = []
                     for user in epi_users:
