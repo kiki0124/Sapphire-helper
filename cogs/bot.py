@@ -28,7 +28,7 @@ class bot(commands.Cog):
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def ping(self, ctx: commands.Context):
         now = datetime.datetime.now()
-        message = await ctx.reply(content=f"Pong! v2.3\nClient latency: {str(self.client.latency)[:4]}s")
+        message = await ctx.reply(content=f"Pong! v2.31\nClient latency: {str(self.client.latency)[:4]}s")
         latency = datetime.datetime.now() - now
         await message.edit(content=f"{message.content}\nDiscord latency: {str(latency.total_seconds())[:4]}s")
 
