@@ -182,7 +182,7 @@ class autoadd(commands.Cog):
                 greetings = ["Hi", "Hey", "Hello", "Hi there"]
                 owner_id = await get_post_creator_id(payload.channel_id) or message_channel.owner_id
                 await message_channel.send(
-                    content=f"{random.choices(greetings)[0]} <@{owner_id}>, it seems like this post's starter message was deleted. Please select one of the options from the buttons below.",
+                    content=f"{random.choices(greetings)[0]} <@{owner_id}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.",
                     view=confirm_close()
                 )
                 
