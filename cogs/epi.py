@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from functions import get_post_creator_id, save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels
 import asyncio
+import aiohttp, json
 
 load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
@@ -13,6 +14,7 @@ ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 SUPPORT_CHANNEL_ID = int(os.getenv("SUPPORT_CHANNEL_ID"))
 GENERAL_CHANNEL_ID = int(os.getenv('GENERAL_CHANNEL_ID'))
 EPI_LOG_THREAD_ID = int(os.getenv("EPI_LOG_THREAD_ID"))
+NTFY_TOPIC_NAME = os.getenv("NTFY_TOPIC_NAME")
 
 epi_users: list[discord.Member|discord.User] = []
 
@@ -181,11 +183,14 @@ class epi(commands.Cog):
                 await i.delete_original_response()
                 index = list(self.epi_data)[0]
                 for message in self.epi_data[index]:
-                    await message.channel.edit(archived=False)
-                    await message.edit(view=None)
-                    await message.reply(
-                        content="Hey, this issue is fixed now!\n-# Thank you for your patience."
-                    )
+                    if message.channel:
+                        await message.channel.edit(archived=False)
+                        await message.edit(view=None)
+                        await message.reply(
+                            content="Hey, this issue is fixed now!\n-# Thank you for your patience."
+                        )
+                    else:
+                        continue
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 main_message = await general.send(content="Hey, this issue is now fixed!\n-# Thank you for your patience.")
                 if epi_users:
@@ -314,6 +319,71 @@ class epi(commands.Cog):
             await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
                 
         # does anyone even read these comments? Ping me with the funniest/weirdest emoji you have (from any server you're in) if you see this...
+
+    @app_commands.command(name="page", description="Alert the developer of any downtime or critical issues")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.describe(service="The affected service(s) - Sapphire- bot/dashboard | appeal.gg | All" ,message="The message to send", priority="The severity, 1 = lowest, 4 = critical (highest)", cb_affected="Whether custom branding is affected or not (for Sapphire outages)")
+    async def page(self, interaction: discord.Interaction, service: str, message: str, priority: int, cb_affected: bool):
+        await interaction.response.defer()
+        if 1 <= priority <= 4:
+            followup = await interaction.followup.send("Sending...", wait=True)
+            severity_emojis = {
+                1: "green_circle",  # Low
+                2: "yellow_circle",  # Medium
+                3: "orange_circle",  # High
+                4: "red_circle"   # Critical
+            }
+            async with aiohttp.ClientSession(trust_env=True) as cs:
+                #jump_url = f"https://discord.com/channels/{interaction.guild_id}/{interaction.channel_id}/{interaction_response.message_id}"
+                tags = [severity_emojis.get(priority, "question")]
+                if cb_affected:
+                    tags.append("moneybag")
+                data = {
+                    "topic": NTFY_TOPIC_NAME,
+                    "message": message,
+                    "title": f"{service} | Sent by @{interaction.user.name}",
+                    "tags": tags,
+                    "click": followup.jump_url,
+                    "icon": interaction.user.avatar.url,
+                }  
+                """ "actions": [
+                        {
+                            "action": "http",
+                            "label": "Reply - on it",
+                            "url": f"https://discord.com/api/v10/webhooks/{interaction.followup.id}/{interaction.followup.token}",
+                            "json": {
+                                "content": '"On it"',
+                                "username": "Xge"
+                            }
+                        },
+                        {
+                            "action": "http",
+                            "label": "Reply - Irrelevant",
+                            "url": f"https://discord.com/api/v10/webhooks/{interaction.followup.id}/{interaction.followup.token}?content=test"
+                        }
+                    ] """
+                try:
+                    async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
+                        if req.status == 200:
+                            await self.send_epi_log(f"`{interaction.user.name}` (`{interaction.user.id}`) used /page. Service: {service} ,Message: `{message}`, Priority: {priority}, Custom Branding Affected: {cb_affected}.")
+                            await followup.edit(f"Notification sent successfully.\n-# Message: {message} | Priority: {priority}")
+                        else:
+                            response = await req.text()
+                            await followup.edit(f"An error occured while trying to send the notification...\nStatus: {req.status}, Response: {response}")
+                except Exception as e:
+                    await followup.edit(content=f"An error occured while trying to send the notification... {e}")
+                    raise e
+        else:
+            await interaction.followup.send(content=f"Priority argument must be between 1 and 4.")
+
+    @page.autocomplete("service")
+    async def page_autocomplete(self, interaction: discord.Interaction, current: str):
+        return [
+            app_commands.Choice(name="Sapphire - bot", value="Sapphire - bot"),
+            app_commands.Choice(name="Sapphire - dashboard", value="Sapphire - dashboard"),
+            app_commands.Choice(name="Appeal.gg", value="Appeal.gg"),
+            app_commands.Choice(name="All", value="All")
+            ]
 
 async def setup(client):
     await client.add_cog(epi(client=client))
