@@ -345,28 +345,26 @@ class epi(commands.Cog):
                     "tags": tags,
                     "click": followup.jump_url,
                     "icon": interaction.user.avatar.url,
-                }  
-                """ "actions": [
+                    "actions": [
                         {
                             "action": "http",
-                            "label": "Reply - on it",
+                            "label": "On it",
                             "url": f"https://discord.com/api/v10/webhooks/{interaction.followup.id}/{interaction.followup.token}",
-                            "json": {
-                                "content": '"On it"',
-                                "username": "Xge"
-                            }
+                            "clear": True
                         },
                         {
                             "action": "http",
-                            "label": "Reply - Irrelevant",
-                            "url": f"https://discord.com/api/v10/webhooks/{interaction.followup.id}/{interaction.followup.token}?content=test"
+                            "label": "Later (>1 hour)",
+                            "url": f"https://discord.com/api/v10/webhooks/{interaction.followup.id}/{interaction.followup.token}",
+                            "clear": True
                         }
-                    ] """
+                    ] 
+                }
                 try:
                     async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
                         if req.status == 200:
                             await self.send_epi_log(f"`{interaction.user.name}` (`{interaction.user.id}`) used /page. Service: {service} ,Message: `{message}`, Priority: {priority}, Custom Branding Affected: {cb_affected}.")
-                            await followup.edit(f"Notification sent successfully.\n-# Message: {message} | Priority: {priority}")
+                            await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority}")
                         else:
                             response = await req.text()
                             await followup.edit(f"An error occured while trying to send the notification...\nStatus: {req.status}, Response: {response}")
