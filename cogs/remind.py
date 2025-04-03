@@ -133,9 +133,9 @@ class remind(commands.Cog):
 
     @tasks.loop(hours=1)
     async def check_for_pending_posts(self):
-        channel = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        if channel:
-            for post in await channel.guild.active_threads():
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        if support:
+            for post in await support.guild.active_threads():
                 if await self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
                     if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
                         try:
