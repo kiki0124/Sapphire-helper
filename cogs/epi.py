@@ -16,7 +16,7 @@ GENERAL_CHANNEL_ID = int(os.getenv('GENERAL_CHANNEL_ID'))
 EPI_LOG_THREAD_ID = int(os.getenv("EPI_LOG_THREAD_ID"))
 NTFY_TOPIC_NAME = os.getenv("NTFY_TOPIC_NAME")
 
-epi_users: list[discord.Member|discord.User] = []
+epi_users: list[int] = []
 
 async def lock_channel(channel: discord.TextChannel|discord.ForumChannel, user: discord.Member, reason: str):
     previous_permissions = channel.overwrites_for(channel.guild.default_role).pair()
@@ -66,11 +66,11 @@ class get_notified(ui.View):
     
     @ui.button(label="Notify me when this issue is resolved", custom_id="epi-get-notified", style=discord.ButtonStyle.grey)
     async def on_get_notified_click(self, interaction: discord.Interaction, button: ui.button):
-        if interaction.user not in epi_users:
-            epi_users.append(interaction.user)
+        if interaction.user.id not in epi_users:
+            epi_users.append(interaction.user.id)
             await interaction.response.send_message(content="You will now be notified when this issue is fixed!", ephemeral=True)
         else:
-            epi_users.remove(interaction.user)
+            epi_users.remove(interaction.user.id)
             await interaction.response.send_message(content="You will no longer be notified for this issue!", ephemeral=True)
 
 class select_channels(ui.ChannelSelect):
@@ -195,9 +195,9 @@ class epi(commands.Cog):
                 main_message = await general.send(content="Hey, this issue is now fixed!\n-# Thank you for your patience.")
                 if epi_users:
                     mentions: list[discord.Member|discord.User] = []
-                    for user in epi_users:
-                        if len(", ".join(mentions)) + len(user.mention) + 2 < 2000: # + 2 is for the space and comma (,) next to each mention
-                            mentions.append(user.mention)
+                    for user_id in epi_users:
+                        if len(", ".join(mentions)) + len(f"<@{user_id}>") + 2 < 2000: # + 2 is for the space and comma (,) next to each mention
+                            mentions.append(f"<@{user_id}>")
                         else:
                             await main_message.reply(content=", ".join(mentions))
                             mentions = [] # reset both for another pinging message
@@ -230,12 +230,8 @@ class epi(commands.Cog):
                 msg_or_txt = f"`{msg_or_txt}`"
             elif isinstance(msg_or_txt, discord.Message):
                 msg_or_txt = msg_or_txt.jump_url
-            if epi_users: # there's at least one user that clicked the 'get notified' button
-                mentions_separated = ', '.join([user.mention for user in epi_users])
-            else:
-                mentions_separated = "No users clicked the get notified button"
             await interaction.followup.send(
-                content=f"Current EPI mode info: {msg_or_txt}\nUsers: {mentions_separated}",
+                content=f"Current EPI mode info: {msg_or_txt}\nEPI-User count: {len(epi_users)}",
                 ephemeral=True
             )
         else:
