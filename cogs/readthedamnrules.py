@@ -58,6 +58,7 @@ class readthedamnrules(commands.Cog):
         return content
 
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
+        await reference_message.channel.typing()
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
         files = await self.get_files(messages=messages_to_move)
         content = await self.get_content(messages_to_move)
