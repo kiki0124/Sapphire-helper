@@ -111,13 +111,6 @@ class utility(commands.Cog):
             else:
                 continue
         return unsolve_id
-
-    async def is_in_support(self, interaction: discord.Interaction) -> bool:
-        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            return True
-        else:
-            await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
-            return False
     
     close_tasks: dict[discord.Thread, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
 
@@ -191,65 +184,67 @@ class utility(commands.Cog):
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
     async def solved(self, interaction: discord.Interaction):
-        if await self.is_in_support(interaction):
-            parent = interaction.channel.parent
-            ndr = parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            solved = parent.get_tag(SOLVED_TAG_ID)
-            not_ndr = ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.casefold()
-            not_solved = solved not in interaction.channel.applied_tags
-            if not_ndr:
-                if not_solved:
-                    await self.mark_post_as_solved(interaction.channel)
-                    one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
-                    await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
-                else:
-                    await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
+        support = interaction.channel.parent
+        ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
+        solved = support.get_tag(SOLVED_TAG_ID)
+        not_ndr = ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.casefold()
+        not_solved = solved not in interaction.channel.applied_tags
+        if not_ndr:
+            if not_solved:
+                await self.mark_post_as_solved(interaction.channel)
+                one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
+                await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
             else:
-                button = ui.Button(label="Confirm", style=discord.ButtonStyle.green, custom_id="solved-confirm")
-                async def on_confirm_button_click(Interaction: discord.Interaction):
-                    await self.mark_post_as_solved(interaction.channel)
-                    one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
-                    await Interaction.response.defer(ephemeral=True)
-                    await Interaction.delete_original_response()
-                    await Interaction.channel.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
-                button.callback = on_confirm_button_click
-                view = ui.View() # construct an empty view item
-                view.add_item(button)
-                await interaction.response.send_message(content="This post has the need-dev-review tag, are you sure you would like to mark it as solved?", view=view, ephemeral=True)
+                await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
+        else:
+            button = ui.Button(label="Confirm", style=discord.ButtonStyle.green, custom_id="solved-confirm")
+            async def on_confirm_button_click(Interaction: discord.Interaction):
+                await self.mark_post_as_solved(interaction.channel)
+                one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
+                await Interaction.response.defer(ephemeral=True)
+                await Interaction.delete_original_response()
+                await Interaction.channel.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
+            button.callback = on_confirm_button_click
+            view = ui.View() # construct an empty view item
+            view.add_item(button)
+            await interaction.response.send_message(content="This post has the need-dev-review tag, are you sure you would like to mark it as solved?", view=view, ephemeral=True)
             
     @app_commands.command(name="remove", description="Remove the given member from the current post")
     @app_commands.guild_only()
     @app_commands.describe(user="What user do you want to remove?")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def remove(self, interaction: discord.Interaction, user: discord.Member):
-        if await self.is_in_support(interaction):
+        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             await interaction.channel.remove_user(user)
             await interaction.response.send_message(content=f"Successfully removed {user.name} from this post.", ephemeral=True)
             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
             await alerts_thread.send(f"`@{interaction.user.name}` ({interaction.user.id}) removed `@{user.name}` (`{user.id}` from {interaction.channel.mention}).")
+        else:
+            await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>")
 
     @app_commands.command(name="unsolve", description="Cancel the post from being closed")
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
     async def unsolved(self, interaction: discord.Interaction):
-        if await self.is_in_support(interaction):
-            solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)     
-            if interaction.channel in self.close_tasks or solved in interaction.channel.applied_tags:
-                await self.unsolve_post(interaction.channel)
-                await interaction.response.send_message(content="Post successfully unsolved")
-            else:
-                await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
+        solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)     
+        if interaction.channel in self.close_tasks or solved in interaction.channel.applied_tags:
+            await self.unsolve_post(interaction.channel)
+            await interaction.response.send_message(content="Post successfully unsolved")
+        else:
+            await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
 
     @app_commands.command(name="needs-dev-review", description="This post needs to be reviewed by the developer")
     @app_commands.guild_only()
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def need_dev_review(self, interaction: discord.Interaction):
-        if await self.is_in_support(interaction):
+        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
             if ndr not in interaction.channel.applied_tags:
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
     
     @commands.Cog.listener('on_message')
     async def cache_command_messages(self, message: discord.Message):
