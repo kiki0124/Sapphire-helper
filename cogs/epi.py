@@ -15,6 +15,7 @@ SUPPORT_CHANNEL_ID = int(os.getenv("SUPPORT_CHANNEL_ID"))
 GENERAL_CHANNEL_ID = int(os.getenv('GENERAL_CHANNEL_ID'))
 EPI_LOG_THREAD_ID = int(os.getenv("EPI_LOG_THREAD_ID"))
 NTFY_TOPIC_NAME = os.getenv("NTFY_TOPIC_NAME")
+NTFY_SECOND_TOPIC = os.getenv("NTFY_SECOND_TOPIC")
 
 epi_users: list[int] = []
 
@@ -317,6 +318,28 @@ class epi(commands.Cog):
                 
         # does anyone even read these comments? Ping me with the funniest/weirdest emoji you have (from any server you're in) if you see this...
 
+    async def handle_websocket(self, followup_message: discord.WebhookMessage):
+        async with aiohttp.ClientSession() as cs:
+            async with cs.ws_connect(f"https://ntfy.sh/{NTFY_SECOND_TOPIC}/ws") as ws:
+                async for msg in ws:
+                    exception_types = [aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR] 
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        data = json.loads(msg.data)
+                        if data["event"] == "message":
+                            match data['title']:
+                                case "On it" | "Later (>1 hour)":
+                                    await ws.close(code=aiohttp.WSCloseCode.OK)
+                                    selected = data["title"]
+                                    await followup_message.reply(f"Reply from Xge: {selected}")
+                                    return
+                                case _:
+                                    await ws.close(code=aiohttp.WSCloseCode.INTERNAL_ERROR)
+                                    await self.send_epi_log(f'Invalid value received in data["title"]. Expected "on it" or "later" but received {data["title"]}')
+                                    raise ValueError(f'Invalid value given in data["title"]. Expected "on it" or "later" but received \"{data["title"]}\"') # raise error and send it with a @
+                    elif msg.type in exception_types:
+                        await ws.close(code=aiohttp.WSCloseCode.INTERNAL_ERROR)
+                        await self.send_epi_log(f"Received invalid WSMsgType - `{msg.type}`.\n`{msg}`.\nWS closed: {ws.closed}")
+
     @app_commands.command(name="page", description="Alert the developer of any downtime or critical issues")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     @app_commands.describe(service="The affected service(s) - Sapphire- bot/dashboard | appeal.gg | All" ,message="The message to send", priority="The severity, 1 = lowest, 4 = critical (highest)", cb_affected="Whether custom branding is affected or not (for Sapphire outages)")
@@ -346,13 +369,15 @@ class epi(commands.Cog):
                         {
                             "action": "http",
                             "label": "On it",
-                            "url": f"https://discord.com/api/v10/webhooks/{interaction.followup.id}/{interaction.followup.token}",
+                            "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
+                            "headers": {"Title": "On it"},
                             "clear": True
                         },
                         {
                             "action": "http",
                             "label": "Later (>1 hour)",
-                            "url": f"https://discord.com/api/v10/webhooks/{interaction.followup.id}/{interaction.followup.token}",
+                            "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
+                            "headers": {"Title": "Later (> 1 hour)"},
                             "clear": True
                         }
                     ] 
@@ -362,6 +387,7 @@ class epi(commands.Cog):
                         if req.status == 200:
                             await self.send_epi_log(f"`{interaction.user.name}` (`{interaction.user.id}`) used /page. Service: {service} ,Message: `{message}`, Priority: {priority}, Custom Branding Affected: {cb_affected}.")
                             await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority}")
+                            await self.handle_websocket(followup)
                         else:
                             response = await req.text()
                             await followup.edit(f"An error occured while trying to send the notification...\nStatus: {req.status}, Response: {response}")
