@@ -26,7 +26,7 @@ class confirm_close(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
     
-    @ui.button(label="Confirm", style=discord.ButtonStyle.green, custom_id="auto-close-confirm")
+    @ui.button(label="Mark as solved", style=discord.ButtonStyle.green, custom_id="auto-close-confirm")
     async def on_confirm_click(self, interaction: discord.Interaction, button: ui.Button):
         experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
         mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
