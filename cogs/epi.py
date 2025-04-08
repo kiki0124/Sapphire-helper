@@ -326,16 +326,10 @@ class epi(commands.Cog):
                     if msg.type == aiohttp.WSMsgType.TEXT:
                         data = json.loads(msg.data)
                         if data["event"] == "message":
-                            match data['title']:
-                                case "On it" | "Later (>1 hour)":
-                                    await ws.close(code=aiohttp.WSCloseCode.OK)
-                                    selected = data["title"]
-                                    await followup_message.reply(f"Reply from Xge: {selected}")
-                                    return
-                                case _:
-                                    await ws.close(code=aiohttp.WSCloseCode.INTERNAL_ERROR)
-                                    await self.send_epi_log(f'Invalid value received in data["title"]. Expected "on it" or "later" but received {data["title"]}')
-                                    raise ValueError(f'Invalid value given in data["title"]. Expected "on it" or "later" but received \"{data["title"]}\"') # raise error and send it with a @
+                            await ws.close(code=aiohttp.WSCloseCode.OK)
+                            selected = data["title"]
+                            await followup_message.reply(f"Reply from Xge: {selected}")
+                            return
                     elif msg.type in exception_types:
                         await ws.close(code=aiohttp.WSCloseCode.INTERNAL_ERROR)
                         await self.send_epi_log(f"Received invalid WSMsgType - `{msg.type}`.\n`{msg}`.\nWS closed: {ws.closed}")
@@ -371,6 +365,13 @@ class epi(commands.Cog):
                             "label": "On it",
                             "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
                             "headers": {"Title": "On it"},
+                            "clear": True
+                        },
+                        {
+                            "action": "http",
+                            "label": "Soon (Next 30mins)",
+                            "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
+                            "headers": {"Title": "Soon (Next 30 mins)"},
                             "clear": True
                         },
                         {
