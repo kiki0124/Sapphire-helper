@@ -383,6 +383,8 @@ class epi(commands.Cog):
                         }
                     ] 
                 }
+                if priority == 4:
+                    data["priority"] = 5
                 try:
                     async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
                         if req.status == 200:
