@@ -98,9 +98,5 @@ class bot(commands.Cog):
         else:
             await interaction.response.send_message(content="Debug not found...", ephemeral=True)
 
-    @app_commands.command(name="error")
-    async def errr(self, ctx: commands.Context):
-        raise ValueError
-
 async def setup(client: commands.Bot):
     await client.add_cog(bot(client))
