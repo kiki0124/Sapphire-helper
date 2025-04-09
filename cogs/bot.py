@@ -20,9 +20,12 @@ class bot(commands.Cog):
     def cog_load(self):
         self.client.tree.on_error = self.tree_on_error
     
-    async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError) -> None:
+    async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, interaction: discord.Interaction = None) -> None:
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-        await alerts_thread.send(content=f"Unhandled error: `{error}`\n<@1105414178937774150>")
+        content=f"Unhandled error: `{error}`\n<@1105414178937774150>"
+        await alerts_thread.send(content=content)
+        if interaction:
+            await alerts_thread.send(content=f"Interaction created at `{interaction.created_at.timestamp()}` <t:{round(interaction.created_at.timestamp())}:f>. Now `{datetime.datetime.now().timestamp()}` <t:{round(datetime.datetime.now().timestamp())}:f>")
 
     @commands.command(name="ping")
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
@@ -75,7 +78,7 @@ class bot(commands.Cog):
         elif isinstance(error, app_commands.NoPrivateMessage):
             await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
         else:
-            await self.send_unhandled_error(error=error)
+            await self.send_unhandled_error(error=error, interaction=interaction)
             print_exception(error)
 
     @app_commands.command(name="debug", description="Debug for various systems")
@@ -94,6 +97,10 @@ class bot(commands.Cog):
             await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
         else:
             await interaction.response.send_message(content="Debug not found...", ephemeral=True)
+
+    @app_commands.command(name="error")
+    async def errr(self, ctx: commands.Context):
+        raise ValueError
 
 async def setup(client: commands.Bot):
     await client.add_cog(bot(client))
