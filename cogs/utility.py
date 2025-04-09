@@ -132,8 +132,6 @@ class utility(commands.Cog):
         solved = post.parent.get_tag(SOLVED_TAG_ID)
         cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
         appeal = post.parent.get_tag(APPEAL_GG_TAG_ID)
-        task =  asyncio.create_task(self.close_post(post=post))
-        self.close_tasks[post] = task
         tags = [solved]
         if cb in post.applied_tags: 
             tags.append(cb)
@@ -142,6 +140,8 @@ class utility(commands.Cog):
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as solved with /solved")
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
+        task = asyncio.create_task(self.close_post(post=post))
+        self.close_tasks[post] = task
         return task
 
     async def unsolve_post(self, post: discord.Thread) -> None:
@@ -193,7 +193,14 @@ class utility(commands.Cog):
             if not_solved:
                 await self.mark_post_as_solved(interaction.channel)
                 one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
-                await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
+                try:
+                    await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
+                except discord.NotFound:
+                    alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
+                    await alerts_thread.send(
+                        f"NotFound <@1105414178937774150>. Created at {interaction.created_at.timestamp()} <t:{round(interaction.created_at.timestamp())}:f>, now {datetime.datetime.now().timestamp()}, <t:{round(datetime.datetime.now().timestamp())}:f>"
+                    )
+                    await interaction.channel.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
             else:
                 await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
         else:
