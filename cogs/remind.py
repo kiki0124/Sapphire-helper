@@ -44,6 +44,8 @@ class CloseNow(ui.View):
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
             alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+            if alerts_thread.archived:
+                await alerts_thread.edit(archived=False)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: Close now button clicked")
             await remove_post_from_pending(interaction.channel_id)
             await remove_post_from_rtdr(interaction.channel_id)
@@ -77,6 +79,8 @@ class remind(commands.Cog):
         
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        if alerts_thread.archived:
+            await alerts_thread.edit(archived=False)
         await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}")
 
     @commands.Cog.listener()
@@ -117,6 +121,8 @@ class remind(commands.Cog):
                     message = await post.fetch_message(post.last_message_id)
                 except discord.HTTPException as e:
                     alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+                    if alerts_thread.archived:
+                        await alerts_thread.edit(archived=False)
                     await alerts_thread.send(
                         content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: `{e.status}`"
                     )
@@ -145,6 +151,8 @@ class remind(commands.Cog):
                             continue
                         except discord.HTTPException as e:
                             alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+                            if alerts.archived:
+                                await alerts.edit(archived=False)
                             await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
                             continue
                         author_not_owner = message.author != post.owner

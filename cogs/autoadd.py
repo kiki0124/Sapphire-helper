@@ -44,6 +44,8 @@ class confirm_close(ui.View):
             action_id = generate_random_id()
             alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Post starter message delete and confirm button clicked- mark post as solved")
+            if alerts_thread.archived:
+                await alerts_thread.edit(archived=False)
             await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
             await remove_post_from_rtdr(interaction.channel_id)
         else:
@@ -84,6 +86,8 @@ class autoadd(commands.Cog):
 
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        if alerts_thread.archived:
+            await alerts_thread.edit(archived=False)
         await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}")
     
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved

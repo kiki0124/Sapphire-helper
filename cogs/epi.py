@@ -41,6 +41,8 @@ async def lock_channel(channel: discord.TextChannel|discord.ForumChannel, user: 
         embed.set_footer(text=f"@{user.name}", icon_url=user.avatar.url)
         await channel.send(embed=embed)
     epi_thread = channel.guild.get_thread(EPI_LOG_THREAD_ID)
+    if epi_thread.archived:
+        await epi_thread.edit(archived=False)
     await epi_thread.send(f"`{user.name}` (`{user.id}`) locked {channel.mention}. Reason: {reason}")
 
 async def unlock_channel(channel: discord.TextChannel|discord.ForumChannel, user: discord.Member, reason: str):
@@ -59,6 +61,8 @@ async def unlock_channel(channel: discord.TextChannel|discord.ForumChannel, user
         await channel.send(embed=embed)
     await delete_channel_permissions(channel.id)
     epi_thread = channel.guild.get_thread(EPI_LOG_THREAD_ID)
+    if epi_thread.archived:
+        await epi_thread.edit(archived=False)
     await epi_thread.send(f"`{user.name}` (`{user.id}`) unlocked {channel.mention}. Reason: {reason}")
 
 class get_notified(ui.View):
@@ -118,6 +122,8 @@ class select_channels(ui.ChannelSelect):
                         elif self.slowmode == 0:
                             await interaction.followup.send(f"Successfully disabled slowmode in {channel.mention}")
                         epi_thread = interaction.guild.get_thread(EPI_LOG_THREAD_ID)
+                        if epi_thread.archived:
+                            await epi_thread.edit(archived=False)
                         await epi_thread.send(content=f"`{interaction.user.name}` (`{interaction.user.id}`) set slowmode of `{self.slowmode}` seconds in {channel.mention}")
             else:
                 await interaction.followup.send(f"You must be able to send messages in {channel.mention} to {self.action} it!", ephemeral=True)
@@ -132,6 +138,8 @@ class epi(commands.Cog):
 
     async def send_epi_log(self, content: str):
         epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID)
+        if epi_thread.archived:
+            await epi_thread.edit(archived=False)
         await epi_thread.send(content)
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")

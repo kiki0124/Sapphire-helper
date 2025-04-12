@@ -61,6 +61,8 @@ class ndr_options_buttons(ui.View):
         action_id = generate_random_id()
         alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
         await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
+        if alerts_thread.archived:
+            await alerts_thread.edit(archived=False)
         await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: /needs-dev-review command used")
         channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
@@ -93,6 +95,8 @@ class utility(commands.Cog):
 
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        if alerts_thread.archived:
+            await alerts_thread.edit(archived=False)
         await alerts_thread.send(
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}"
         )
@@ -197,6 +201,8 @@ class utility(commands.Cog):
                     await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
                 except discord.NotFound:
                     alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
+                    if alerts_thread.archived:
+                        await alerts_thread.edit(archived=False)
                     await alerts_thread.send(
                         f"NotFound <@1105414178937774150>. Created at {interaction.created_at.timestamp()} <t:{round(interaction.created_at.timestamp())}:f>, now {datetime.datetime.now().timestamp()}, <t:{round(datetime.datetime.now().timestamp())}:f>"
                     )
@@ -225,6 +231,8 @@ class utility(commands.Cog):
             await interaction.channel.remove_user(user)
             await interaction.response.send_message(content=f"Successfully removed {user.name} from this post.", ephemeral=True)
             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+            if alerts_thread.archived:
+                await alerts_thread.edit(archived=False)
             await alerts_thread.send(f"`@{interaction.user.name}` ({interaction.user.id}) removed `@{user.name}` (`{user.id}` from {interaction.channel.mention}).")
         else:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>")
@@ -277,6 +285,8 @@ class utility(commands.Cog):
 
     async def send_qr_log_remove_from_cache(self, message: discord.Message, user: discord.Member):
         qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID)
+        if qr_logs_thread.archived:
+            await qr_logs_thread.edit(archived=False)
         await qr_logs_thread.send(
             content=f"Message deleted by `@{user.name}` (`{user.id}`) in {message.channel.mention}\nMessage id: `{message.id}`"
         )
@@ -290,8 +300,7 @@ class utility(commands.Cog):
         in_support = isinstance(reaction.message.channel, discord.Thread) \
             and reaction.message.channel.parent_id == SUPPORT_CHANNEL_ID
         from_sapphire = reaction.message.author.id == 678344927997853742 # Sapphire's user id
-        allowed_reactions = ["🗑️", "❌"]
-        reaction_allowed = reaction.emoji in allowed_reactions
+        reaction_allowed = reaction.emoji in ["🗑️", "❌"]
         if in_support and from_sapphire and reaction_allowed:
             experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
             if reaction.message.interaction_metadata:
