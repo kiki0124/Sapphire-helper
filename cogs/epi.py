@@ -335,9 +335,17 @@ class epi(commands.Cog):
                         data = json.loads(msg.data)
                         if data["event"] == "message":
                             await ws.close(code=aiohttp.WSCloseCode.OK)
-                            selected = data["title"]
-                            await followup_message.reply(f"Reply from Xge: {selected}")
-                            return
+                            response = data["title"] # the button that Xge clicked in the notification
+                            channel = self.client.get_channel(followup_message.channel.id)
+                            webhooks = await channel.webhooks()
+                            webhook = webhooks[0] or await followup_message.channel.create_webhook(name="Created by Sapphire helper")
+                            xge = self.client.get_user(265236642476982273) or await self.client.fetch_user(265236642476982273) # xge's user id, use get to get from the cache and fetch if couldn't find in cache
+                            await webhook.send(
+                                content=f"{response}\n-# Reply to {followup_message.jump_url}",
+                                username=xge.global_name or xge.name, # global name or username if global name doesn't exist (is none)
+                                avatar_url=xge.avatar.url
+                            )
+                            return await ws.close(code=aiohttp.WSCloseCode.OK)
                     elif msg.type in exception_types:
                         await ws.close(code=aiohttp.WSCloseCode.INTERNAL_ERROR)
                         await self.send_epi_log(f"Received invalid WSMsgType - `{msg.type}`.\n`{msg}`.\nWS closed: {ws.closed}")
