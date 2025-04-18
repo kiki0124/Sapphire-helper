@@ -9,6 +9,7 @@ from functions import remove_post_from_rtdr, get_post_creator_id, \
                     generate_random_id, remove_post_from_pending
 from aiocache import cached
 from typing import Union
+import re
 
 load_dotenv()
 
@@ -91,8 +92,6 @@ class utility(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
         
-    prefix_messages: dict[int, int] = {} # id of the command/response message: id of the user that triggered it
-
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         if alerts_thread.archived:
@@ -260,40 +259,14 @@ class utility(commands.Cog):
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
         else:
             await interaction.response.send_message(f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
-    
-    @commands.Cog.listener('on_message')
-    async def cache_command_messages(self, message: discord.Message):
-        is_support = isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID
-        is_prefix_command = message.content.startswith(("s!", "!", "<@678344927997853742>")) and not message.author.bot
-        if is_support and is_prefix_command:
-            def check (m: discord.Message):
-                is_in_support = isinstance(m.channel, discord.Thread) and m.channel.parent_id == SUPPORT_CHANNEL_ID
-                if is_in_support and m.author.id == 678344927997853742: # Sapphire's user id
-                    is_replying = m.reference and m.reference.message_id == message.id
-                    is_in_same_channel = m.channel.id == message.channel.id # a message from sapphire in the same channel within 3 seconds is very likely to be a command response
-                    is_in_footer = False
-                    if m.embeds:
-                        is_in_footer = m.embeds[len(m.embeds)-1].footer.text == f"Recommended by @{message.author.name}" # check text of last/lowest embed
-                    return is_replying or is_in_same_channel or is_in_footer
-                else: 
-                    return False
-            try:
-                msg = await self.client.wait_for('message', check=check, timeout=3) # returns the message if the check above returns True, only waits for up to 3 seconds
-                self.prefix_messages[msg.id] = message.author.id
-            except asyncio.TimeoutError: # 3 seconds have passed with no message from Sapphire
-                return
 
-    async def send_qr_log_remove_from_cache(self, message: discord.Message, user: discord.Member):
+    async def send_qr_log(self, message: discord.Message, user: discord.Member):
         qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID)
         if qr_logs_thread.archived:
             await qr_logs_thread.edit(archived=False)
         await qr_logs_thread.send(
             content=f"Message deleted by `@{user.name}` (`{user.id}`) in {message.channel.mention}\nMessage id: `{message.id}`"
         )
-        try:
-            self.prefix_messages.pop(message.id) # remove from cache
-        except KeyError:
-            return
 
     @commands.Cog.listener('on_reaction_add')
     async def delete_accidental_qr(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
@@ -306,15 +279,20 @@ class utility(commands.Cog):
             if reaction.message.interaction_metadata:
                 if experts in user.roles:
                     await reaction.message.delete()
-                    await self.send_qr_log_remove_from_cache(message=reaction.message, user=user)
+                    await self.send_qr_log(message=reaction.message, user=user)
                     return
                 elif reaction.message.interaction_metadata.user == user:
                     await reaction.message.delete()
-                    await self.send_qr_log_remove_from_cache(message=reaction.message, user=user)
-            elif reaction.message.id in self.prefix_messages: # the message id is in the cache
-                if self.prefix_messages[reaction.message.id] == user.id or experts in user.roles:
+                    await self.send_qr_log(message=reaction.message, user=user)
+            elif reaction.message.embeds:
+                in_footer = False
+                regex = f'(Recommended|Sent) by @{reaction.message.author.name}'
+                footer_text = reaction.message.embeds[len(reaction.message.embeds)-1].footer.text
+                if re.match(regex, footer_text, re.IGNORECASE):
+                    in_footer = True
+                if in_footer or experts in user.roles:
                     await reaction.message.delete()
-                    await self.send_qr_log_remove_from_cache(message=reaction.message, user=user)
+                    await self.send_qr_log(message=reaction.message, user=user)
 
     async def wait_until_ready(self):
         await self.client.wait_until_ready()
