@@ -327,14 +327,19 @@ class epi(commands.Cog):
         # does anyone even read these comments? Ping me with the funniest/weirdest emoji you have (from any server you're in) if you see this...
 
     async def handle_websocket(self, followup_message: discord.WebhookMessage):
+        await self.send_epi_log("Attempting to connect to websocket")
         async with aiohttp.ClientSession() as cs:
             async with cs.ws_connect(f"https://ntfy.sh/{NTFY_SECOND_TOPIC}/ws") as ws:
+                await self.send_epi_log("Websocket connected")
                 async for msg in ws:
+                    await self.send_epi_log(f"WS event received.\n`{msg.type}`")
                     exception_types = [aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR] 
                     if msg.type == aiohttp.WSMsgType.TEXT:
                         data = json.loads(msg.data)
                         if data["event"] == "message":
+                            await self.send_epi_log(f"WS `message` event received. `{data['title']}`")
                             await ws.close(code=aiohttp.WSCloseCode.OK)
+                            await self.send_epi_log(f"Attempted to close WS. Closed: `{ws.closed}`")
                             response = data["title"] # the button that Xge clicked in the notification
                             channel = self.client.get_channel(followup_message.channel.id)
                             webhooks = await channel.webhooks()
