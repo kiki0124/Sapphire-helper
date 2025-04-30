@@ -276,26 +276,28 @@ class utility(commands.Cog):
         reaction_allowed = reaction.emoji in ["🗑️", "❌"]
         if in_support and from_sapphire and reaction_allowed:
             experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
+            if experts in user.roles:
+                await reaction.message.delete()
+                await self.send_qr_log(reaction.message, user)
+                return
             if reaction.message.interaction_metadata:
-                if experts in user.roles:
+                if reaction.message.interaction_metadata.user == user:
                     await reaction.message.delete()
                     await self.send_qr_log(message=reaction.message, user=user)
                     return
-                elif reaction.message.interaction_metadata.user == user:
-                    await reaction.message.delete()
-                    await self.send_qr_log(message=reaction.message, user=user)
             elif reaction.message.embeds:
-                in_footer = False
-                regex = f'(Recommended|Sent) by @{reaction.message.author.name}'
-                footer_text = reaction.message.embeds[len(reaction.message.embeds)-1].footer.text
-                if re.match(regex, footer_text, re.IGNORECASE):
-                    in_footer = True
-                if in_footer or experts in user.roles:
+                if reaction.message.embeds[len(reaction.message.embeds)-1].footer:
+                    regex = f'(Recommended|Sent) by @{reaction.message.author.name}'
+                    footer_text = reaction.message.embeds[len(reaction.message.embeds)-1].footer.text
+                    if re.match(regex, footer_text, re.IGNORECASE):
+                        await reaction.message.delete()
+                        await self.send_qr_log(message=reaction.message, user=user)
+                        return
+            if reaction.message.reference and reaction.message.reference.cached_message:
+                if user == reaction.message.reference.cached_message.author:
                     await reaction.message.delete()
-                    await self.send_qr_log(message=reaction.message, user=user)
-
-    async def wait_until_ready(self):
-        await self.client.wait_until_ready()
+                    await self.send_qr_log(reaction.message, user)
+                    return
 
 async def setup(client):
     await client.add_cog(utility(client))
