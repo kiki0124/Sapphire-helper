@@ -9,6 +9,7 @@ import random
 from discord import ui
 import os
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 
@@ -42,13 +43,15 @@ class CloseNow(ui.View):
             if appeal in interaction.channel.applied_tags:
                 tags.append(appeal)
             action_id = generate_random_id()
-            await interaction.channel.edit(applied_tags=tags, archived=True, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
+            await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
             alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: Close now button clicked")
             await remove_post_from_pending(interaction.channel_id)
             await remove_post_from_rtdr(interaction.channel_id)
+            await asyncio.sleep(3)
+            await interaction.channel.edit(archived=False, reason="Archive post after close now button was clicked")
         else:
             await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
 
