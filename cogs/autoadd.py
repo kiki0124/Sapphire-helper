@@ -151,25 +151,25 @@ class autoadd(commands.Cog):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         if support:
             for post in await support.guild.active_threads():
-                if post.parent_id == SUPPORT_CHANNEL_ID:
-                    if not post.locked:
-                        applied_tags = post.applied_tags
-                        ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-                        if ndr not in applied_tags:
-                            owner = post.owner
-                            if post.id in await get_rtdr_posts():
-                                owner = post.guild.get_member(await get_post_creator_id(post.id))
-                            if not owner: # post owner/creator will be None if they left the server
-                                tags = [support.get_tag(SOLVED_TAG_ID)]
-                                cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-                                appeal = support.get_tag(APPEAL_GG_TAG_ID)
-                                if cb in applied_tags: 
-                                    tags.append(cb)
-                                if appeal in applied_tags:
-                                    tags.append(appeal)
-                                action_id = generate_random_id()
-                                await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
-                                await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
+                if post.parent_id == SUPPORT_CHANNEL_ID and not post.locked:
+                    applied_tags = post.applied_tags
+                    ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
+                    if ndr not in applied_tags:
+                        owner = post.owner
+                        if post.id in await get_rtdr_posts():
+                            owner = post.guild.get_member(await get_post_creator_id(post.id))
+                        if not owner: # post owner/creator will be None if they left the server
+                            tags = [support.get_tag(SOLVED_TAG_ID)]
+                            cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
+                            appeal = support.get_tag(APPEAL_GG_TAG_ID)
+                            if cb in applied_tags: 
+                                tags.append(cb)
+                            if appeal in applied_tags:
+                                tags.append(appeal)
+                            action_id = generate_random_id()
+                            await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
+                            await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
+                            await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
 
     @commands.Cog.listener('on_raw_message_delete')
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
