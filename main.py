@@ -10,7 +10,14 @@ load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 PREFIX = os.getenv("PREFIX")
 
-client = commands.Bot(command_prefix=PREFIX ,intents=discord.Intents.all(), help_command=None, strip_after_prefix=True)
+intents = discord.Intents.none()
+intents.message_content = True
+intents.guild_messages = True
+intents.guilds = True
+intents.members = True
+intents.guild_reactions = True
+
+client = commands.Bot(command_prefix=PREFIX ,intents=intents, help_command=None, strip_after_prefix=True)
 
 @client.event
 async def on_ready():
