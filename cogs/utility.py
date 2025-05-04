@@ -331,13 +331,6 @@ class utility(commands.Cog):
                 embed.add_field(name="When will this bug be fixed", value=priority_texts.get(priority.casefold()), inline=False)
             await interaction.response.send_message(embed=embed)
             await interaction.channel.edit(name=f"[ATBL] {interaction.channel.name}", reason=f"@{interaction.user.name} used /atbl")
-            def check(m: discord.Message):
-                return m.channel.id == interaction.channel.id and m.type == discord.MessageType.channel_name_change
-            try: 
-                msg = await self.client.wait_for("message", check=check, timeout=5) # the "sapphire helper changed the post title ..."
-                await msg.delete()
-            except asyncio.TimeoutError:
-                pass
         else:
             await interaction.response.send_message(f"Invalid priority argument given. Priority must be one of {', '.join(priorities)}.", ephemeral=True)
 
