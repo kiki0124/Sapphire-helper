@@ -96,8 +96,13 @@ class utility(commands.Cog):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
-        await alerts_thread.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}"
+        webhooks = await alerts_thread.parent.webhooks()
+        webhook = webhooks[0] or await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+        await webhook.send(
+            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
+            username=self.client.user.name,
+            avatar_url=self.client.user.avatar.url,
+            thread=discord.Object(id=ALERTS_THREAD_ID)
         )
 
     @cached()
@@ -262,10 +267,15 @@ class utility(commands.Cog):
 
     async def send_qr_log(self, message: discord.Message, user: discord.Member):
         qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID)
+        webhooks = await qr_logs_thread.parent.webhooks()
+        webhook = webhooks[0] or await qr_logs_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
         if qr_logs_thread.archived:
             await qr_logs_thread.edit(archived=False)
-        await qr_logs_thread.send(
-            content=f"Message deleted by `@{user.name}` (`{user.id}`) in {message.channel.mention}\nMessage id: `{message.id}`"
+        await webhook.send(
+            content=f"Message deleted by `@{user.name}` (`{user.id}`) in {message.channel.mention}\nMessage id: `{message.id}`",
+            username=self.client.user.name,
+            avatar_url=self.client.user.avatar.url,
+            thread=discord.Object(id=QR_LOG_THREAD_ID)
         )
 
     @commands.Cog.listener('on_reaction_add')
@@ -298,6 +308,38 @@ class utility(commands.Cog):
                     await reaction.message.delete()
                     await self.send_qr_log(reaction.message, user)
                     return
+
+    @app_commands.command(name="atbl", description="Mark the current post as 'Added to bug list'")
+    @app_commands.describe(priority="The priority of this issue")
+    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
+    async def atbl(self, interaction: discord.Interaction, priority: str):
+        priorities = ["very low", "low", "medium", "high", "special issue"]
+        if priority.casefold() in priorities:
+            priority_texts = {
+                "very low": "Will be fixed some day.",
+                "low": "Will be taken care of if there are no higher priority bugs on the buglist.",
+                "medium": "Will most likely be fixed within 1-2 weeks.",
+                "high": "Will be fixed as soon as possible",
+            }
+            embed = discord.Embed(
+                title="",
+                description="### This bug has been added to the developers buglist.",
+                colour=0xe88802
+            )
+            if priority.casefold() != "special issue":
+                embed.add_field(name="Priority", value=priority.capitalize(), inline=False)
+                embed.add_field(name="When will this bug be fixed", value=priority_texts.get(priority.casefold()), inline=False)
+            await interaction.response.send_message(embed=embed)
+            await interaction.channel.edit(name=f"[ATBL] {interaction.channel.name}", reason=f"@{interaction.user.name} used /atbl")
+            def check(m: discord.Message):
+                return m.channel.id == interaction.channel.id and m.type == discord.MessageType.channel_name_change
+            try: 
+                msg = await self.client.wait_for("message", check=check, timeout=5) # the "sapphire helper changed the post title ..."
+                await msg.delete()
+            except asyncio.TimeoutError:
+                pass
+        else:
+            await interaction.response.send_message(f"Invalid priority argument given. Priority must be one of {', '.join(priorities)}.", ephemeral=True)
 
 async def setup(client):
     await client.add_cog(utility(client))
