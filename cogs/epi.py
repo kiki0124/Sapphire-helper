@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from functions import get_post_creator_id, save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels
 import asyncio
 import aiohttp, json
+import datetime
 
 load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
@@ -138,9 +139,16 @@ class epi(commands.Cog):
 
     async def send_epi_log(self, content: str):
         epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID)
+        webhooks = await epi_thread.parent.webhooks()
+        webhook = webhooks[0] or await epi_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
         if epi_thread.archived:
             await epi_thread.edit(archived=False)
-        await epi_thread.send(content)
+        await webhook.send(
+            content=content,
+            username=self.client.user.name,
+            avatar_url=self.client.user.avatar.url,
+            thread=discord.Object(id=EPI_LOG_THREAD_ID)
+        )
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
@@ -326,11 +334,11 @@ class epi(commands.Cog):
                 
         # does anyone even read these comments? Ping me with the funniest/weirdest emoji you have (from any server you're in) if you see this...
 
-    async def handle_websocket(self, followup_message: discord.WebhookMessage):
-        await self.send_epi_log("Attempting to connect to websocket")
+    async def handle_websocket(self, message: discord.WebhookMessage|discord.Message):
+        await self.send_epi_log("Attempting to connect to WS")
         async with aiohttp.ClientSession() as cs:
             async with cs.ws_connect(f"https://ntfy.sh/{NTFY_SECOND_TOPIC}/ws") as ws:
-                await self.send_epi_log("Websocket connected")
+                await self.send_epi_log("WS connected")
                 async for msg in ws:
                     await self.send_epi_log(f"WS event received.\n`{msg.type}`")
                     exception_types = [aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR] 
@@ -341,12 +349,12 @@ class epi(commands.Cog):
                             await ws.close(code=aiohttp.WSCloseCode.OK)
                             await self.send_epi_log(f"Attempted to close WS. Closed: `{ws.closed}`")
                             response = data["title"] # the button that Xge clicked in the notification
-                            channel = self.client.get_channel(followup_message.channel.id)
+                            channel = self.client.get_channel(message.channel.id)
                             webhooks = await channel.webhooks()
-                            webhook = webhooks[0] or await followup_message.channel.create_webhook(name="Created by Sapphire helper")
+                            webhook = webhooks[0] or await channel.create_webhook(name="Created by Sapphire helper")
                             xge = self.client.get_user(265236642476982273) or await self.client.fetch_user(265236642476982273) # xge's user id, use get to get from the cache and fetch if couldn't find in cache
                             await webhook.send(
-                                content=f"{response}\n-# Reply to {followup_message.jump_url}",
+                                content=f"{response}\n-# Reply to {message.jump_url}",
                                 username=xge.global_name or xge.name, # global name or username if global name doesn't exist (is none)
                                 avatar_url=xge.avatar.url
                             )
@@ -429,6 +437,66 @@ class epi(commands.Cog):
             app_commands.Choice(name="Appeal.gg", value="Appeal.gg"),
             app_commands.Choice(name="All", value="All")
             ]
+
+    @commands.Cog.listener("on_message")
+    async def autopage_on_ratelimit(self, message: discord.Message):
+        if message.channel.id in [1023568468206956554, 1146016865345343531] and message.author.bot: # #cluster-log and the id of the channel in testing server as I don't want to add another .env variable
+            if 265236642476982273 in [user.id for user in message.mentions]: #! IMPORTANT: please make sure that this is Xge's user ID. For testing I had to switch it with my own as messages' mentions field only shows for users who are in the server
+                experts_channel = self.client.get_channel(EPI_LOG_THREAD_ID).parent
+                severity_emojis = {
+                3: "orange_circle",  # High
+                4: "red_circle"   # Critical
+                }
+                priority = 3
+                if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # 20 and 7 instead of 21 and 8 because it starts from 0 (0-23 rather than 1-24)
+                    priority = 4
+                msg = await experts_channel.send(f"Sending automated page for {message.jump_url}")
+                async with aiohttp.ClientSession(trust_env=True) as cs:
+                    tags = [severity_emojis.get(priority, "question")]
+                    data = {
+                        "topic": NTFY_TOPIC_NAME,
+                        "message": message.clean_content,
+                        "title": "[Automated] Ratelimited",
+                        "tags": tags,
+                        "click": experts_channel.jump_url,
+                        "actions": [
+                            {
+                                "action": "http",
+                                "label": "On it",
+                                "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
+                                "headers": {"Title": "On it"},
+                                "clear": True
+                            },
+                            {
+                                "action": "http",
+                                "label": "Soon (Next 30mins)",
+                                "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
+                                "headers": {"Title": "Soon (Next 30 mins)"},
+                                "clear": True
+                            },
+                            {
+                                "action": "http",
+                                "label": "Later (>1 hour)",
+                                "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
+                                "headers": {"Title": "Later (> 1 hour)"},
+                                "clear": True
+                            }
+                        ] 
+                    }
+                    if priority == 4:
+                        data["priority"] = 5
+                    try:
+                        async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
+                            if req.status == 200:
+                                await self.send_epi_log(f"Sent automated page for rate limits. Priority: {priority}.")
+                                await msg.edit(content=f"Automated page for [ratelimits]({message.jump_url}) sent successfully.\n-# Priority: {priority}")
+                                await self.handle_websocket(msg)
+                            else:
+                                response = await req.text()
+                                await msg.edit(f"An error occured while trying to send the notification...\nStatus: {req.status}, Response: {response}")
+                    except Exception as e:
+                        await msg.edit(content=f"An error occured while trying to send the notification... {e}")
+                        raise e
 
 async def setup(client):
     await client.add_cog(epi(client=client))
