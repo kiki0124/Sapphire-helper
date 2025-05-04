@@ -84,7 +84,14 @@ class remind(commands.Cog):
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}")
+        webhooks = await alerts_thread.parent.webhooks()
+        webhook = webhooks[0] or await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+        await webhook.send(
+            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
+            username=self.client.user.name,
+            avatar_url=self.client.user.avatar.url,
+            thread=discord.Object(id=ALERTS_THREAD_ID)
+        )
 
     @commands.Cog.listener()
     async def on_ready(self):
