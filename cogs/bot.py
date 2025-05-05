@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 from traceback import print_exception
 import functions
+import psutil
 
 load_dotenv()
 
@@ -31,7 +32,7 @@ class bot(commands.Cog):
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def ping(self, ctx: commands.Context):
         now = datetime.datetime.now()
-        message = await ctx.reply(content=f"Pong! v3.3\nClient latency: {str(self.client.latency)[:4]}s", mention_author=False)
+        message = await ctx.reply(content=f"Pong!\nClient latency: {str(self.client.latency)[:4]}s", mention_author=False)
         latency = datetime.datetime.now() - now
         await message.edit(content=f"{message.content}\nDiscord latency: {str(latency.total_seconds())[:4]}s")
 
@@ -97,6 +98,20 @@ class bot(commands.Cog):
             await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
         else:
             await interaction.response.send_message(content="Debug not found...", ephemeral=True)
+
+    @commands.command()
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    async def stats(self, ctx: commands.Context):
+        embed = discord.Embed(
+            title="Sapphire Helper | Version 3.3",
+            colour=discord.Colour.purple()
+        )
+        embed.add_field(name="CPU Count:", value=os.cpu_count(), inline=False)
+        embed.add_field(name="CPU Load:", value=f"{psutil.cpu_percent()}%", inline=False)
+        embed.add_field(name="Available Memory:", value=f"{str(psutil.virtual_memory()[1]/1000000000)[:4]}GB", inline=False)
+        embed.add_field(name="Memory Usage:", value=f"{psutil.virtual_memory()[2]}%", inline=False)
+        embed.set_footer(text=f"Discord.py version {discord.__version__}")
+        await ctx.reply(embed=embed, mention_author=False)
 
 async def setup(client: commands.Bot):
     await client.add_cog(bot(client))
