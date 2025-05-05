@@ -255,6 +255,58 @@ class epi(commands.Cog):
         else:
             await interaction.followup.send(content="EPI mode is not currently enabled... Try again later.")
 
+    @group.command(name="edit", description="Edit current EPI information")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.describe(info="The new text to be displayed or message ID from #status to be forwarded. Leave empty to not edit.", sticky="Whether a sticky message should be created in #general. Leave empty to not edit")
+    async def edit(self, interaction: discord.Interaction, info: str = None, sticky: bool = None):
+        await interaction.response.defer(ephemeral=True)
+        if self.epi_data:
+            if info:
+                previous = list(self.epi_data.keys())[0]
+                if not info.isdigit():
+                    msg_or_text = info
+                elif info.isdigit():
+                    status_channel = discord.utils.get(interaction.guild.channels, name="status", type=discord.ChannelType.news)
+                    try:
+                        msg_or_text = await status_channel.fetch_message(int(info))
+                    except discord.NotFound or discord.HTTPException as exc:
+                        return await interaction.followup.send(content=f"Unable to fetch message from {status_channel.mention} with ID `{info}`.\n`{exc.status}`, `{exc.text}`", ephemeral=True)
+                if isinstance(msg_or_text, str):
+                    url_or_text = f"`{msg_or_text}`"
+                elif isinstance(msg_or_text, discord.Message):
+                    url_or_text = msg_or_text.jump_url
+                messages = list(self.epi_data.values())[0]
+                self.epi_data.pop(previous)
+                self.epi_data.update({msg_or_text: messages})
+                await interaction.followup.send(f"Successfully updated EPI info to {url_or_text}", ephemeral=True)
+                await self.send_epi_log(f"EPI mode edited by `{interaction.user.name}`, changed info to {url_or_text}")
+            if sticky != None:
+                if sticky:
+                    if not self.sticky_message:
+                        general = self.client.get_channel(GENERAL_CHANNEL_ID)
+                        msg_or_text = list(self.epi_data.keys())[0]
+                        if isinstance(msg_or_text, str):
+                            msg = await general.send(f"## The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_text}", view=get_notified())
+                        elif isinstance(msg_or_text, discord.Message):
+                            msg = await general.send(f"## Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}", view=get_notified())
+                        self.sticky_message = msg
+                        await interaction.followup.send("Successfully enabled sticky messages.", ephemeral=True)
+                        await self.send_epi_log(f"EPI mode edited by `{interaction.user.name}`, enabled sticky messages.")
+                    elif self.sticky_message:
+                        await interaction.followup.send("Cannot enable sticky messages as its already enabled.", ephemeral=True)
+                elif sticky == False:
+                    if self.sticky_message:
+                        await self.sticky_message.delete()
+                        self.sticky_message = None
+                        await interaction.followup.send("Successfully disabled sticky messages.", ephemeral=True)
+                        await self.send_epi_log(f"EPI edited by `{interaction.user.name}`, disabled sticky messages.")
+                    elif not self.sticky_message:
+                        await interaction.followup.send("Cannot disable sticky messages as its already disabled.", ephemeral=True)
+            if info == None and sticky == None:
+                await interaction.followup.send("You must provide at least one of `info` or `sticky` parameters and both were left empty.", ephemeral=True)
+        else:
+            await interaction.followup.send("EPI must be enabled for you to edit it. Use /epi enable to enable it.", ephemeral=True)
+
     @commands.Cog.listener('on_thread_create')
     async def send_epi_info(self, thread: discord.Thread):
         if thread.parent_id == SUPPORT_CHANNEL_ID and self.epi_data:
@@ -262,9 +314,9 @@ class epi(commands.Cog):
             owner_id = await get_post_creator_id(thread.id) or thread.owner_id
             msg_or_txt = list(self.epi_data.keys())[0]
             if isinstance(msg_or_txt, str):
-                message = await thread.send(content=f"Hey <@{owner_id}>, the following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_txt}", view=get_notified())                
+                message = await thread.send(content=f"## Hey <@{owner_id}>, the following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_txt}", view=get_notified())                
             elif isinstance(msg_or_txt, discord.Message):
-                message = await thread.send(content=f"Hey <@{owner_id}>, Sapphire is currently having some trouble. Take a look at the message below for more details:\n-# The devs are already on it - thanks for your patience!", view=get_notified())
+                message = await thread.send(content=f"## Hey <@{owner_id}>, Sapphire is currently having some trouble. Take a look at the message below for more details:\n-# The devs are already on it - thanks for your patience!", view=get_notified())
                 await msg_or_txt.forward(thread)
             self.epi_data[msg_or_txt].append(message)
 
@@ -283,9 +335,9 @@ class epi(commands.Cog):
             await self.sticky_message.delete()
             msg_or_text = list(self.epi_data.keys())[0]
             if isinstance(msg_or_text, str):
-                msg = await message.channel.send(f"The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_text}", view=get_notified())
+                msg = await message.channel.send(f"## The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_text}", view=get_notified())
             elif isinstance(msg_or_text, discord.Message):
-                msg = await message.channel.send(f"Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}", view=get_notified())
+                msg = await message.channel.send(f"## Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}", view=get_notified())
             self.sticky_message = msg
 
     channel_permissions: dict[discord.TextChannel | discord.ForumChannel, dict[discord.Role|discord.Member|discord.Object, discord.PermissionOverwrite]] = {}
