@@ -51,7 +51,7 @@ async def unlock_channel(channel: discord.TextChannel|discord.ForumChannel, user
     allow = discord.Permissions()._from_value(allow_deny[0])
     deny = discord.Permissions()._from_value(allow_deny[1])
     overwrites = discord.PermissionOverwrite().from_pair(allow=allow, deny=deny)
-    await channel.edit(overwrites={channel.guild.default_role: overwrites} ,reason=f"{user.name} ({user.id}) used /unlock. Reason: {reason}")
+    await channel.edit(overwrites={channel.guild.default_role: overwrites}, reason=f"{user.name} ({user.id}) used /unlock. Reason: {reason}")
     if isinstance(channel, discord.TextChannel):
         embed = discord.Embed(
             title="Channel unlocked",
@@ -105,27 +105,27 @@ class select_channels(ui.ChannelSelect):
                         if not channel.id in await get_locked_channels():
                             if fetched_channel.permissions_for(interaction.guild.default_role).view_channel:
                                 await lock_channel(fetched_channel, interaction.user, self.reason)
-                                await interaction.followup.send(content=f"Successfully locked {channel.mention} with reason {self.reason}", ephemeral=True)
+                                await interaction.followup.send(content=f"Successfully locked {channel.mention} with reason: {self.reason}", ephemeral=True)
                             else:
-                                await interaction.followup.send(content=f"You are only able to lock channels that the everyone role can view!", ephemeral=True)
+                                await interaction.followup.send(content=f"You are only able to lock channels that `@everyone` can view!", ephemeral=True)
                         else:
                             await interaction.followup.send(content=f"{channel.mention} is already locked! Use /unlock to unlock it.", ephemeral=True)
                     case "unlock":
                         if channel.id in await get_locked_channels():
                             await unlock_channel(fetched_channel, interaction.user, self.reason)
-                            await interaction.followup.send(f"Successfully unlocked {channel.mention} with reason {self.reason}", ephemeral=True)
+                            await interaction.followup.send(f"Successfully unlocked {channel.mention} with reason: {self.reason}", ephemeral=True)
                         else:
                             await interaction.followup.send(f"Couldn't unlock {channel.mention} as it isn't currently locked.", ephemeral=True)
                     case "slowmode":
                         await fetched_channel.edit(slowmode_delay=self.slowmode, reason=f"/slowmode used by {interaction.user.name} ({interaction.user.id}). Reason: {self.reason}")
                         if self.slowmode > 0:
-                            await interaction.followup.send(f"Successfully set slowmode in {channel.mention} to {self.slowmode} seconds with reason {self.reason}", ephemeral=True)
+                            await interaction.followup.send(f"Successfully set slowmode in {channel.mention} to {self.slowmode} seconds with reason: {self.reason}", ephemeral=True)
                         elif self.slowmode == 0:
-                            await interaction.followup.send(f"Successfully disabled slowmode in {channel.mention}")
+                            await interaction.followup.send(f"Successfully disabled slowmode in {channel.mention}!")
                         epi_thread = interaction.guild.get_thread(EPI_LOG_THREAD_ID)
                         if epi_thread.archived:
                             await epi_thread.edit(archived=False)
-                        await epi_thread.send(content=f"`{interaction.user.name}` (`{interaction.user.id}`) set slowmode of `{self.slowmode}` seconds in {channel.mention}")
+                        await epi_thread.send(content=f"`{interaction.user.name}` (`{interaction.user.id}`) set slowmode of `{self.slowmode}` seconds in {channel.mention}!")
             else:
                 await interaction.followup.send(f"You must be able to send messages in {channel.mention} to {self.action} it!", ephemeral=True)
 
@@ -134,7 +134,7 @@ class epi(commands.Cog):
         self.client = client
 
     epi_data: dict[discord.Message|str, list[discord.Message]] = {} # the custom set message: list of mssages to be edited to remove the get notified button
-    group = app_commands.Group(name="epi", description="Commands related to Extra Post Information system")
+    group = app_commands.Group(name="epi", description="Commands related to Emergency Post Information system")
     sticky_message: discord.Message|None = None
 
     async def send_epi_log(self, content: str):
@@ -236,7 +236,7 @@ class epi(commands.Cog):
             view.add_item(button)
             await interaction.followup.send(view=view, content=f"Are you sure you want to disable EPI mode? This will ping `{len(epi_users)}` user(s) that clicked the 'Get notified when this issue is resolved' button.\n-# Dismiss this message to cancel.", ephemeral=True)
         else:
-            await interaction.followup.send(content="EPI mode is not currently enabled...", ephemeral=True)
+            await interaction.followup.send(content="EPI mode is not currently enabled!", ephemeral=True)
 
     @group.command(name="view", description="View the current EPI mode status")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
@@ -253,11 +253,11 @@ class epi(commands.Cog):
                 ephemeral=True
             )
         else:
-            await interaction.followup.send(content="EPI mode is not currently enabled... Try again later.")
+            await interaction.followup.send(content="EPI mode is not currently enabled! Run the command again if EPI mode is activated.")
 
     @group.command(name="edit", description="Edit current EPI information")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    @app_commands.describe(info="The new text to be displayed or message ID from #status to be forwarded. Leave empty to not edit.", sticky="Whether a sticky message should be created in #general. Leave empty to not edit")
+    @app_commands.describe(info="The new text to be displayed or message ID from #status to be forwarded. Leave empty to not edit.", sticky="Whether a sticky message should be created in #general. Leave empty to not edit.")
     async def edit(self, interaction: discord.Interaction, info: str = None, sticky: bool = None):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
@@ -290,22 +290,22 @@ class epi(commands.Cog):
                         elif isinstance(msg_or_text, discord.Message):
                             msg = await general.send(f"## Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}", view=get_notified())
                         self.sticky_message = msg
-                        await interaction.followup.send("Successfully enabled sticky messages.", ephemeral=True)
+                        await interaction.followup.send("Successfully enabled sticky messages!", ephemeral=True)
                         await self.send_epi_log(f"EPI mode edited by `{interaction.user.name}`, enabled sticky messages.")
                     elif self.sticky_message:
-                        await interaction.followup.send("Cannot enable sticky messages as its already enabled.", ephemeral=True)
+                        await interaction.followup.send("Cannot enable sticky messages as its already enabled!", ephemeral=True)
                 elif sticky == False:
                     if self.sticky_message:
                         await self.sticky_message.delete()
                         self.sticky_message = None
-                        await interaction.followup.send("Successfully disabled sticky messages.", ephemeral=True)
+                        await interaction.followup.send("Successfully disabled sticky messages!", ephemeral=True)
                         await self.send_epi_log(f"EPI edited by `{interaction.user.name}`, disabled sticky messages.")
                     elif not self.sticky_message:
-                        await interaction.followup.send("Cannot disable sticky messages as its already disabled.", ephemeral=True)
+                        await interaction.followup.send("Cannot disable sticky messages as its already disabled!", ephemeral=True)
             if info == None and sticky == None:
                 await interaction.followup.send("You must provide at least one of `info` or `sticky` parameters and both were left empty.", ephemeral=True)
         else:
-            await interaction.followup.send("EPI must be enabled for you to edit it. Use /epi enable to enable it.", ephemeral=True)
+            await interaction.followup.send("EPI must be enabled for you to edit it! Use /epi enable to enable it.", ephemeral=True)
 
     @commands.Cog.listener('on_thread_create')
     async def send_epi_info(self, thread: discord.Thread):
