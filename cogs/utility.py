@@ -50,35 +50,36 @@ class ndr_options_buttons(ui.View):
         super().__init__(timeout=None)
         self.Interaction = Interaction
     
-    async def mark_post_as_ndr(self, interaction: discord.Interaction):
-        ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+    async def mark_post_as_ndr(self, post: discord.Thread):
+        ndr = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
         tags = [ndr]
-        cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-        appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
-        if cb in interaction.channel.applied_tags: 
+        cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        appeal = post.parent.get_tag(APPEAL_GG_TAG_ID)
+        if cb in post.applied_tags: 
             tags.append(cb)
-        if appeal in interaction.channel.applied_tags:
+        if appeal in post.applied_tags:
             tags.append(appeal)
         action_id = generate_random_id()
-        alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
-        await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
+        alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+        await post.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: /needs-dev-review command used")
-        channel = interaction.guild.get_channel(NDR_CHANNEL_ID)
-        await channel.send(f'A new post has been marked as "Needs dev review"\n> {interaction.channel.mention}')
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: /needs-dev-review command used")
+        channel = post.guild.get_channel(NDR_CHANNEL_ID)
+        await channel.send(f'A new post has been marked as "Needs dev review"\n> {post.mention}')
+        await remove_post_from_pending(post.id)
 
     @ui.button(label="Only add tag", style=discord.ButtonStyle.grey, custom_id="ndr-only-add-tag")
     async def on_only_add_tag_click(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer(ephemeral=False)
-        await self.mark_post_as_ndr(interaction)
+        await self.mark_post_as_ndr(interaction.channel)
         await interaction.channel.send(content="Post successfully marked as *needs-dev-review*.")
         await self.Interaction.delete_original_response()
 
     @ui.button(label="Add tag & send questions", style=discord.ButtonStyle.grey, custom_id="ndr-tag-and-questions")
     async def on_send_questions_click(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer()
-        await self.mark_post_as_ndr(interaction)
+        await self.mark_post_as_ndr(interaction.channel)
         embed = discord.Embed(
                     description=f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by {interaction.user.mention}\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _",
                     colour=0x2b2d31
