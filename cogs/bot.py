@@ -26,7 +26,7 @@ class bot(commands.Cog):
         content=f"Unhandled error: `{error}`\n<@1105414178937774150>"
         await alerts_thread.send(content=content)
         if interaction:
-            await alerts_thread.send(content=f"Interaction created at `{interaction.created_at.timestamp()}` <t:{round(interaction.created_at.timestamp())}:f>. Now `{datetime.datetime.now().timestamp()}` <t:{round(datetime.datetime.now().timestamp())}:f>")
+            await alerts_thread.send(content=f"Interaction created at `{interaction.created_at.timestamp()}` <t:{round(interaction.created_at.timestamp())}:T>. Now `{datetime.datetime.now().timestamp()}` <t:{round(datetime.datetime.now().timestamp())}:T>")
 
     @commands.command(name="ping")
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
