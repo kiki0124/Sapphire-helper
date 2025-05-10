@@ -147,7 +147,8 @@ class epi(commands.Cog):
             content=content,
             username=self.client.user.name,
             avatar_url=self.client.user.avatar.url,
-            thread=discord.Object(id=EPI_LOG_THREAD_ID)
+            thread=discord.Object(id=EPI_LOG_THREAD_ID),
+            wait=False
         )
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
