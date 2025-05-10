@@ -88,7 +88,8 @@ class remind(commands.Cog):
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
             username=self.client.user.name,
             avatar_url=self.client.user.avatar.url,
-            thread=discord.Object(id=ALERTS_THREAD_ID)
+            thread=discord.Object(id=ALERTS_THREAD_ID),
+            wait=False
         )
 
     @commands.Cog.listener()
