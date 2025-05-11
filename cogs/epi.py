@@ -121,7 +121,7 @@ class select_channels(ui.ChannelSelect):
                         if self.slowmode > 0:
                             await interaction.followup.send(f"Successfully set slowmode in {channel.mention} to {self.slowmode} seconds with reason: {self.reason}", ephemeral=True)
                         elif self.slowmode == 0:
-                            await interaction.followup.send(f"Successfully disabled slowmode in {channel.mention}!")
+                            await interaction.followup.send(f"Successfully disabled slowmode in {channel.mention}!", ephemeral=True)
                         epi_thread = interaction.guild.get_thread(EPI_LOG_THREAD_ID)
                         if epi_thread.archived:
                             await epi_thread.edit(archived=False)
