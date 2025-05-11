@@ -69,7 +69,7 @@ class readthedamnrules(commands.Cog):
         post = await support.create_thread(
             name=title,
             files=files,
-            content=f"**Original message:**\n```\n{content}```\n\n{reference_message.author.mention} please provide any additional information here so we can give you the best help.\n-# Created by {user.name} | In the future please always use <#{SUPPORT_CHANNEL_ID}> for all Sapphire and Appeal.gg related questions."
+            content=f"**Original message:**\n```\n{content}```\n\n{reference_message.author.mention} please provide any additional information here so we can give you the best help.\n-# Created by {user.name} | In the future please always use <#{SUPPORT_CHANNEL_ID}> for all Sapphire and appeal.gg related questions."
         )
         new_message_content = post[1].content
         new_message_content = new_message_content.removesuffix(user.name)
