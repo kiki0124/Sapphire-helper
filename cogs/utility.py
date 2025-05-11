@@ -88,7 +88,6 @@ class ndr_options_buttons(ui.View):
         await interaction.channel.send(embed=embed, view=need_dev_review_buttons())
         await self.Interaction.delete_original_response()
 
-
 class utility(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
@@ -103,7 +102,8 @@ class utility(commands.Cog):
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
             username=self.client.user.name,
             avatar_url=self.client.user.avatar.url,
-            thread=discord.Object(id=ALERTS_THREAD_ID)
+            thread=discord.Object(id=ALERTS_THREAD_ID),
+            wait=False
         )
 
     @cached()
@@ -112,6 +112,7 @@ class utility(commands.Cog):
         Get the id of /unsolve command.
         This fetches the command from discord and caches the result
         """
+        print(f"Get unsolve id called at {datetime.datetime.now().hour}:{datetime.datetime.now().minute}:{datetime.datetime.now().second}")
         unsolve_id = 1281211280618950708
         for command in await self.client.tree.fetch_commands():
             if command.name == "unsolve": 
@@ -119,6 +120,7 @@ class utility(commands.Cog):
                 break
             else:
                 continue
+        print(f"Get unsolve id | value returned at {datetime.datetime.now().hour}:{datetime.datetime.now().minute}:{datetime.datetime.now().second}")
         return unsolve_id
     
     close_tasks: dict[discord.Thread, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
@@ -193,23 +195,23 @@ class utility(commands.Cog):
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
     async def solved(self, interaction: discord.Interaction):
+        print(f"Command called at {datetime.datetime.now().hour}:{datetime.datetime.now().minute}:{datetime.datetime.now().second}")
         support = interaction.channel.parent
         ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        solved = support.get_tag(SOLVED_TAG_ID)
-        not_ndr = ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.casefold()
-        not_solved = solved not in interaction.channel.applied_tags
-        if not_ndr:
-            if not_solved:
+        if ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.casefold():
+            solved = support.get_tag(SOLVED_TAG_ID)
+            if solved not in interaction.channel.applied_tags:
                 await self.mark_post_as_solved(interaction.channel)
                 one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
                 try:
                     await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
+                    print(f"Command responded at {datetime.datetime.now().hour}:{datetime.datetime.now().minute}:{datetime.datetime.now().second}")
                 except discord.NotFound:
                     alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
                     if alerts_thread.archived:
                         await alerts_thread.edit(archived=False)
                     await alerts_thread.send(
-                        f"NotFound <@1105414178937774150>. Created at {interaction.created_at.timestamp()} <t:{round(interaction.created_at.timestamp())}:f>, now {datetime.datetime.now().timestamp()}, <t:{round(datetime.datetime.now().timestamp())}:f>"
+                        f"/solved raised NotFound <@1105414178937774150>. Created at {interaction.created_at.timestamp()} <t:{round(interaction.created_at.timestamp())}:T>, now {datetime.datetime.now().timestamp()}, <t:{round(datetime.datetime.now().timestamp())}:T>\n"
                     )
                     await interaction.channel.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
             else:
@@ -225,7 +227,7 @@ class utility(commands.Cog):
             button.callback = on_confirm_button_click
             view = ui.View() # construct an empty view item
             view.add_item(button)
-            await interaction.response.send_message(content="This post has the need-dev-review tag, are you sure you would like to mark it as solved?", view=view, ephemeral=True)
+            await interaction.response.send_message(content="This post has the **needs-dev-review tag**, are you sure you would like to mark it as solved?", view=view, ephemeral=True)
             
     @app_commands.command(name="remove", description="Remove the given member from the current post")
     @app_commands.guild_only()
@@ -331,7 +333,15 @@ class utility(commands.Cog):
                 embed.add_field(name="Priority", value=priority.capitalize(), inline=False)
                 embed.add_field(name="When will this bug be fixed", value=priority_texts.get(priority.casefold()), inline=False)
             await interaction.response.send_message(embed=embed)
-            await interaction.channel.edit(name=f"[ATBL] {interaction.channel.name}", reason=f"@{interaction.user.name} used /atbl")
+            ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+            cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+            appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
+            tags = [ndr]
+            if cb in interaction.channel.applied_tags:
+                tags.append(cb)
+            if appeal in interaction.channel.applied_tags:
+                tags.append(appeal)
+            await interaction.channel.edit(name=f"[ATBL] {interaction.channel.name}", reason=f"@{interaction.user.name} used /atbl", applied_tags=tags)
         else:
             await interaction.response.send_message(f"Invalid priority argument given. Priority must be one of {', '.join(priorities)}.", ephemeral=True)
 
