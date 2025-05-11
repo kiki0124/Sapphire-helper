@@ -3,7 +3,7 @@ from discord.ext import commands
 import asyncio
 import os
 from dotenv import load_dotenv
-from functions import generate_random_id
+from functions import generate_random_id, get_post_creator_id
 
 load_dotenv()
 SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
@@ -27,7 +27,8 @@ class waiting_for_reply(commands.Cog):
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
             username=self.client.user.name,
             avatar_url=self.client.user.avatar.url,
-            thread=discord.Object(id=ALERTS_THREAD_ID)
+            thread=discord.Object(id=ALERTS_THREAD_ID),
+            wait=False
         )
         
     posts: dict[int, asyncio.Task] = {}
@@ -49,34 +50,31 @@ class waiting_for_reply(commands.Cog):
     @commands.Cog.listener('on_message')
     async def add_remove_waiting_for_reply(self, message: discord.Message):
         channel_id = message.channel.id
-        in_support = isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID
-        if message.author != self.client.user:
-            if in_support:
-                support = message.channel.parent
-                unanswered = support.get_tag(UNANSWERED_TAG_ID)
-                solved = support.get_tag(SOLVED_TAG_ID)
-                wfr = support.get_tag(WAITING_FOR_REPLY_TAG_ID)
-                ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-                applied_tags = message.channel.applied_tags
-                start_message = message.id == message.channel.id # a thread id is always equal to the starter message id
-                tags_filters =   not ndr in applied_tags and\
-                                not unanswered in applied_tags and\
-                                not solved in applied_tags
-                message_author_is_owner = message.author == message.channel.owner
-                has_wfr = wfr in applied_tags
-                if not start_message and tags_filters:
-                    if not has_wfr:
-                        if message_author_is_owner and channel_id not in self.posts:
-                            task = asyncio.create_task(self.add_waiting_tag(post=message.channel))
-                            self.posts[channel_id] = task
-                        elif not message_author_is_owner and channel_id in self.posts:
-                            self.posts[channel_id].cancel()
-                            self.posts.pop(channel_id)
-                    elif not message_author_is_owner and has_wfr:
-                        action_id = generate_random_id()
-                        applied_tags.remove(wfr)
-                        await message.channel.edit(applied_tags=applied_tags, reason=f"ID: {action_id}. Remove waiting for reply tag as last message author isn't OP")
-                        await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=applied_tags, context="Remove waiting for reply tag")
+        if message.author != self.client.user and isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
+            support = message.channel.parent
+            unanswered = support.get_tag(UNANSWERED_TAG_ID)
+            solved = support.get_tag(SOLVED_TAG_ID)
+            wfr = support.get_tag(WAITING_FOR_REPLY_TAG_ID)
+            ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
+            applied_tags = message.channel.applied_tags
+            tags_filters =   not ndr in applied_tags and\
+                            not unanswered in applied_tags and\
+                            not solved in applied_tags
+            message_author_is_owner = message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id)
+            has_wfr = wfr in applied_tags
+            if message.id != message.channel.id and ndr not in applied_tags and unanswered not in applied_tags and solved not in applied_tags:
+                if not has_wfr:
+                    if message_author_is_owner and channel_id not in self.posts:
+                        task = asyncio.create_task(self.add_waiting_tag(post=message.channel))
+                        self.posts[channel_id] = task
+                    elif not message_author_is_owner and channel_id in self.posts:
+                        self.posts[channel_id].cancel()
+                        self.posts.pop(channel_id)
+                elif not message_author_is_owner and has_wfr:
+                    action_id = generate_random_id()
+                    applied_tags.remove(wfr)
+                    await message.channel.edit(applied_tags=applied_tags, reason=f"ID: {action_id}. Remove waiting for reply tag as last message author isn't OP")
+                    await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=applied_tags, context="Remove waiting for reply tag")
 
 async def setup(client):
     await client.add_cog(waiting_for_reply(client))
