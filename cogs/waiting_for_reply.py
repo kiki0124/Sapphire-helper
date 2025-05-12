@@ -57,9 +57,6 @@ class waiting_for_reply(commands.Cog):
             wfr = support.get_tag(WAITING_FOR_REPLY_TAG_ID)
             ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
             applied_tags = message.channel.applied_tags
-            tags_filters =   not ndr in applied_tags and\
-                            not unanswered in applied_tags and\
-                            not solved in applied_tags
             message_author_is_owner = message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id)
             has_wfr = wfr in applied_tags
             if message.id != message.channel.id and ndr not in applied_tags and unanswered not in applied_tags and solved not in applied_tags:
