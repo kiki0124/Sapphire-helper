@@ -240,7 +240,7 @@ class utility(commands.Cog):
             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
-            await alerts_thread.send(f"`@{interaction.user.name}` ({interaction.user.id}) removed `@{user.name}` (`{user.id}` from {interaction.channel.mention}).")
+            await alerts_thread.send(f"{interaction.user.name} removed {user.name} from {interaction.channel.mention}).")
         else:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>")
 
