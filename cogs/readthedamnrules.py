@@ -69,12 +69,13 @@ class readthedamnrules(commands.Cog):
         post = await support.create_thread(
             name=title,
             files=files,
-            content=f"**Original message:**\n```\n{content}```\n\n{reference_message.author.mention} please provide any additional information here so we can give you the best help.\n-# Created by {user.name} | In the future please always use <#{SUPPORT_CHANNEL_ID}> for all Sapphire and Appeal.gg related questions."
+            content=f"**Original message:**\n```\n{content}```\n\n{reference_message.author.mention} please provide any additional information here so we can give you the best help.\n-# Created by {user.mention} | In the future please always use <#{SUPPORT_CHANNEL_ID}> for all Sapphire and appeal.gg related questions.",
+            allowed_mentions=discord.AllowedMentions(everyone=False, users=[reference_message.author])
         )
-        new_message_content = post[1].content
+        """ new_message_content = post[1].content
         new_message_content = new_message_content.removesuffix(user.name)
         new_message_content += user.mention
-        await post[1].edit(content=new_message_content) # replace the name of the initiator at the end of the message with a ping of them to add them to the post without it actually pinging them
+        await post[1].edit(content=new_message_content) # replace the name of the initiator at the end of the message with a ping of them to add them to the post without it actually pinging them """
         await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
         await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300, silent=True)
         for msg in messages_to_move:
