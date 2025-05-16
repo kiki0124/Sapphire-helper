@@ -94,9 +94,10 @@ class autoadd(commands.Cog):
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
             username=self.client.user.name,
             avatar_url=self.client.user.avatar.url,
-            thread=discord.Object(id=ALERTS_THREAD_ID)
+            thread=discord.Object(id=ALERTS_THREAD_ID),
+            wait=False
         )
-        
+
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
     @commands.Cog.listener('on_message')
@@ -121,18 +122,16 @@ class autoadd(commands.Cog):
             await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if message.author != self.client.user and (message.author == message.channel.owner) or (message.author.id == await get_post_creator_id(message.channel.id)):
+        if message.author != self.client.user and message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id):
             ndr = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
             solved = message.channel.parent.get_tag(SOLVED_TAG_ID)
             applied_tags = message.channel.applied_tags
-            if solved not in applied_tags and ndr not in applied_tags: 
-                if not message.id == message.channel.id:
-                    pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
-                    negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t"
-                    if not re.search(negative_pattern, message.content, re.IGNORECASE):
-                        if re.search(pattern, message.content, re.IGNORECASE):
-                            await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.get_solved_id()}>")
-                            self.sent_post_ids.append(message.channel.id)
+            if solved not in applied_tags and ndr not in applied_tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
+                pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
+                negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t"
+                if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
+                    await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.get_solved_id()}>")
+                    self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
         applied_tags = message.channel.applied_tags
