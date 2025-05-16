@@ -9,7 +9,6 @@ import random
 from discord import ui
 import os
 from dotenv import load_dotenv
-import asyncio
 
 load_dotenv()
 
