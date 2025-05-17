@@ -507,13 +507,22 @@ class epi(commands.Cog):
             await interaction.followup.send(content=f"Priority argument must be between 1 and 4.")
 
     @page.autocomplete("service")
-    async def page_autocomplete(self, interaction: discord.Interaction, current: str):
+    async def page_autocomplete_service(self, interaction: discord.Interaction, current: str):
         return [
             app_commands.Choice(name="Sapphire - bot", value="Sapphire - bot"),
             app_commands.Choice(name="Sapphire - dashboard", value="Sapphire - dashboard"),
             app_commands.Choice(name="Appeal.gg", value="Appeal.gg"),
             app_commands.Choice(name="All", value="All")
             ]
+    
+    @page.autocomplete("priority")
+    async def page_autocomplete_priority(self, interaction: discord.Interaction, current: int):
+        return [
+            app_commands.Choice(name="4 | Night", value=4),
+            app_commands.Choice(name="3 | Major issue", value=3),
+            app_commands.Choice(name="2 | Minor issue", value=2),
+            app_commands.Choice(name="1 | Information", value=1)
+        ]
 
     @commands.Cog.listener("on_message")
     async def autopage_on_ratelimit(self, message: discord.Message):
