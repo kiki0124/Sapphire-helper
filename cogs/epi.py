@@ -187,7 +187,7 @@ class epi(commands.Cog):
                 await self.send_epi_log(content=f"EPI mode enabled by `{interaction.user.name}` (`{interaction.user.id}`)\n`{info}`")
                 if sticky:
                     general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
-                    msg = await general.send(f"The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {info}", view=get_notified())
+                    msg = await general.send(f"## The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {info}", view=get_notified())
                     self.sticky_message = msg
             elif info.isdigit():
                 status_channel = discord.utils.get(interaction.guild.channels, name="status", type=discord.ChannelType.news)
@@ -200,7 +200,7 @@ class epi(commands.Cog):
                 await self.send_epi_log(content=f"EPI mode enabled by `{interaction.user.name}` (`{interaction.user.id}`)\n{message.jump_url}")
                 if sticky:
                     general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
-                    msg = await general.send(f"Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {message.jump_url}", view=get_notified())
+                    msg = await general.send(f"## Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {message.jump_url}", view=get_notified())
                     self.sticky_message = msg
         else:
             url_or_text = list(self.epi_data)[0]
