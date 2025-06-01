@@ -296,7 +296,7 @@ class utility(commands.Cog):
                     return
             elif reaction.message.embeds:
                 if reaction.message.embeds[len(reaction.message.embeds)-1].footer:
-                    regex = f'(Recommended|Sent) by @{reaction.message.author.name}'
+                    regex = f'(Recommended|Sent) by @{user.name}'
                     footer_text = reaction.message.embeds[len(reaction.message.embeds)-1].footer.text
                     if re.match(regex, footer_text, re.IGNORECASE):
                         await reaction.message.delete()
