@@ -454,7 +454,6 @@ class epi(commands.Cog):
                 4: "red_circle"   # Critical
             }
             async with aiohttp.ClientSession(trust_env=True) as cs:
-                #jump_url = f"https://discord.com/channels/{interaction.guild_id}/{interaction.channel_id}/{interaction_response.message_id}"
                 tags = [severity_emojis.get(priority, "question")]
                 if cb_affected:
                     tags.append("moneybag")
@@ -495,7 +494,7 @@ class epi(commands.Cog):
                     async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
                         if req.status == 200:
                             await self.send_epi_log(f"`{interaction.user.name}` (`{interaction.user.id}`) used /page. Service: {service} ,Message: `{message}`, Priority: {priority}, Custom Branding Affected: {cb_affected}.")
-                            await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority}")
+                            await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority} | Service: {service}")
                             await self.handle_websocket(followup)
                         else:
                             response = await req.text()
