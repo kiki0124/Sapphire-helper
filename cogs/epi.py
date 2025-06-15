@@ -574,7 +574,7 @@ class epi(commands.Cog):
     @commands.Cog.listener("on_message")
     async def autopage_on_ratelimit(self, message: discord.Message):
         if message.channel.id in [1023568468206956554, 1146016865345343531] and message.author.bot: # #cluster-log and the id of the channel in testing server as I don't want to add another .env variable
-            if 1105414178937774150 in [user.id for user in message.mentions]: #! IMPORTANT: please make sure that this is Xge's user ID. For testing I had to switch it with my own as messages' mentions field only shows for users who are in the server
+            if 265236642476982273 in [user.id for user in message.mentions]: #! IMPORTANT: please make sure that this is Xge's user ID. For testing I had to switch it with my own as messages' mentions field only shows for users who are in the server
                 experts_channel = self.client.get_channel(EPI_LOG_THREAD_ID).parent
                 msg = await experts_channel.send(f"Sending automated page for {message.jump_url}")
                 priority = 3
