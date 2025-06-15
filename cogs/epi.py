@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord import app_commands, ui
 import os
 from dotenv import load_dotenv
-from functions import get_post_creator_id, save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels
+from functions import get_post_creator_id, save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id
 import asyncio
 import aiohttp, json
 import datetime
@@ -161,7 +161,7 @@ class epi(commands.Cog):
     epi_data: dict[discord.Message|str, list[discord.Message]] = {} # the custom set message: list of mssages to be edited to remove the get notified button
     group = app_commands.Group(name="epi", description="Commands related to Emergency Post Information system")
     sticky_message: discord.Message|None = None
-    recent_page: dict | None = None # {"user_id": 1234, "message": "low taper fade is still massive", "timestamp": 1234.56, "priority": 1, "service": "Sapphire - bot", "cb_affected": False}
+    recent_page: dict | None = None # {"user_id": 1234, "message": "low taper fade is still massive", "timestamp": 1234.56, "priority": 1, "service": "Sapphire - bot", "cb_affected": False, "id": "AbC123"}
 
     async def send_epi_log(self, content: str):
         epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID)
@@ -402,11 +402,11 @@ class epi(commands.Cog):
         else:
             await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
 
-    async def handle_websocket(self, message: discord.WebhookMessage|discord.Message):
-        await self.send_epi_log("Attempting to connect to WS")
+    async def handle_websocket(self, message: discord.WebhookMessage|discord.Message, id: str):
+        await self.send_epi_log(f"Attempting to connect to WS.\nID: `{id}`")
         async with aiohttp.ClientSession() as cs:
             async with cs.ws_connect(f"https://ntfy.sh/{NTFY_SECOND_TOPIC}/ws") as ws:
-                await self.send_epi_log("WS connected")
+                await self.send_epi_log(f"WS connected.\nID: `{id}`")
                 async for msg in ws:
                     types = {
                         1: "TEXT",
@@ -415,25 +415,28 @@ class epi(commands.Cog):
                         4: "PING",
                         5: "PONG"
                     }
-                    await self.send_epi_log(f"WS event received.\nType: `{types.get(msg.type, '?')}`")
+                    await self.send_epi_log(f"WS event received.\nType: `{types.get(msg.type, '?')}` | ID: `{id}`")
                     exception_types = [aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR] 
                     if msg.type == aiohttp.WSMsgType.TEXT:
                         data = json.loads(msg.data)
                         if data["event"] == "message":
-                            await self.send_epi_log(f"WS `message` event received. `{data['title']}`")
-                            await ws.close(code=aiohttp.WSCloseCode.OK)
-                            await self.send_epi_log(f"Attempted to close WS. Closed: `{ws.closed}`")
-                            response = data["title"] # the button that Xge clicked in the notification
-                            channel = self.client.get_channel(message.channel.id)
-                            webhooks = await channel.webhooks()
-                            webhook = webhooks[0] or await channel.create_webhook(name="Created by Sapphire helper")
-                            xge = self.client.get_user(265236642476982273) or await self.client.fetch_user(265236642476982273) # xge's user id, use get to get from the cache and fetch if couldn't find in cache
-                            await webhook.send(
-                                content=f"{response}\n-# Reply to {message.jump_url}",
-                                username=xge.global_name or xge.name, # global name or username if global name doesn't exist (is none)
-                                avatar_url=xge.avatar.url
-                            )
-                            return await ws.close(code=aiohttp.WSCloseCode.OK)
+                            if data["message"] == id:
+                                await self.send_epi_log(f"WS `message` event received. response: `{data['title']}` | ID: `{data['message']}`")
+                                await ws.close(code=aiohttp.WSCloseCode.OK)
+                                await self.send_epi_log(f"Attempted to close WS. Closed: `{ws.closed}` | ID: `{data['message']}`")
+                                response = data["title"] # the button that Xge clicked in the notification
+                                channel = self.client.get_channel(message.channel.id)
+                                webhooks = await channel.webhooks()
+                                webhook = webhooks[0] or await channel.create_webhook(name="Created by Sapphire helper")
+                                xge = self.client.get_user(265236642476982273) or await self.client.fetch_user(265236642476982273) # xge's user id, use get to get from the cache and fetch if couldn't find in cache
+                                await webhook.send(
+                                    content=f"{response}\n-# Reply to {message.jump_url}",
+                                    username=xge.global_name or xge.name, # global name or username if global name doesn't exist (is none)
+                                    avatar_url=xge.avatar.url
+                                )
+                                return await ws.close(code=aiohttp.WSCloseCode.OK)
+                            else:
+                                await self.send_epi_log(f"WS `message` received with another random ID (expected `{id}`, received `{data['message']}`). Ignoring.")
                     elif msg.type in exception_types:
                         await ws.close(code=aiohttp.WSCloseCode.INTERNAL_ERROR)
                         await self.send_epi_log(f"Received invalid WSMsgType - `{msg.type}`.\n`{msg}`.\nWS closed: {ws.closed}")
@@ -453,6 +456,8 @@ class epi(commands.Cog):
         if user:
             title.join(f" | Sent by @{user.name}")
         async with aiohttp.ClientSession(trust_env=True) as cs:
+            random_id = generate_random_id()
+            self.recent_page["id"] = random_id
             data = {
                 "topic": NTFY_TOPIC_NAME,
                 "message": message,
@@ -464,21 +469,21 @@ class epi(commands.Cog):
                         "action": "http",
                         "label": "On it",
                         "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                        "headers": {"Title": "On it"},
+                        "headers": {"Title": "On it", "message": random_id},
                         "clear": True
                     },
                     {
                         "action": "http",
                         "label": "Soon (Next 30mins)",
                         "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                        "headers": {"Title": "Soon (Next 30 mins)"},
+                        "headers": {"Title": "Soon (Next 30 mins)", "message": random_id},
                         "clear": True
                     },
                     {
                         "action": "http",
                         "label": "Later (>1 hour)",
                         "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                        "headers": {"Title": "Later (> 1 hour)"},
+                        "headers": {"Title": "Later (> 1 hour)", "message": random_id},
                         "clear": True
                     }
                 ] 
@@ -492,12 +497,12 @@ class epi(commands.Cog):
                     if req.status == 200:
                         if user:
                             service = title.removesuffix(f" | Sent by @{user.name}")
-                            await self.send_epi_log(f"`{user.name}` (`{user.id}`) used /page. Service: {service} | Message: `{message}` | Priority: {priority} | Custom Branding Affected: {cb_affected}.")
-                            await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority} | Service: {service}")
+                            await self.send_epi_log(f"`{user.name}` (`{user.id}`) used /page. Service: {service} | Message: `{message}` | Priority: {priority} | Custom Branding Affected: {cb_affected}.\n-# ID: {random_id}")
+                            await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority} | Service: {service} | ID: {random_id}")
                         else:
-                            await followup.edit(content=f"Automated page for [ratelimits]({ratelimit_url}) sent successfully.\n-# Priority: {priority}")
-                            await self.send_epi_log(f"Sent automated page for rate limits. Priority: {priority}.")    
-                        await self.handle_websocket(followup)
+                            await followup.edit(content=f"Automated page for [ratelimits]({ratelimit_url}) sent successfully.\n-# Priority: {priority} | ID: {random_id}")
+                            await self.send_epi_log(f"Sent automated page for rate limits. Priority: {priority}.\n-# ID: {random_id}")    
+                        await self.handle_websocket(followup, random_id)
                     else:
                         response = await req.text()
                         await followup.edit(f"An error occured while trying to send the notification...\nStatus: {req.status}, Response: {response}")
@@ -532,21 +537,25 @@ class epi(commands.Cog):
                 button.callback = callback
                 view = ui.View()
                 view.add_item(button)
-                await interaction.followup.send(f"A page was sent <t:{self.recent_page['timestamp']}:R> by <@{self.recent_page['user_id']}>. Service: `{self.recent_page['service']}` | Message: `{self.recent_page['message']}` | Priority: `{self.recent_page['priority']}` | CB affected: `{self.recent_page['cb_affected']}`.\nAre you sure you would like to send this one?\n-# Click *confirm* button to confirm, dismiss message to cancel.", ephemeral=True, view=view)
+                await interaction.followup.send(f"A page was sent <t:{self.recent_page['timestamp']}:R> by <@{self.recent_page['user_id']}>. Service: `{self.recent_page['service']}` | Message: `{self.recent_page['message']}` | Priority: `{self.recent_page['priority']}` | CB affected: `{self.recent_page['cb_affected']}` | ID: {self.recent_page['id']}.\nAre you sure you would like to send this one?\n-# Click *confirm* button to confirm, dismiss message to cancel.", ephemeral=True, view=view)
             else:
                 await interaction.response.defer()
                 followup = await interaction.followup.send("Sending...", wait=True)
-                await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
                 self.recent_page = {
                 "user_id": interaction.user.id,
                 "message": message,
                 "timestamp": round(datetime.datetime.now().timestamp()),
                 "priority": priority,
                 "service": service,
-                "cb_affected": cb_affected
+                "cb_affected": cb_affected,
                 }
+                await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
         else:
             await interaction.followup.send(content=f"Priority argument must be between 1 and 4.")
+
+    @commands.command()
+    async def page_debug(self, ctx: commands.Context):
+        await ctx.reply(self.recent_page or "None", mention_author=False)
 
     @page.autocomplete("service")
     async def page_autocomplete_service(self, interaction: discord.Interaction, current: str):
