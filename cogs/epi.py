@@ -7,6 +7,7 @@ from functions import get_post_creator_id, save_channel_permissions, get_channel
 import asyncio
 import aiohttp, json
 import datetime
+import re
 
 load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
@@ -160,6 +161,7 @@ class epi(commands.Cog):
     epi_data: dict[discord.Message|str, list[discord.Message]] = {} # the custom set message: list of mssages to be edited to remove the get notified button
     group = app_commands.Group(name="epi", description="Commands related to Emergency Post Information system")
     sticky_message: discord.Message|None = None
+    recent_page: dict | None = None # {"user_id": 1234, "message": "low taper fade is still massive", "timestamp": 1234.56, "priority": 1, "service": "Sapphire - bot", "cb_affected": False}
 
     async def send_epi_log(self, content: str):
         epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID)
@@ -345,15 +347,6 @@ class epi(commands.Cog):
                 await msg_or_txt.forward(thread)
             self.epi_data[msg_or_txt].append(message)
 
-    """ @commands.Cog.listener('on_member_join')
-    async def add_users_role(self, member: discord.Member):
-        if self.epi_data: # only add jr if epi is enabled
-            await asyncio.sleep(5) # wait for a few seconds as in some cases epi is enabled for things like dashboard issues while sapphire itself is fully operational
-            refreshed_member = member.guild.get_member(member.id) # the original member parameter is like a snapshot from when the event was called, refresh the data in a new object/variable
-            users_role = discord.utils.get(member.guild.roles, name="Users")
-            if users_role not in refreshed_member.roles:
-                member.add_roles(users_role, reason="Add join roles when EPI is enabled.") """
-
     @commands.Cog.listener('on_message')
     async def epi_sticky_message(self, message: discord.Message):
         if self.epi_data and not message.author.bot and message.channel.id == GENERAL_CHANNEL_ID and self.sticky_message:
@@ -408,8 +401,6 @@ class epi(commands.Cog):
                 await interaction.followup.send("Achievement unlocked: How did we get here?", ephemeral=True)
         else:
             await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
-                
-        # does anyone even read these comments? Ping me with the funniest/weirdest emoji you have (from any server you're in) if you see this...
 
     async def handle_websocket(self, message: discord.WebhookMessage|discord.Message):
         await self.send_epi_log("Attempting to connect to WS")
@@ -417,7 +408,14 @@ class epi(commands.Cog):
             async with cs.ws_connect(f"https://ntfy.sh/{NTFY_SECOND_TOPIC}/ws") as ws:
                 await self.send_epi_log("WS connected")
                 async for msg in ws:
-                    await self.send_epi_log(f"WS event received.\n`{msg.type}`")
+                    types = {
+                        1: "TEXT",
+                        2: "BINARY",
+                        3: "CLOSE",
+                        4: "PING",
+                        5: "PONG"
+                    }
+                    await self.send_epi_log(f"WS event received.\nType: `{types.get(msg.type, '?')}`")
                     exception_types = [aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR] 
                     if msg.type == aiohttp.WSMsgType.TEXT:
                         data = json.loads(msg.data)
@@ -440,68 +438,113 @@ class epi(commands.Cog):
                         await ws.close(code=aiohttp.WSCloseCode.INTERNAL_ERROR)
                         await self.send_epi_log(f"Received invalid WSMsgType - `{msg.type}`.\n`{msg}`.\nWS closed: {ws.closed}")
 
+    async def send_page(self, title: str, message: str, priority: int, followup: discord.Message, cb_affected: bool = False,user: discord.Member = None, ratelimit_url: str = None):
+        severity_emojis = {
+            1: "green_circle",  # information
+            2: "yellow_circle",  # Medium
+            3: "orange_circle",  # High
+            4: "red_circle"   # Critical - night
+        }
+        tags = [severity_emojis.get(priority, "question")]
+        if cb_affected:
+            tags.append("moneybag")
+        if not user:
+            tags.append("robot")
+        if user:
+            title.join(f" | Sent by @{user.name}")
+        async with aiohttp.ClientSession(trust_env=True) as cs:
+            data = {
+                "topic": NTFY_TOPIC_NAME,
+                "message": message,
+                "title": title,
+                "tags": tags,
+                "click": followup.jump_url,
+                "actions": [
+                    {
+                        "action": "http",
+                        "label": "On it",
+                        "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
+                        "headers": {"Title": "On it"},
+                        "clear": True
+                    },
+                    {
+                        "action": "http",
+                        "label": "Soon (Next 30mins)",
+                        "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
+                        "headers": {"Title": "Soon (Next 30 mins)"},
+                        "clear": True
+                    },
+                    {
+                        "action": "http",
+                        "label": "Later (>1 hour)",
+                        "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
+                        "headers": {"Title": "Later (> 1 hour)"},
+                        "clear": True
+                    }
+                ] 
+            }
+            if priority == 4:
+                data["priority"] = 5
+            if user:
+                data["icon"] = user.avatar.url
+            try:
+                async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
+                    if req.status == 200:
+                        if user:
+                            service = title.removesuffix(f" | Sent by @{user.name}")
+                            await self.send_epi_log(f"`{user.name}` (`{user.id}`) used /page. Service: {service} | Message: `{message}` | Priority: {priority} | Custom Branding Affected: {cb_affected}.")
+                            await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority} | Service: {service}")
+                        else:
+                            await followup.edit(content=f"Automated page for [ratelimits]({ratelimit_url}) sent successfully.\n-# Priority: {priority}")
+                            await self.send_epi_log(f"Sent automated page for rate limits. Priority: {priority}.")    
+                        await self.handle_websocket(followup)
+                    else:
+                        response = await req.text()
+                        await followup.edit(f"An error occured while trying to send the notification...\nStatus: {req.status}, Response: {response}")
+            except Exception as e:
+                await followup.edit(content=f"An error occured while trying to send the notification... {e}")
+                raise e
+
     @app_commands.command(name="page", description="Alert the developer of any downtime or critical issues")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     @app_commands.describe(service="The affected service(s) - Sapphire- bot/dashboard | appeal.gg | All" ,message="The message to send", priority="The severity, 1 = lowest, 4 = critical (highest)", cb_affected="Whether custom branding is affected or not (for Sapphire outages)")
     async def page(self, interaction: discord.Interaction, service: str, message: str, priority: int, cb_affected: bool):
-        await interaction.response.defer()
         if 1 <= priority <= 4:
-            followup = await interaction.followup.send("Sending...", wait=True)
-            severity_emojis = {
-                1: "green_circle",  # Low
-                2: "yellow_circle",  # Medium
-                3: "orange_circle",  # High
-                4: "red_circle"   # Critical
-            }
-            async with aiohttp.ClientSession(trust_env=True) as cs:
-                tags = [severity_emojis.get(priority, "question")]
-                if cb_affected:
-                    tags.append("moneybag")
-                data = {
-                    "topic": NTFY_TOPIC_NAME,
-                    "message": message,
-                    "title": f"{service} | Sent by @{interaction.user.name}",
-                    "tags": tags,
-                    "click": followup.jump_url,
-                    "icon": interaction.user.avatar.url,
-                    "actions": [
-                        {
-                            "action": "http",
-                            "label": "On it",
-                            "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                            "headers": {"Title": "On it"},
-                            "clear": True
-                        },
-                        {
-                            "action": "http",
-                            "label": "Soon (Next 30mins)",
-                            "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                            "headers": {"Title": "Soon (Next 30 mins)"},
-                            "clear": True
-                        },
-                        {
-                            "action": "http",
-                            "label": "Later (>1 hour)",
-                            "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                            "headers": {"Title": "Later (> 1 hour)"},
-                            "clear": True
+            fifteen_minutes_ago = datetime.datetime.now() - datetime.timedelta(minutes=15)
+            if self.recent_page and datetime.datetime.fromtimestamp(self.recent_page["timestamp"]) > fifteen_minutes_ago:
+                await interaction.response.defer(ephemeral=True)
+                button = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page-confirm")
+                async def callback(i: discord.Interaction):
+                    if i.user.id == interaction.user.id:
+                        followup = await i.channel.send("Sending...")
+                        await interaction.delete_original_response()
+                        await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
+                        self.recent_page = {
+                        "user_id": interaction.user.id,
+                        "message": message,
+                        "timestamp": round(datetime.datetime.now().timestamp()),
+                        "priority": priority,
+                        "service": service,
+                        "cb_affected": cb_affected
                         }
-                    ] 
+                    else:
+                        await i.followup.send(f"Only the user who executed the command ({interaction.user.mention}) can use this button.", ephemeral=True)
+                button.callback = callback
+                view = ui.View()
+                view.add_item(button)
+                await interaction.followup.send(f"A page was sent <t:{self.recent_page['timestamp']}:R> by <@{self.recent_page['user_id']}>. Service: `{self.recent_page['service']}` | Message: `{self.recent_page['message']}` | Priority: `{self.recent_page['priority']}` | CB affected: `{self.recent_page['cb_affected']}`.\nAre you sure you would like to send this one?\n-# Click *confirm* button to confirm, dismiss message to cancel.", ephemeral=True, view=view)
+            else:
+                await interaction.response.defer()
+                followup = await interaction.followup.send("Sending...", wait=True)
+                await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
+                self.recent_page = {
+                "user_id": interaction.user.id,
+                "message": message,
+                "timestamp": round(datetime.datetime.now().timestamp()),
+                "priority": priority,
+                "service": service,
+                "cb_affected": cb_affected
                 }
-                if priority == 4:
-                    data["priority"] = 5
-                try:
-                    async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
-                        if req.status == 200:
-                            await self.send_epi_log(f"`{interaction.user.name}` (`{interaction.user.id}`) used /page. Service: {service} ,Message: `{message}`, Priority: {priority}, Custom Branding Affected: {cb_affected}.")
-                            await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority} | Service: {service}")
-                            await self.handle_websocket(followup)
-                        else:
-                            response = await req.text()
-                            await followup.edit(f"An error occured while trying to send the notification...\nStatus: {req.status}, Response: {response}")
-                except Exception as e:
-                    await followup.edit(content=f"An error occured while trying to send the notification... {e}")
-                    raise e
         else:
             await interaction.followup.send(content=f"Priority argument must be between 1 and 4.")
 
@@ -526,62 +569,23 @@ class epi(commands.Cog):
     @commands.Cog.listener("on_message")
     async def autopage_on_ratelimit(self, message: discord.Message):
         if message.channel.id in [1023568468206956554, 1146016865345343531] and message.author.bot: # #cluster-log and the id of the channel in testing server as I don't want to add another .env variable
-            if 265236642476982273 in [user.id for user in message.mentions]: #! IMPORTANT: please make sure that this is Xge's user ID. For testing I had to switch it with my own as messages' mentions field only shows for users who are in the server
+            if 1105414178937774150 in [user.id for user in message.mentions]: #! IMPORTANT: please make sure that this is Xge's user ID. For testing I had to switch it with my own as messages' mentions field only shows for users who are in the server
                 experts_channel = self.client.get_channel(EPI_LOG_THREAD_ID).parent
-                severity_emojis = {
-                3: "orange_circle",  # High
-                4: "red_circle"   # Critical
-                }
+                msg = await experts_channel.send(f"Sending automated page for {message.jump_url}")
                 priority = 3
                 if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # 20 and 7 instead of 21 and 8 because it starts from 0 (0-23 rather than 1-24)
                     priority = 4
-                msg = await experts_channel.send(f"Sending automated page for {message.jump_url}")
-                async with aiohttp.ClientSession(trust_env=True) as cs:
-                    tags = [severity_emojis.get(priority, "question")]
-                    data = {
-                        "topic": NTFY_TOPIC_NAME,
-                        "message": message.clean_content,
-                        "title": "[Automated] Ratelimited",
-                        "tags": tags,
-                        "click": experts_channel.jump_url,
-                        "actions": [
-                            {
-                                "action": "http",
-                                "label": "On it",
-                                "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                                "headers": {"Title": "On it"},
-                                "clear": True
-                            },
-                            {
-                                "action": "http",
-                                "label": "Soon (Next 30mins)",
-                                "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                                "headers": {"Title": "Soon (Next 30 mins)"},
-                                "clear": True
-                            },
-                            {
-                                "action": "http",
-                                "label": "Later (>1 hour)",
-                                "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                                "headers": {"Title": "Later (> 1 hour)"},
-                                "clear": True
-                            }
-                        ] 
-                    }
-                    if priority == 4:
-                        data["priority"] = 5
-                    try:
-                        async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
-                            if req.status == 200:
-                                await self.send_epi_log(f"Sent automated page for rate limits. Priority: {priority}.")
-                                await msg.edit(content=f"Automated page for [ratelimits]({message.jump_url}) sent successfully.\n-# Priority: {priority}")
-                                await self.handle_websocket(msg)
-                            else:
-                                response = await req.text()
-                                await msg.edit(f"An error occured while trying to send the notification...\nStatus: {req.status}, Response: {response}")
-                    except Exception as e:
-                        await msg.edit(content=f"An error occured while trying to send the notification... {e}")
-                        raise e
+                h = re.findall(pattern=r"\[ H\d+ ]", string=message.content)
+                h = h[0] if h else "Unknown"
+                await self.send_page(f"{h} Ratelimited", "Received 429", priority, msg, False, ratelimit_url=message.jump_url)
+                self.recent_page = {
+                "user_id": self.client.user.id,
+                "message": "Received 429",
+                "timestamp": round(datetime.datetime.now().timestamp()),
+                "priority": priority,
+                "service": f"{h} Ratelimited",
+                "cb_affected": False
+                }
 
 async def setup(client):
     await client.add_cog(epi(client=client))
