@@ -523,7 +523,6 @@ class epi(commands.Cog):
                     if i.user.id == interaction.user.id:
                         followup = await i.channel.send("Sending...")
                         await interaction.delete_original_response()
-                        await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
                         self.recent_page = {
                         "user_id": interaction.user.id,
                         "message": message,
@@ -532,12 +531,13 @@ class epi(commands.Cog):
                         "service": service,
                         "cb_affected": cb_affected
                         }
+                        await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
                     else:
                         await i.followup.send(f"Only the user who executed the command ({interaction.user.mention}) can use this button.", ephemeral=True)
                 button.callback = callback
                 view = ui.View()
                 view.add_item(button)
-                await interaction.followup.send(f"A page was sent <t:{self.recent_page['timestamp']}:R> by <@{self.recent_page['user_id']}>. Service: `{self.recent_page['service']}` | Message: `{self.recent_page['message']}` | Priority: `{self.recent_page['priority']}` | CB affected: `{self.recent_page['cb_affected']}` | ID: {self.recent_page['id']}.\nAre you sure you would like to send this one?\n-# Click *confirm* button to confirm, dismiss message to cancel.", ephemeral=True, view=view)
+                await interaction.followup.send(f"A page was sent <t:{self.recent_page['timestamp']}:R> by <@{self.recent_page['user_id']}>. Service: `{self.recent_page['service']}` | Message: `{self.recent_page['message']}` | Priority: `{self.recent_page['priority']}` | CB affected: `{self.recent_page['cb_affected']}` | ID: `{self.recent_page['id']}`.\nAre you sure you would like to send this one?\n-# Click *confirm* button to confirm, dismiss message to cancel.", ephemeral=True, view=view)
             else:
                 await interaction.response.defer()
                 followup = await interaction.followup.send("Sending...", wait=True)
@@ -552,10 +552,6 @@ class epi(commands.Cog):
                 await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
         else:
             await interaction.followup.send(content=f"Priority argument must be between 1 and 4.")
-
-    @commands.command()
-    async def page_debug(self, ctx: commands.Context):
-        await ctx.reply(self.recent_page or "None", mention_author=False)
 
     @page.autocomplete("service")
     async def page_autocomplete_service(self, interaction: discord.Interaction, current: str):
@@ -586,7 +582,6 @@ class epi(commands.Cog):
                     priority = 4
                 h = re.findall(pattern=r"\[ H\d+ ]", string=message.content)
                 h = h[0] if h else "Unknown"
-                await self.send_page(f"{h} Ratelimited", "Received 429", priority, msg, False, ratelimit_url=message.jump_url)
                 self.recent_page = {
                 "user_id": self.client.user.id,
                 "message": "Received 429",
@@ -595,6 +590,7 @@ class epi(commands.Cog):
                 "service": f"{h} Ratelimited",
                 "cb_affected": False
                 }
+                await self.send_page(f"{h} Ratelimited", "Received 429", priority, msg, False, ratelimit_url=message.jump_url)
 
 async def setup(client):
     await client.add_cog(epi(client=client))
