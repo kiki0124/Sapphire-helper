@@ -441,7 +441,15 @@ class epi(commands.Cog):
                         await ws.close(code=aiohttp.WSCloseCode.INTERNAL_ERROR)
                         await self.send_epi_log(f"Received invalid WSMsgType - `{msg.type}`.\n`{msg}`.\nWS closed: {ws.closed}")
 
-    async def send_page(self, title: str, message: str, priority: int, followup: discord.Message, cb_affected: bool = False,user: discord.Member = None, ratelimit_url: str = None):
+    async def send_page(self, 
+                        title: str, 
+                        message: str, 
+                        priority: int, 
+                        followup: discord.Message, 
+                        cb_affected: bool = False,
+                        user: discord.Member = None, 
+                        ratelimit_url: str = None
+                        ):
         severity_emojis = {
             1: "green_circle",  # information
             2: "yellow_circle",  # Medium
@@ -512,7 +520,12 @@ class epi(commands.Cog):
 
     @app_commands.command(name="page", description="Alert the developer of any downtime or critical issues")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    @app_commands.describe(service="The affected service(s) - Sapphire- bot/dashboard | appeal.gg | All" ,message="The message to send", priority="The severity, 1 = lowest, 4 = critical (highest)", cb_affected="Whether custom branding is affected or not (for Sapphire outages)")
+    @app_commands.describe(
+        service="The affected service(s) - Sapphire- bot/dashboard | appeal.gg | All",
+        message="The message to send", 
+        priority="The severity, 1 = lowest, 4 = critical (highest)", 
+        cb_affected="Whether custom branding is affected or not (for Sapphire outages)"
+    )
     async def page(self, interaction: discord.Interaction, service: str, message: str, priority: int, cb_affected: bool):
         if 1 <= priority <= 4:
             fifteen_minutes_ago = datetime.datetime.now() - datetime.timedelta(minutes=15)
@@ -547,11 +560,11 @@ class epi(commands.Cog):
                 "timestamp": round(datetime.datetime.now().timestamp()),
                 "priority": priority,
                 "service": service,
-                "cb_affected": cb_affected,
+                "cb_affected": cb_affected
                 }
                 await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
         else:
-            await interaction.followup.send(content=f"Priority argument must be between 1 and 4.")
+            await interaction.response.send_message(content=f"Priority argument must be between 1 and 4.")
 
     @page.autocomplete("service")
     async def page_autocomplete_service(self, interaction: discord.Interaction, current: str):
