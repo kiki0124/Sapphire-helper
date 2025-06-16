@@ -571,7 +571,7 @@ class epi(commands.Cog):
         return [
             app_commands.Choice(name="Sapphire - bot", value="Sapphire - bot"),
             app_commands.Choice(name="Sapphire - dashboard", value="Sapphire - dashboard"),
-            app_commands.Choice(name="Appeal.gg", value="Appeal.gg"),
+            app_commands.Choice(name="appeal.gg", value="appeal.gg"),
             app_commands.Choice(name="All", value="All")
             ]
     
