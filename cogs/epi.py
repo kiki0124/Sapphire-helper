@@ -232,7 +232,8 @@ class epi(commands.Cog):
                         await message.channel.edit(archived=False)
                         await message.edit(view=None)
                         await message.reply(
-                            content="Hey, this issue is fixed now!\n-# Thank you for your patience."
+                            content="Hey, this issue is fixed now!\n-# Thank you for your patience.",
+                            mention_author=False
                         )
                     else:
                         continue
@@ -244,10 +245,10 @@ class epi(commands.Cog):
                         if len(", ".join(mentions)) + len(f"<@{user_id}>") + 2 < 2000: # + 2 is for the space and comma (,) next to each mention
                             mentions.append(f"<@{user_id}>")
                         else:
-                            await main_message.reply(content=", ".join(mentions))
+                            await main_message.reply(content=", ".join(mentions), mention_author=False)
                             mentions = [] # reset both for another pinging message
                     if mentions:
-                        await main_message.reply(content=", ".join(mentions))
+                        await main_message.reply(content=", ".join(mentions), mention_author=False)
                     mentioned = True
                 else:
                     mentioned = False
