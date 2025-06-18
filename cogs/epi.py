@@ -594,17 +594,26 @@ class epi(commands.Cog):
                 priority = 3
                 if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # 20 and 7 instead of 21 and 8 because it starts from 0 (0-23 rather than 1-24)
                     priority = 4
-                h = re.findall(pattern=r"\[ H\d+ ]", string=message.content)
+                h_pattern = r"\[ H\d+ ]"
+                resets_pattern = r"<t:(\d+):R>"
+                h = re.findall(pattern=h_pattern, string=message.content)
                 h = h[0] if h else "Unknown"
+                _resets_timestamp = re.findall(resets_pattern, string=message.content)
+                resets_timestamp = _resets_timestamp[0] if _resets_timestamp else None
+                if resets_timestamp:
+                    time = datetime.datetime.fromtimestamp(resets_timestamp)
+                    page_msg = f"Resets at: {time.hour+1}:{time.minute+1}:{time.second+1}" # +1 as its zero-indexed 
+                else:
+                    page_msg = "Resets at: Unknown"
                 self.recent_page = {
                 "user_id": self.client.user.id,
-                "message": "Received 429",
+                "message": page_msg,
                 "timestamp": round(datetime.datetime.now().timestamp()),
                 "priority": priority,
                 "service": f"{h} Ratelimited",
                 "cb_affected": False
                 }
-                await self.send_page(f"{h} Ratelimited", "Received 429", priority, msg, False, ratelimit_url=message.jump_url)
+                await self.send_page(f"{h} Ratelimited", page_msg, priority, msg, False, ratelimit_url=message.jump_url)
 
 async def setup(client):
     await client.add_cog(epi(client=client))
