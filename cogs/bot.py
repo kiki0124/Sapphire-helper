@@ -96,6 +96,22 @@ class bot(commands.Cog):
         elif debug.startswith("eval sql"):
             command = debug.removeprefix('eval sql ')
             await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
+        elif debug == "check post":
+            parent = post.parent
+            applied_tags = post.applied_tags
+            ndr = parent.get_tag(int(os.getenv("NEED_DEV_REVIEW_TAG_ID"))) not in applied_tags
+            solved = parent.get_tag(int(os.getenv("SOLVED_TAG_ID"))) not in applied_tags
+            archived = not post.archived
+            locked = not post.locked
+            is_pending = post.id not in await functions.get_pending_posts()
+            last_message = post.last_message or await post.fetch_message(post.last_message_id) or None
+            message_time = False
+            author_is_owner = False
+            owner_id = await functions.get_post_creator_id(post.id) or post.owner_id
+            if last_message:
+                author_is_owner = last_message.author.id != owner_id
+                message_time = functions.check_time_more_than_day(last_message.created_at.timestamp())
+            await interaction.response.send_message(f"NDR: {ndr} | solved: {solved} | archived: {archived} | locked: {locked} | message time: {message_time} | author is owner: {author_is_owner} | pending: {is_pending} | **total: {ndr and solved and archived and locked and author_is_owner and message_time and is_pending}**")
         else:
             await interaction.response.send_message(content="Debug not found...", ephemeral=True)
 
@@ -103,7 +119,7 @@ class bot(commands.Cog):
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def stats(self, ctx: commands.Context):
         embed = discord.Embed(
-            title="Sapphire Helper | Version 3.4",
+            title="Sapphire Helper | Version 3.5",
             colour=discord.Colour.purple()
         )
         embed.add_field(name="CPU Count:", value=os.cpu_count(), inline=False)
