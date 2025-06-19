@@ -601,8 +601,8 @@ class epi(commands.Cog):
                 _resets_timestamp = re.findall(resets_pattern, string=message.content)
                 resets_timestamp = _resets_timestamp[0] if _resets_timestamp else None
                 if resets_timestamp:
-                    time = datetime.datetime.fromtimestamp(resets_timestamp)
-                    page_msg = f"Resets at: {time.hour+1}:{time.minute+1}:{time.second+1}" # +1 as its zero-indexed 
+                    time = datetime.datetime.fromtimestamp(int(resets_timestamp))
+                    page_msg = f"Resets at: {time.hour}:{time.minute}:{time.second}"
                 else:
                     page_msg = "Resets at: Unknown"
                 self.recent_page = {
