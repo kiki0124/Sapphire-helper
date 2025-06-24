@@ -102,11 +102,9 @@ class remind(commands.Cog):
 
     @tasks.loop(hours=1)
     async def check_exception_posts(self):
-        print("check exception posts triggered")
         to_remove = []
         for post_id, tries in reminder_not_sent_posts.items():
             post = self.client.get_channel(post_id)
-            print(f"check exceptions: {post_id}, {tries}")
             if tries < 24:
                 try:
                     message: discord.Message|None = await post.fetch_message(post.last_message_id)
@@ -149,25 +147,17 @@ class remind(commands.Cog):
 
     @tasks.loop(hours=1)
     async def check_for_pending_posts(self):
-        print("check for pending posts triggered")
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         if support:
-            print("support.")
             for post in await support.guild.active_threads():
-                print(f"for post in guild.active threads called {post.id}")
                 if await self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
-                    print("post matches filter")
                     if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
-                        print("post not in get pending posts and not in reminder not sents")
                         try:
                             message: discord.Message|None = await post.fetch_message(post.last_message_id)
-                            print("message fetched")
                         except discord.NotFound: # message id could be for a message that was already deleted
                             reminder_not_sent_posts[post.id] = 1
-                            print("NotFound")
                             continue
                         except discord.HTTPException as e:
-                            print(f"HTTPException: {e.code}, {e.response}, {e.status}, {e.text}")
                             alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
                             if alerts.archived:
                                 await alerts.edit(archived=False)
@@ -197,7 +187,6 @@ class remind(commands.Cog):
 
     @tasks.loop(hours=1)
     async def close_pending_posts(self):
-        print("close pending posts triggered")
         for post_id in await get_pending_posts():
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
@@ -223,17 +212,14 @@ class remind(commands.Cog):
 
     @check_for_pending_posts.before_loop
     async def cfpp_before_loop(self):
-        print("check for pending posts - before loop triggered")
         await self.client.wait_until_ready() # only start the loop when the bot's cache is ready
 
     @close_pending_posts.before_loop
     async def cpp_before_loop(self):
-        print("close pending posts - before loop triggered")
         await self.client.wait_until_ready()
     
     @check_exception_posts.before_loop
     async def cep_before_loop(self):
-        print("check exception posts - before loop triggered")
         await self.client.wait_until_ready()
 
     @commands.command()
