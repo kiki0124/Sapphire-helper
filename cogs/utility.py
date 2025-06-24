@@ -247,7 +247,7 @@ class utility(commands.Cog):
         solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)     
         if interaction.channel in self.close_tasks or solved in interaction.channel.applied_tags:
             await self.unsolve_post(interaction.channel)
-            await interaction.response.send_message(content="Post successfully unsolved")
+            await interaction.response.send_message(content="Post successfully unsolved! Please send a message here explaining what you still need help with.")
         else:
             await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
 
