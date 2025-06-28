@@ -345,5 +345,30 @@ class utility(commands.Cog):
         else:
             await interaction.response.send_message(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
 
+    @commands.hybrid_command(name="incomplete-post", description="Request more information from the post creator")
+    @commands.guild_only()
+    async def incomplete_post(self, ctx: commands.Context):
+        await ctx.defer(ephemeral=True)
+        if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
+            user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
+            experts = ctx.guild.get_role(EXPERTS_ROLE_ID)
+            mods = ctx.guild.get_role(MODERATORS_ROLE_ID)
+            content = None
+            if experts in ctx.author.roles or mods in ctx.author.roles:
+                content = f"<@{user_id}>"
+            embed = discord.Embed(
+                title="Incomplete support post",
+                description="Hey, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible'",
+                colour=0xFFA800
+            )
+            embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.avatar.url)
+            if not ctx.interaction:
+                await ctx.message.delete()
+            elif ctx.interaction:
+                await ctx.interaction.delete_original_response()
+            await ctx.channel.send(content=content, embed=embed)
+        else:
+            await ctx.reply(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
+
 async def setup(client):
     await client.add_cog(utility(client))
