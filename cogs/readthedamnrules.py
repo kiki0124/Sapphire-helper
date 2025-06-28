@@ -57,6 +57,15 @@ class readthedamnrules(commands.Cog):
             content = '\n'.join(messages_content)
         return content
 
+    def get_extra_content(self, reference_msg: discord.Message) -> str:
+        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        if isinstance(reference_msg.channel, discord.Thread) and reference_msg.channel.parent_id == SUPPORT_CHANNEL_ID:
+            return f"{reference_msg.author.mention} in the future please always create your own post instead of using other users' posts!" # asking for help in another user's support post
+        elif isinstance(reference_msg.channel, discord.Thread) and reference_msg.channel.id != SUPPORT_CHANNEL_ID and reference_msg.channel.category_id == support.category_id:
+            return f"{reference_msg.author.mention} the feature you suggested is already possible with Sapphire!" # requesting a feature which already exists
+        else:
+            return f"{reference_msg.author.mention} please provide any additional information here so we can give you the best help." # default message - if none of the special ones above are used
+
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
         await reference_message.channel.typing()
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
@@ -69,18 +78,18 @@ class readthedamnrules(commands.Cog):
         post = await support.create_thread(
             name=title,
             files=files,
-            content=f"**Original message:**\n```\n{content}```\n\n{reference_message.author.mention} please provide any additional information here so we can give you the best help.\n-# Created by {user.mention} | In the future please always use <#{SUPPORT_CHANNEL_ID}> for all Sapphire and appeal.gg related questions."
+            content=f"**Original message:**\n```\n{content}```\n\n{self.get_extra_content(reference_message)}\n-# Created by {user.mention} | In the future please always create a post in <#{SUPPORT_CHANNEL_ID}> for all Sapphire and appeal.gg related questions."
         )
         await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
-        await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire or appeal.gg. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire or appeal.gg related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300, allowed_mentions=discord.AllowedMentions(users=[]))
-        for msg in messages_to_move:
-            await msg.delete()
+        await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire or appeal.gg. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire or appeal.gg related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300, allowed_mentions=discord.AllowedMentions.none())
+        await reference_message.channel.delete_messages(messages_to_move, reason=f"rtdr system used by {user.name}")
         return post[0]
 
     @commands.Cog.listener('on_message')
     async def redirect_to_support(self, message: discord.Message):
-        if not message.author.bot:
-            if message.channel.id == GENERAL_CHANNEL_ID and message.reference and message.content.startswith(self.client.user.mention):
+        if not message.author.bot and message.reference and message.content.startswith(self.client.user.mention) and message.guild:
+            everyone = message.guild.default_role
+            if message.channel.permissions_for(everyone).view_channel and message.channel.permissions_for(everyone).send_messages:
                 experts = message.guild.get_role(EXPERTS_ROLE_ID)
                 moderators = message.guild.get_role(MODERATORS_ROLE_ID)
                 if experts in message.author.roles or moderators in message.author.roles:
@@ -91,13 +100,15 @@ class readthedamnrules(commands.Cog):
 
     @commands.Cog.listener('on_reaction_add')
     async def reaction_redirect_to_support(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
-        if reaction.message.channel.id == GENERAL_CHANNEL_ID:
-            reactions = ["❓", "❔"] # allowed reactions, all other reactions will be ignored in this context
-            if reaction.message.author != user and reaction.emoji in reactions:
-                experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
-                mods = reaction.message.guild.get_role(MODERATORS_ROLE_ID)
-                if experts in user.roles or mods in user.roles:
-                    await self.handle_request(reaction.message, user=user)
+        if reaction.message.guild and reaction.message.author != user and not reaction.message.author.bot:
+            everyone = reaction.message.guild.default_role
+            if reaction.message.channel.permissions_for(everyone).view_channel and reaction.message.channel.permissions_for(everyone).send_messages:
+                reactions = ("❓", "❔") # allowed reactions, all other reactions will be ignored in this context
+                if reaction.emoji in reactions:
+                    experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
+                    mods = reaction.message.guild.get_role(MODERATORS_ROLE_ID)
+                    if experts in user.roles or mods in user.roles:
+                        await self.handle_request(reaction.message, user=user)
 
 async def setup(client):
     await client.add_cog(readthedamnrules(client))
