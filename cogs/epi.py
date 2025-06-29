@@ -229,12 +229,19 @@ class epi(commands.Cog):
                 index = list(self.epi_data)[0]
                 for message in self.epi_data[index]:
                     if message.channel:
-                        await message.channel.edit(archived=False)
-                        await message.edit(view=None)
-                        await message.reply(
-                            content="Hey, this issue is fixed now!\n-# Thank you for your patience.",
-                            mention_author=False
-                        )
+                        if not message.channel.archived:
+                            await message.edit(view=None)
+                            await message.reply(
+                                content="Hey, this issue is fixed now!\n-# Thank you for your patience.",
+                                mention_author=False
+                            )
+                        else:
+                            await message.channel.edit(archived=False)
+                            await message.reply(
+                                content="Hey, this issue is fixed now!\n-# Thank you for your patience.",
+                                mention_author=False
+                            )
+                            await message.channel.edit(archived=True)
                     else:
                         continue
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
