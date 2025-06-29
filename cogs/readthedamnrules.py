@@ -52,7 +52,7 @@ class readthedamnrules(commands.Cog):
         messages_content: list[discord.Message] = []
         for message in messages:
             if message.content:
-                messages_content.append(message.content)
+                messages_content.append(message.clean_content)
         if messages_content:
             content = '\n'.join(messages_content)
         return content
