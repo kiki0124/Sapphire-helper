@@ -281,7 +281,7 @@ class utility(commands.Cog):
     async def delete_accidental_qr(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         in_support = isinstance(reaction.message.channel, discord.Thread) \
             and reaction.message.channel.parent_id == SUPPORT_CHANNEL_ID
-        from_sapphire = reaction.message.author.id == 678344927997853742 # Sapphire's user id
+        from_sapphire = reaction.message.author.id in [678344927997853742, self.client.user.id] # Sapphire's user id
         reaction_allowed = reaction.emoji in ["🗑️", "❌"]
         if in_support and from_sapphire and reaction_allowed:
             experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
