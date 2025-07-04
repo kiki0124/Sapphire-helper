@@ -174,7 +174,8 @@ class epi(commands.Cog):
             username=self.client.user.name,
             avatar_url=self.client.user.avatar.url,
             thread=discord.Object(id=EPI_LOG_THREAD_ID),
-            wait=False
+            wait=False,
+            allowed_mentions=discord.AllowedMentions.none()
         )
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
@@ -186,7 +187,7 @@ class epi(commands.Cog):
             if not info.isdigit():
                 self.epi_data[info] = []
                 await interaction.followup.send(content=f"Successfully enabled EPI mode with the following text `{info}`", ephemeral=True)
-                await self.send_epi_log(content=f"EPI mode enabled by `{interaction.user.name}` (`{interaction.user.id}`)\n`{info}`")
+                await self.send_epi_log(content=f"EPI mode enabled by {interaction.user.mention}\n`{info}`")
                 if sticky:
                     general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                     msg = await general.send(f"## The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {info}", view=get_notified())
@@ -199,7 +200,7 @@ class epi(commands.Cog):
                     return await interaction.followup.send(content=f"Unable to fetch message from {status_channel.mention} with ID of `{info}`.\n`{exc.status}`, `{exc.text}`", ephemeral=True)
                 self.epi_data[message] = []
                 await interaction.followup.send(content=f"Successfully enabled EPI mode with {message.jump_url}", ephemeral=True)
-                await self.send_epi_log(content=f"EPI mode enabled by `{interaction.user.name}` (`{interaction.user.id}`)\n{message.jump_url}")
+                await self.send_epi_log(content=f"EPI mode enabled by {interaction.user.mention}\n{message.jump_url}")
                 if sticky:
                     general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                     msg = await general.send(f"## Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {message.jump_url}", view=get_notified())
@@ -265,7 +266,7 @@ class epi(commands.Cog):
                     await self.sticky_message.delete()
                     self.sticky_message = None
                 await interaction.channel.send(content=f"EPI mode successfully disabled by {interaction.user.name}.\nMentioned users: {mentioned}")
-                await self.send_epi_log(f"EPI mode disabled by `{interaction.user.name}` `({interaction.user.id})`")
+                await self.send_epi_log(f"EPI mode disabled by {interaction.user.mention}")
             button.callback = on_button_click
             view = discord.ui.View()
             view.add_item(button)
@@ -314,7 +315,7 @@ class epi(commands.Cog):
                 self.epi_data.pop(previous)
                 self.epi_data.update({msg_or_text: messages})
                 await interaction.followup.send(f"Successfully updated EPI info to {url_or_text}", ephemeral=True)
-                await self.send_epi_log(f"EPI mode edited by `{interaction.user.name}`, changed info to {url_or_text}")
+                await self.send_epi_log(f"EPI mode edited by {interaction.user.mention} - Changed info to {url_or_text}")
             if sticky != None:
                 if sticky:
                     if not self.sticky_message:
@@ -326,7 +327,7 @@ class epi(commands.Cog):
                             msg = await general.send(f"## Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}", view=get_notified())
                         self.sticky_message = msg
                         await interaction.followup.send("Successfully enabled sticky messages!", ephemeral=True)
-                        await self.send_epi_log(f"EPI mode edited by `{interaction.user.name}`, enabled sticky messages.")
+                        await self.send_epi_log(f"EPI mode edited by {interaction.user.mention} - Enabled sticky messages.")
                     elif self.sticky_message:
                         await interaction.followup.send("Cannot enable sticky messages as its already enabled!", ephemeral=True)
                 elif sticky == False:
@@ -334,7 +335,7 @@ class epi(commands.Cog):
                         await self.sticky_message.delete()
                         self.sticky_message = None
                         await interaction.followup.send("Successfully disabled sticky messages!", ephemeral=True)
-                        await self.send_epi_log(f"EPI edited by `{interaction.user.name}`, disabled sticky messages.")
+                        await self.send_epi_log(f"EPI edited by {interaction.user.mention} - disabled sticky messages.")
                     elif not self.sticky_message:
                         await interaction.followup.send("Cannot disable sticky messages as its already disabled!", ephemeral=True)
             if info == None and sticky == None:
@@ -410,6 +411,8 @@ class epi(commands.Cog):
         else:
             await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
 
+    page_websockets: dict[str, asyncio.Task] = {} # id: task
+
     async def handle_websocket(self, message: discord.WebhookMessage|discord.Message, id: str):
         await self.send_epi_log(f"Attempting to connect to WS.\nID: `{id}`")
         async with aiohttp.ClientSession() as cs:
@@ -442,7 +445,8 @@ class epi(commands.Cog):
                                     username=xge.global_name or xge.name, # global name or username if global name doesn't exist (is none)
                                     avatar_url=xge.avatar.url
                                 )
-                                return await ws.close(code=aiohttp.WSCloseCode.OK)
+                                del self.page_websockets[id]
+                                return
                             else:
                                 await self.send_epi_log(f"WS `message` received with another random ID (expected `{id}`, received `{data['message']}`). Ignoring.")
                     elif msg.type in exception_types:
@@ -513,12 +517,13 @@ class epi(commands.Cog):
                     if req.status == 200:
                         if user:
                             service = title.removesuffix(f" | Sent by @{user.name}")
-                            await self.send_epi_log(f"`{user.name}` (`{user.id}`) used /page. Service: {service} | Message: `{message}` | Priority: {priority} | Custom Branding Affected: {cb_affected}.\n-# ID: {random_id}")
+                            await self.send_epi_log(f"{user.mention} used /page. Service: {service} | Message: `{message}` | Priority: {priority} | Custom Branding Affected: {cb_affected}.\n-# ID: {random_id}")
                             await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority} | Service: {service} | ID: {random_id}")
                         else:
                             await followup.edit(content=f"Automated page for [ratelimits]({ratelimit_url}) sent successfully.\n-# Priority: {priority} | ID: {random_id}")
                             await self.send_epi_log(f"Sent automated page for rate limits. Priority: {priority}.\n-# ID: {random_id}")    
-                        await self.handle_websocket(followup, random_id)
+                        task = asyncio.create_task(self.handle_websocket(followup, random_id))
+                        self.page_websockets[random_id] = task
                     else:
                         response = await req.text()
                         await followup.edit(f"An error occured while trying to send the notification...\nStatus: {req.status}, Response: {response}")
@@ -601,7 +606,7 @@ class epi(commands.Cog):
                 priority = 3
                 if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # 20 and 7 instead of 21 and 8 because it starts from 0 (0-23 rather than 1-24)
                     priority = 4
-                h_pattern = r"\[ H\d+ ]"
+                h_pattern = r"\[ H\d+ ]" # [ H<some number> ] e.g. [ H16 ] from the message 
                 resets_pattern = r"<t:(\d+):R>"
                 h = re.findall(pattern=h_pattern, string=message.content)
                 h = h[0] if h else "Unknown"
@@ -621,6 +626,49 @@ class epi(commands.Cog):
                 "cb_affected": False
                 }
                 await self.send_page(f"{h} Ratelimited", page_msg, priority, msg, False, ratelimit_url=message.jump_url)
+
+    @app_commands.command(name="page-ws-close", description="Manually close a websocket created after a /page")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.describe(id="The id of the websocket to close. If none is provided all currently open websockets will be closed.")
+    async def page_websockets_close(self, interaction: discord.Interaction, id: str = None):
+        await interaction.response.defer(ephemeral=True)
+        if self.page_websockets:
+            if id:
+                if id in self.page_websockets.keys():
+                    close = self.page_websockets[id].cancel()
+                    if close:
+                        await interaction.followup.send(f"Successfully closed websocket with id `{id}`.")
+                        await self.send_epi_log(f"{interaction.user.mention} closed page websocket with id `{id}`")
+                    else:
+                        await interaction.followup.send("Websocket could not be closed... This could be due to it already being done (Xge responded) or someone else already cancelled it.")
+                else:
+                    await interaction.followup.send(f"Invalid key provided. Received `{id}`. Available keys: `{', '.join([key for key in self.page_websockets.keys()]) or 'None'}`")
+            else:
+                confirm = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page_websocket_close_confirm")
+                async def callback(i: discord.Interaction):
+                    await i.response.defer(ephemeral=True)
+                    keys = self.page_websockets.keys()
+                    if keys:
+                        closed: list[str] = []
+                        not_closed: list[str] = []
+                        for key in keys:
+                            close = self.page_websockets[key].cancel()
+                            closed.append(key) if close else not_closed.append(key)
+                            continue
+                        closed_str = ", ".join(f"`{closed}`") if closed else None
+                        not_closed_str = ",".join(f"`{not_closed}`") if not_closed else None
+                        await i.followup.send(
+                            content=f"{'Successfully closed: ' + closed_str if closed_str else ''}.\n{'not closed: ' + not_closed_str if not_closed_str else ''}",
+                            ephemeral=True
+                        )
+                        await interaction.edit_original_response(view=None)
+                        await self.send_epi_log(f"{i.user.mention} manually closed all currently open websockets ({len(keys)})")
+                confirm.callback = callback
+                view = ui.View()
+                view.add_item(confirm)
+                await interaction.followup.send("Are you sure you would like to close all currently open page web sockets?\n**This action can't be undone**", view=view)
+        else:
+            await interaction.followup.send(f"There aren't any websockets open right now...")
 
 async def setup(client):
     await client.add_cog(epi(client=client))
