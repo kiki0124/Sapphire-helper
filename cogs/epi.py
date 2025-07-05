@@ -8,6 +8,7 @@ import asyncio
 import aiohttp, json
 import datetime
 import re
+from typing import Literal
 
 load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
@@ -539,7 +540,7 @@ class epi(commands.Cog):
         priority="The severity, 1 = lowest, 4 = critical (highest)", 
         cb_affected="Whether custom branding is affected or not (for Sapphire outages)"
     )
-    async def page(self, interaction: discord.Interaction, service: str, message: str, priority: int, cb_affected: bool):
+    async def page(self, interaction: discord.Interaction, service: Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"], message: str, priority: int, cb_affected: bool):
         if 1 <= priority <= 4:
             fifteen_minutes_ago = datetime.datetime.now() - datetime.timedelta(minutes=15)
             if self.recent_page and datetime.datetime.fromtimestamp(self.recent_page["timestamp"]) > fifteen_minutes_ago:
@@ -578,15 +579,6 @@ class epi(commands.Cog):
                 await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
         else:
             await interaction.response.send_message(content=f"Priority argument must be between 1 and 4.")
-
-    @page.autocomplete("service")
-    async def page_autocomplete_service(self, interaction: discord.Interaction, current: str):
-        return [
-            app_commands.Choice(name="Sapphire - bot", value="Sapphire - bot"),
-            app_commands.Choice(name="Sapphire - dashboard", value="Sapphire - dashboard"),
-            app_commands.Choice(name="appeal.gg", value="appeal.gg"),
-            app_commands.Choice(name="All", value="All")
-            ]
     
     @page.autocomplete("priority")
     async def page_autocomplete_priority(self, interaction: discord.Interaction, current: int):
