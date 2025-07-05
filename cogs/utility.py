@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from functions import remove_post_from_rtdr, get_post_creator_id, \
                     generate_random_id, remove_post_from_pending
 from aiocache import cached
-from typing import Union
+from typing import Union, Literal
 import re
 
 load_dotenv()
@@ -311,37 +311,33 @@ class utility(commands.Cog):
     @app_commands.command(name="atbl", description="Mark the current post as 'Added to bug list'")
     @app_commands.describe(priority="The priority of this issue")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
-    async def atbl(self, interaction: discord.Interaction, priority: str):
+    async def atbl(self, interaction: discord.Interaction, priority: Literal["Very Low", "Low", "Medium", "High", "Special Issue"]):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            priorities = ["very low", "low", "medium", "high", "special issue"]
-            if priority.casefold() in priorities:
-                priority_texts = {
-                    "very low": "We'll get to this eventually.",
-                    "low": "We'll take care of this when we have time and if there are no higher-priority bugs.",
-                    "medium": "We'll probably get to this in about 1-2 weeks, unless something more urgent comes up.",
-                    "high": "We'll fix this as soon as we can.",
-                    "special issue": "User specific issue"
-                }
-                embed = discord.Embed(
-                    title="",
-                    description="### The development team has added this bug to their tracking list.",
-                    colour=0xe88802
-                )
-                embed.add_field(name="Priority", value=priority.capitalize(), inline=True)
-                if priority.casefold() != "special issue":
-                    embed.add_field(name="When is this issue expected to be resolved?", value=priority_texts.get(priority.casefold()), inline=True)
-                await interaction.response.send_message(embed=embed)
-                ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-                cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-                appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
-                tags = [ndr]
-                if cb in interaction.channel.applied_tags:
-                    tags.append(cb)
-                if appeal in interaction.channel.applied_tags:
-                    tags.append(appeal)
-                await interaction.channel.edit(name=f"[ATBL] {interaction.channel.name}", reason=f"@{interaction.user.name} used /atbl", applied_tags=tags)
-            else:
-                await interaction.response.send_message(f"Invalid priority argument given. Priority must be one of {', '.join(priorities)}.", ephemeral=True)
+            priority_texts = {
+                "very low": "We'll get to this eventually.",
+                "low": "We'll take care of this when we have time and if there are no higher-priority bugs.",
+                "medium": "We'll probably get to this in about 1-2 weeks, unless something more urgent comes up.",
+                "high": "We'll fix this as soon as we can.",
+                "special issue": "User specific issue"
+            }
+            embed = discord.Embed(
+                title="",
+                description="### The development team has added this bug to their tracking list.",
+                colour=0xe88802
+            )
+            embed.add_field(name="Priority", value=priority, inline=False)
+            if priority.casefold() != "special issue":
+                embed.add_field(name="When is this issue expected to be resolved?", value=priority_texts.get(priority.casefold()), inline=False)
+            await interaction.response.send_message(embed=embed)
+            ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+            cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+            appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
+            tags = [ndr]
+            if cb in interaction.channel.applied_tags:
+                tags.append(cb)
+            if appeal in interaction.channel.applied_tags:
+                tags.append(appeal)
+            await interaction.channel.edit(name=f"[ATBL] {interaction.channel.name}", reason=f"@{interaction.user.name} used /atbl", applied_tags=tags)
         else:
             await interaction.response.send_message(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
 
