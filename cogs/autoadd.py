@@ -122,10 +122,8 @@ class autoadd(commands.Cog):
 
     async def send_suggestion_message(self, message: discord.Message):
         if message.author != self.client.user and message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id):
-            ndr = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            solved = message.channel.parent.get_tag(SOLVED_TAG_ID)
-            applied_tags = message.channel.applied_tags
-            if solved not in applied_tags and ndr not in applied_tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
+            applied_tags = message.channel._applied_tags
+            if SOLVED_TAG_ID not in applied_tags and NEED_DEV_REVIEW_TAG_ID not in applied_tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
                 pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
                 negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t"
                 if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
@@ -133,9 +131,8 @@ class autoadd(commands.Cog):
                     self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
-        applied_tags = message.channel.applied_tags
-        unanswered = message.channel.parent.get_tag(UNANSWERED_TAG_ID)
-        if unanswered in applied_tags and message.author != self.client.user:
+        if UNANSWERED_TAG_ID in message.channel._applied_tags and message.author != self.client.user:
+            applied_tags = message.channel.applied_tags
             author_not_owner = message.author != message.channel.owner
             if message.channel.id in await get_rtdr_posts():
                 author_not_owner = message.author.id != await get_post_creator_id(message.channel.id)
@@ -157,9 +154,7 @@ class autoadd(commands.Cog):
         if support:
             for post in await support.guild.active_threads():
                 if post.parent_id == SUPPORT_CHANNEL_ID and not post.locked:
-                    applied_tags = post.applied_tags
-                    ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-                    if ndr not in applied_tags:
+                    if NEED_DEV_REVIEW_TAG_ID not in post._applied_tags:
                         owner = post.owner
                         if post.id in await get_rtdr_posts():
                             owner = post.guild.get_member(await get_post_creator_id(post.id))
@@ -167,9 +162,9 @@ class autoadd(commands.Cog):
                             tags = [support.get_tag(SOLVED_TAG_ID)]
                             cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
                             appeal = support.get_tag(APPEAL_GG_TAG_ID)
-                            if cb in applied_tags: 
+                            if CUSTOM_BRANDING_TAG_ID in post._applied_tags: 
                                 tags.append(cb)
-                            if appeal in applied_tags:
+                            if APPEAL_GG_TAG_ID in post._applied_tags:
                                 tags.append(appeal)
                             action_id = generate_random_id()
                             await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
@@ -183,9 +178,8 @@ class autoadd(commands.Cog):
                     and message_channel.parent_id == SUPPORT_CHANNEL_ID
         is_starter_message = payload.message_id == payload.channel_id
         if is_in_support and is_starter_message:
-            ndr = message_channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            solved = message_channel.parent.get_tag(SOLVED_TAG_ID)
-            tag_filters = ndr not in message_channel.applied_tags and solved not in message_channel.applied_tags
+            tags = message_channel._applied_tags
+            tag_filters = NEED_DEV_REVIEW_TAG_ID not in tags and SOLVED_TAG_ID not in tags
             other_filters = not message_channel.locked and not message_channel.archived
             if tag_filters and other_filters:
                 greetings = ["Hi", "Hey", "Hello", "Hi there"]
