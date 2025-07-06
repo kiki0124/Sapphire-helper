@@ -159,7 +159,7 @@ class utility(commands.Cog):
         """
         if post in self.close_tasks: 
             self.close_tasks[post].cancel()
-            self.close_tasks.pop(post)
+            del self.close_tasks[post]
         not_solved = post.parent.get_tag(NOT_SOLVED_TAG_ID)
         cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
         appeal = post.parent.get_tag(APPEAL_GG_TAG_ID)
@@ -179,9 +179,7 @@ class utility(commands.Cog):
         --Integrated with rtdr system
         """
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-            mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
-            return experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel.id)
+            return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID)) or interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel.id)
         else:
             return False
 
@@ -193,11 +191,8 @@ class utility(commands.Cog):
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
     async def solved(self, interaction: discord.Interaction):
-        support = interaction.channel.parent
-        ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        if ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.casefold():
-            solved = support.get_tag(SOLVED_TAG_ID)
-            if solved not in interaction.channel.applied_tags:
+        if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags and "forwarded" not in interaction.channel.name.casefold():
+            if SOLVED_TAG_ID not in interaction.channel._applied_tags:
                 await self.mark_post_as_solved(interaction.channel)
                 one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
                 try:
@@ -256,8 +251,7 @@ class utility(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def need_dev_review(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            if ndr not in interaction.channel.applied_tags:
+            if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags:
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
@@ -284,8 +278,7 @@ class utility(commands.Cog):
         from_sapphire = reaction.message.author.id == 678344927997853742 # Sapphire's user id
         reaction_allowed = reaction.emoji in ["🗑️", "❌"]
         if in_support and from_sapphire and reaction_allowed:
-            experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
-            if experts in user.roles:
+            if user.get_role(EXPERTS_ROLE_ID):
                 await reaction.message.delete()
                 await self.send_qr_log(reaction.message, user)
                 return
@@ -347,10 +340,8 @@ class utility(commands.Cog):
         await ctx.defer(ephemeral=True)
         if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
             user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
-            experts = ctx.guild.get_role(EXPERTS_ROLE_ID)
-            mods = ctx.guild.get_role(MODERATORS_ROLE_ID)
             content = None
-            if experts in ctx.author.roles or mods in ctx.author.roles:
+            if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID):
                 content = f"<@{user_id}>"
             embed = discord.Embed(
                 title="Incomplete support post",
