@@ -19,7 +19,6 @@ CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 EXPERTS_ROLE_ID = int(os.getenv('EXPERTS_ROLE_ID'))
 MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
-WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
 APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 
 class confirm_close(ui.View):
