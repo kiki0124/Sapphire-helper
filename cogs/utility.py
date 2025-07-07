@@ -264,10 +264,11 @@ class utility(commands.Cog):
         if qr_logs_thread.archived:
             await qr_logs_thread.edit(archived=False)
         await webhook.send(
-            content=f"Message deleted by `@{user.name}` (`{user.id}`) in {message.channel.mention}\nMessage id: `{message.id}`",
+            content=f"Message deleted by {user.mention} in {message.channel.mention}\nMessage id: `{message.id}`",
             username=self.client.user.name,
             avatar_url=self.client.user.avatar.url,
-            thread=discord.Object(id=QR_LOG_THREAD_ID)
+            thread=discord.Object(id=QR_LOG_THREAD_ID),
+            allowed_mentions=discord.AllowedMentions.none()
         )
 
     @commands.Cog.listener('on_reaction_add')
