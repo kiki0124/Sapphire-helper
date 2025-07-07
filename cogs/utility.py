@@ -386,10 +386,10 @@ class utility(commands.Cog):
             description='Inform the post creator that their question/issue is not Sapphire/appeal.gg related.'
     )
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    @commands.guild_only()
     async def wrong_server(self, ctx: commands.Context):
         await ctx.defer(ephemeral=True)
         if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
+            user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
             if ctx.interaction:
                 await ctx.interaction.delete_original_response()
             elif not ctx.interaction:
@@ -403,7 +403,7 @@ class utility(commands.Cog):
             embed.set_footer(text=f'Recommended by @{ctx.author.name}', icon_url=ctx.author.avatar.url)
 
             await self.lock_unrelated_post(ctx.channel)
-            await ctx.channel.send(embed=embed, content=ctx.channel.owner.mention)
+            await ctx.channel.send(embed=embed, content=f'<@{user_id}>')
         else:
             await ctx.reply(content=f'This command can only be used in <#{SUPPORT_CHANNEL_ID}>!', ephemeral=True)
 
