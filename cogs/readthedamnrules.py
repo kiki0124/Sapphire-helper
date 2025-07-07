@@ -90,9 +90,7 @@ class readthedamnrules(commands.Cog):
         if not message.author.bot and message.reference and message.content.startswith(self.client.user.mention) and message.guild:
             everyone = message.guild.default_role
             if message.channel.permissions_for(everyone).view_channel and message.channel.permissions_for(everyone).send_messages:
-                experts = message.guild.get_role(EXPERTS_ROLE_ID)
-                moderators = message.guild.get_role(MODERATORS_ROLE_ID)
-                if experts in message.author.roles or moderators in message.author.roles:
+                if message.author.get_role(EXPERTS_ROLE_ID) or message.author.get_role(MODERATORS_ROLE_ID):
                     replied_message = message.reference.cached_message or await message.channel.fetch_message(message.reference.message_id)
                     if not replied_message.author == message.author:
                         await self.handle_request(reference_message=replied_message, user=message.author, message=message)
@@ -105,9 +103,7 @@ class readthedamnrules(commands.Cog):
             if reaction.message.channel.permissions_for(everyone).view_channel and reaction.message.channel.permissions_for(everyone).send_messages:
                 reactions = ("❓", "❔") # allowed reactions, all other reactions will be ignored in this context
                 if reaction.emoji in reactions:
-                    experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
-                    mods = reaction.message.guild.get_role(MODERATORS_ROLE_ID)
-                    if experts in user.roles or mods in user.roles:
+                    if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID):
                         await self.handle_request(reaction.message, user=user)
 
 async def setup(client):
