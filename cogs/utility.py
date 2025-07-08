@@ -123,9 +123,9 @@ class utility(commands.Cog):
     
     close_tasks: dict[discord.Thread, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
 
-    async def close_post(self, post: discord.Thread, close_delay: Optional[int] = 3600) -> None:
+    async def close_post(self, post: discord.Thread, close_delay: Optional[float] = 3600) -> None:
         """  
-        Used with asyncio.create_task to close the given post after the given delay.
+        Used with asyncio.create_task to close the given post after the given delay in seconds.
         """
         await asyncio.sleep(close_delay) # wait for close_delay hours
         await post.edit(
