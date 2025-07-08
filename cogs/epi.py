@@ -286,7 +286,7 @@ class epi(commands.Cog):
             elif isinstance(msg_or_txt, discord.Message):
                 msg_or_txt = msg_or_txt.jump_url
             await interaction.followup.send(
-                content=f"Current EPI mode info: {msg_or_txt}\nEPI-User count: {len(epi_users)}",
+                content=f"Current EPI mode info: {msg_or_txt}\nEPI-User count: {len(epi_users)}. Sticky: {bool(self.sticky_message)}",
                 ephemeral=True
             )
         else:
