@@ -154,7 +154,6 @@ class utility(commands.Cog):
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
         task = asyncio.create_task(self.close_post(post=post))
         self.close_tasks[post] = task
-        return task
 
     async def lock_unrelated_post(self, post: discord.Thread) -> None:
         """
@@ -166,7 +165,6 @@ class utility(commands.Cog):
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=solved, context="/unrelated used")
         task = asyncio.create_task(self.close_post(post=post, close_delay=600))
         self.close_tasks[post] = task
-        return task
 
     async def unsolve_post(self, post: discord.Thread) -> None:
         """  
