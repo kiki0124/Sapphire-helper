@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from functions import remove_post_from_rtdr, get_post_creator_id, \
                     generate_random_id, remove_post_from_pending
 from aiocache import cached
-from typing import Union, Literal
+from typing import Union, Literal, Optional
 import re
 
 load_dotenv()
@@ -123,12 +123,15 @@ class utility(commands.Cog):
     
     close_tasks: dict[discord.Thread, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
 
-    async def close_post(self, post: discord.Thread) -> None:
+    async def close_post(self, post: discord.Thread, close_delay: Optional[float] = 3600) -> None:
         """  
-        Used with asyncio.create_task to close the given post after an hour of delay.
+        Used with asyncio.create_task to close the given post after the given delay in seconds.
         """
-        await asyncio.sleep(3600) # wait for 1 hour
-        await post.edit(archived=True, reason=f"Auto archive solved post after 1 hour")
+        await asyncio.sleep(close_delay) # wait for close_delay hours
+        await post.edit(
+            archived=True,
+            reason=f"Auto archive {'solved' if close_delay == 3600 else 'unrelated'} post after {close_delay} seconds"
+        )
         self.close_tasks.pop(post)
         await remove_post_from_rtdr(post.id)
         await remove_post_from_pending(post.id)
@@ -151,7 +154,17 @@ class utility(commands.Cog):
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
         task = asyncio.create_task(self.close_post(post=post))
         self.close_tasks[post] = task
-        return task
+
+    async def lock_unrelated_post(self, post: discord.Thread) -> None:
+        """
+        Lock the given post, override the tags to the solved tag and create a task with a delay to archive it
+        """
+        solved = [post.parent.get_tag(SOLVED_TAG_ID)]
+        action_id = generate_random_id()
+        await post.edit(locked=True, applied_tags=solved, reason=f'ID: {action_id}. Post locked as it was not sapphire related')
+        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=solved, context="/unrelated used")
+        task = asyncio.create_task(self.close_post(post=post, close_delay=600))
+        self.close_tasks[post] = task
 
     async def unsolve_post(self, post: discord.Thread) -> None:
         """  
@@ -365,6 +378,32 @@ class utility(commands.Cog):
             await ctx.channel.send(content=content, embed=embed)
         else:
             await ctx.reply(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
+
+    @commands.hybrid_command(
+            name='unrelated',
+            description='Inform the post creator that their question/issue is not Sapphire/appeal.gg related.'
+    )
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    async def wrong_server(self, ctx: commands.Context):
+        await ctx.defer(ephemeral=True)
+        if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
+            user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
+            if ctx.interaction:
+                await ctx.interaction.delete_original_response()
+            elif not ctx.interaction:
+                await ctx.message.delete()
+
+            embed = discord.Embed(
+                title='Unrelated question/issue',
+                description='Hey, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query.',
+                colour=discord.Colour.purple()
+            )
+            embed.set_footer(text=f'Recommended by @{ctx.author.name}', icon_url=ctx.author.avatar.url)
+
+            await self.lock_unrelated_post(ctx.channel)
+            await ctx.channel.send(embed=embed, content=f'<@{user_id}>')
+        else:
+            await ctx.reply(content=f'This command can only be used in <#{SUPPORT_CHANNEL_ID}>!', ephemeral=True)
 
 async def setup(client):
     await client.add_cog(utility(client))
