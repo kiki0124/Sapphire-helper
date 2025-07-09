@@ -226,11 +226,11 @@ class utility(commands.Cog):
     async def remove(self, interaction: discord.Interaction, user: discord.Member):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             await interaction.channel.remove_user(user)
-            await interaction.response.send_message(content=f"Successfully removed {user.name} from this post.", ephemeral=True)
+            await interaction.response.send_message(content=f"Successfully removed {user.mention} from this post.", ephemeral=True)
             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
-            await alerts_thread.send(f"{interaction.user.name} removed {user.name} from {interaction.channel.mention}).")
+            await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}).", allowed_mentions=discord.AllowedMentions.none())
         else:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>")
 
