@@ -216,7 +216,7 @@ class epi(commands.Cog):
     
     @group.command(name="disable", description="Disable EPI mode- mark the issue as solved & ping all users that asked to be pinged")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
-    async def epi_disable(self, interaction: discord.Interaction):
+    async def epi_disable(self, interaction: discord.Interaction, message: str = None):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
             button = discord.ui.Button(
@@ -229,21 +229,25 @@ class epi(commands.Cog):
                 await i.response.defer(ephemeral=True)
                 await i.delete_original_response()
                 index = list(self.epi_data)[0]
-                for message in self.epi_data[index]:
-                    if message.channel:
-                        if not message.channel.archived:
-                            await message.edit(view=None)
-                            await message.reply(
-                                content="Hey, this issue is fixed now!\n-# Thank you for your patience.",
+                for msg in self.epi_data[index]:
+                    if msg.channel:
+                        content = "Hey, this issue is fixed now!\n-# Thank you for your patience."
+                        if message:
+                            content += f"\n> {message}"
+                        if not msg.channel.archived:
+                            await msg.edit(view=None)
+                            await msg.reply(
+                                content= content,
                                 mention_author=False
                             )
                         else:
-                            await message.channel.edit(archived=False)
-                            await message.reply(
-                                content="Hey, this issue is fixed now!\n-# Thank you for your patience.",
+                            await msg.channel.edit(archived=False)
+                            msg.edit(view=None)
+                            await msg.reply(
+                                content= content,
                                 mention_author=False
                             )
-                            await message.channel.edit(archived=True)
+                            await msg.channel.edit(archived=True)
                     else:
                         continue
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
