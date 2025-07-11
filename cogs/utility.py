@@ -251,7 +251,10 @@ class utility(commands.Cog):
     async def unsolved(self, interaction: discord.Interaction):
         if interaction.channel in self.close_tasks or SOLVED_TAG_ID in interaction.channel._applied_tags:
             await self.unsolve_post(interaction.channel)
-            await interaction.response.send_message(content=f"Post successfully unsolved!\nPlease send a message here explaining what you still need help with.\n-# If the post is solved you may use </solved:{await self.get_solved_id()}> to mark it as solved.")
+            content = f"Post successfully unsolved!\nPlease send a message here explaining what you still need help with.\n-# If the post is solved you may use </solved:{await self.get_solved_id()}> to mark it as solved."
+            if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID):
+                content = "Post successfully unsolved!"
+            await interaction.response.send_message(content=content)
         else:
             await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
 
