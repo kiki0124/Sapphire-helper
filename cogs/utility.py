@@ -238,8 +238,7 @@ class utility(commands.Cog):
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
     async def unsolved(self, interaction: discord.Interaction):
-        solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)     
-        if interaction.channel in self.close_tasks or solved in interaction.channel.applied_tags:
+        if interaction.channel in self.close_tasks or SOLVED_TAG_ID in interaction.channel._applied_tags:
             await self.unsolve_post(interaction.channel)
             await interaction.response.send_message(content="Post successfully unsolved! Please send a message here explaining what you still need help with.")
         else:

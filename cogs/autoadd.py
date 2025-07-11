@@ -118,8 +118,8 @@ class autoadd(commands.Cog):
 
     async def send_suggestion_message(self, message: discord.Message):
         if message.author != self.client.user and message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id):
-            applied_tags = message.channel._applied_tags
-            if SOLVED_TAG_ID not in applied_tags and NEED_DEV_REVIEW_TAG_ID not in applied_tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
+            tags = message.channel._applied_tags
+            if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
                 pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
                 negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t"
                 if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
