@@ -129,9 +129,8 @@ class autoadd(commands.Cog):
     async def replace_unanswered_tag(self, message: discord.Message):
         if UNANSWERED_TAG_ID in message.channel._applied_tags and message.author != self.client.user:
             applied_tags = message.channel.applied_tags
-            author_not_owner = message.author != message.channel.owner
-            if message.channel.id in await get_rtdr_posts():
-                author_not_owner = message.author.id != await get_post_creator_id(message.channel.id)
+            owner_id = await get_post_creator_id(message.channel.id)
+            author_not_owner = message.author.id != owner_id
             if author_not_owner:
                 tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                 cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
