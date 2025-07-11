@@ -240,7 +240,7 @@ class utility(commands.Cog):
     async def unsolved(self, interaction: discord.Interaction):
         if interaction.channel in self.close_tasks or SOLVED_TAG_ID in interaction.channel._applied_tags:
             await self.unsolve_post(interaction.channel)
-            await interaction.response.send_message(content="Post successfully unsolved! Please send a message here explaining what you still need help with.")
+            await interaction.response.send_message(content="Post successfully unsolved!\nPlease send a message here explaining what you still need help with.")
         else:
             await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
 
