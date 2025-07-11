@@ -120,6 +120,17 @@ class utility(commands.Cog):
                 continue
         return unsolve_id
     
+    @cached()
+    async def get_solved_id(self):
+        solved_id = 1274997472162349079
+        for command in await self.client.tree.fetch_commands():
+                if command.name == "solved": 
+                    solved_id=command.id
+                    break
+                else:
+                    continue
+        return solved_id
+
     close_tasks: dict[discord.Thread, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
 
     async def close_post(self, post: discord.Thread) -> None:
@@ -240,7 +251,7 @@ class utility(commands.Cog):
     async def unsolved(self, interaction: discord.Interaction):
         if interaction.channel in self.close_tasks or SOLVED_TAG_ID in interaction.channel._applied_tags:
             await self.unsolve_post(interaction.channel)
-            await interaction.response.send_message(content="Post successfully unsolved!\nPlease send a message here explaining what you still need help with.")
+            await interaction.response.send_message(content=f"Post successfully unsolved!\nPlease send a message here explaining what you still need help with.\n-# If the post is solved you may use </solved:{await self.get_solved_id()}> to mark it as solved.")
         else:
             await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
 
