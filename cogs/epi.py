@@ -229,11 +229,11 @@ class epi(commands.Cog):
                 await i.response.defer(ephemeral=True)
                 await i.delete_original_response()
                 index = list(self.epi_data)[0]
+                content = "Hey, this issue is fixed now!\n-# Thank you for your patience."
+                if message:
+                    content += f"\n> {message}"    
                 for msg in self.epi_data[index]:
                     if msg.channel:
-                        content = "Hey, this issue is fixed now!\n-# Thank you for your patience."
-                        if message:
-                            content += f"\n> {message}"
                         if not msg.channel.archived:
                             await msg.edit(view=None)
                             await msg.reply(
@@ -251,7 +251,7 @@ class epi(commands.Cog):
                     else:
                         continue
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
-                main_message = await general.send(content="Hey, this issue is now fixed!\n-# Thank you for your patience.")
+                main_message = await general.send(content=content)
                 if epi_users:
                     mentions: list[discord.Member|discord.User] = []
                     for user_id in epi_users:
