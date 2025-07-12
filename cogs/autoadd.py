@@ -19,7 +19,6 @@ CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 EXPERTS_ROLE_ID = int(os.getenv('EXPERTS_ROLE_ID'))
 MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
-WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
 APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 
 class confirm_close(ui.View):
@@ -28,10 +27,8 @@ class confirm_close(ui.View):
     
     @ui.button(label="Mark as solved", style=discord.ButtonStyle.green, custom_id="auto-close-confirm")
     async def on_confirm_click(self, interaction: discord.Interaction, button: ui.Button):
-        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-        mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
         is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
-        if experts in interaction.user.roles or mods in interaction.user.roles or is_owner:
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or is_owner:
             await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# {interaction.user.name} clicked the confirm button", allowed_mentions=discord.AllowedMentions.none())
             solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
             appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
@@ -49,17 +46,15 @@ class confirm_close(ui.View):
             await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
             await remove_post_from_rtdr(interaction.channel_id)
         else:
-            await interaction.response.send_message(content=f"Only {experts.mention}, {mods.mention} and the post creator can use this!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
 
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
     async def on_cancel_click(self, interaction: discord.Interaction, button: ui.Button):
-        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-        mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
         is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
-        if experts in interaction.user.roles or mods in interaction.user.roles or is_owner:
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or is_owner:
             await interaction.message.edit(content=f"~~{interaction.message.content}~~\n-# {interaction.user.name} has clicked the *cancel* button.", view=None, allowed_mentions=discord.AllowedMentions.none())
         else:
-            await interaction.response.send_message(content=f"Only {experts.mention}, {mods.mention} and the post creator can use this!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
 
 class autoadd(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -123,10 +118,8 @@ class autoadd(commands.Cog):
 
     async def send_suggestion_message(self, message: discord.Message):
         if message.author != self.client.user and message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id):
-            ndr = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            solved = message.channel.parent.get_tag(SOLVED_TAG_ID)
-            applied_tags = message.channel.applied_tags
-            if solved not in applied_tags and ndr not in applied_tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
+            tags = message.channel._applied_tags
+            if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
                 pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
                 negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t"
                 if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
@@ -134,12 +127,10 @@ class autoadd(commands.Cog):
                     self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
-        applied_tags = message.channel.applied_tags
-        unanswered = message.channel.parent.get_tag(UNANSWERED_TAG_ID)
-        if unanswered in applied_tags and message.author != self.client.user:
-            author_not_owner = message.author != message.channel.owner
-            if message.channel.id in await get_rtdr_posts():
-                author_not_owner = message.author.id != await get_post_creator_id(message.channel.id)
+        if UNANSWERED_TAG_ID in message.channel._applied_tags and message.author != self.client.user:
+            applied_tags = message.channel.applied_tags
+            owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
+            author_not_owner = message.author.id != owner_id
             if author_not_owner:
                 tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                 cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
@@ -158,9 +149,7 @@ class autoadd(commands.Cog):
         if support:
             for post in await support.guild.active_threads():
                 if post.parent_id == SUPPORT_CHANNEL_ID and not post.locked:
-                    applied_tags = post.applied_tags
-                    ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-                    if ndr not in applied_tags:
+                    if NEED_DEV_REVIEW_TAG_ID not in post._applied_tags:
                         owner = post.owner
                         if post.id in await get_rtdr_posts():
                             owner = post.guild.get_member(await get_post_creator_id(post.id))
@@ -168,9 +157,9 @@ class autoadd(commands.Cog):
                             tags = [support.get_tag(SOLVED_TAG_ID)]
                             cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
                             appeal = support.get_tag(APPEAL_GG_TAG_ID)
-                            if cb in applied_tags: 
+                            if CUSTOM_BRANDING_TAG_ID in post._applied_tags: 
                                 tags.append(cb)
-                            if appeal in applied_tags:
+                            if APPEAL_GG_TAG_ID in post._applied_tags:
                                 tags.append(appeal)
                             action_id = generate_random_id()
                             await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
@@ -184,9 +173,8 @@ class autoadd(commands.Cog):
                     and message_channel.parent_id == SUPPORT_CHANNEL_ID
         is_starter_message = payload.message_id == payload.channel_id
         if is_in_support and is_starter_message:
-            ndr = message_channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            solved = message_channel.parent.get_tag(SOLVED_TAG_ID)
-            tag_filters = ndr not in message_channel.applied_tags and solved not in message_channel.applied_tags
+            tags = message_channel._applied_tags
+            tag_filters = NEED_DEV_REVIEW_TAG_ID not in tags and SOLVED_TAG_ID not in tags
             other_filters = not message_channel.locked and not message_channel.archived
             if tag_filters and other_filters:
                 greetings = ["Hi", "Hey", "Hello", "Hi there"]

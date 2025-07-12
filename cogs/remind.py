@@ -30,9 +30,8 @@ class CloseNow(ui.View):
         
     @ui.button(label="Issue already solved? Close post now", custom_id="remind-close-now", style=discord.ButtonStyle.grey)
     async def on_close_now_click(self, interaction: discord.Interaction, button: ui.Button):
-        experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-        mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
-        if experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner:
+        owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.id == owner_id:
             await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
             tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
             cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
@@ -67,10 +66,9 @@ class remind(commands.Cog):
         * Is in #support (parent_id==SUPPORT_CHANNEL_ID)
         """
         if thread.parent_id == SUPPORT_CHANNEL_ID:
-            parent = thread.parent
-            applied_tags = thread.applied_tags
-            ndr = parent.get_tag(NEED_DEV_REVIEW_TAG_ID) not in applied_tags
-            solved = parent.get_tag(SOLVED_TAG_ID) not in applied_tags
+            applied_tags = thread._applied_tags
+            ndr = NEED_DEV_REVIEW_TAG_ID not in applied_tags
+            solved = SOLVED_TAG_ID not in applied_tags
             archived = not thread.archived
             locked = not thread.locked
             return ndr and solved and archived and locked
@@ -178,9 +176,9 @@ class remind(commands.Cog):
     async def remove_pending_posts(self, message: discord.Message):
         if message.author != self.client.user:
             if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
-                ndr = message.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-                others_filter = not message.channel.locked and ndr not in message.channel.applied_tags
-                message_author = message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id)
+                others_filter = not message.channel.locked and NEED_DEV_REVIEW_TAG_ID not in message.channel._applied_tags
+                owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
+                message_author = message.author.id == owner_id
                 in_pending_post = message.channel.id in await get_pending_posts()
                 if message_author and in_pending_post and others_filter:
                     await remove_post_from_pending(message.channel.id)
@@ -190,10 +188,10 @@ class remind(commands.Cog):
         for post_id in await get_pending_posts():
             post = self.client.get_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
-                applied_tags = post.applied_tags
-                ndr = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID) not in applied_tags
+                ndr = NEED_DEV_REVIEW_TAG_ID not in post._applied_tags
                 more_than_24_hours = await check_post_last_message_time(post_id)
                 if ndr and more_than_24_hours:
+                    applied_tags = post.applied_tags
                     tags = [post.parent.get_tag(SOLVED_TAG_ID)]
                     cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
                     appeal = post.parent.get_tag(APPEAL_GG_TAG_ID)
@@ -225,16 +223,12 @@ class remind(commands.Cog):
     @commands.command()
     @commands.has_role(EXPERTS_ROLE_ID)
     async def check_running(self, ctx: commands.Context, task: str):
-        match task:
-            case "cep":
-                await ctx.reply(self.check_exception_posts.is_running(), mention_author=False)
-            case "cpp":
-                await ctx.reply(self.close_pending_posts.is_running(), mention_author=False)
-            case "cfpp":
-                await ctx.reply(self.check_for_pending_posts.is_running(), mention_author=False)
-            case _:
-                await ctx.reply(f"Unknown `task` given. Expected one of ['cep', 'cpp', 'cfpp'] but received '{task}'")
-
+        data = {
+            "cep": self.check_exception_posts.is_running(),
+            "cpp": self.close_pending_posts.is_running(),
+            "cfpp": self.check_for_pending_posts.is_running()
+        }
+        await ctx.reply(content=data.get(task.casefold(), "Task must be one of cep, cpp, cfpp"), mention_author=False)
 
 async def setup(client):
     await client.add_cog(remind(client))

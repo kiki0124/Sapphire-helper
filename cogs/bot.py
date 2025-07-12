@@ -97,10 +97,9 @@ class bot(commands.Cog):
             command = debug.removeprefix('eval sql ')
             await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
         elif debug == "check post":
-            parent = post.parent
-            applied_tags = post.applied_tags
-            ndr = parent.get_tag(int(os.getenv("NEED_DEV_REVIEW_TAG_ID"))) not in applied_tags
-            solved = parent.get_tag(int(os.getenv("SOLVED_TAG_ID"))) not in applied_tags
+            applied_tags = post._applied_tags
+            ndr = int(os.getenv("NEED_DEV_REVIEW_TAG_ID")) not in applied_tags
+            solved = int(os.getenv("SOLVED_TAG_ID")) not in applied_tags
             archived = not post.archived
             locked = not post.locked
             is_pending = post.id not in await functions.get_pending_posts()

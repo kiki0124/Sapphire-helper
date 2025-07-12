@@ -17,7 +17,6 @@ SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
 NOT_SOLVED_TAG_ID = int(os.getenv("NOT_SOLVED_TAG_ID"))
 SUPPORT_CHANNEL_ID = int(os.getenv('SUPPORT_CHANNEL_ID'))
 NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
-UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 CUSTOM_BRANDING_TAG_ID = int(os.getenv('CUSTOM_BRANDING_TAG_ID'))
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
@@ -121,6 +120,17 @@ class utility(commands.Cog):
                 continue
         return unsolve_id
     
+    @cached()
+    async def get_solved_id(self):
+        solved_id = 1274997472162349079
+        for command in await self.client.tree.fetch_commands():
+                if command.name == "solved": 
+                    solved_id=command.id
+                    break
+                else:
+                    continue
+        return solved_id
+
     close_tasks: dict[discord.Thread, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
 
     async def close_post(self, post: discord.Thread, close_delay: Optional[float] = 3600) -> None:
@@ -172,7 +182,7 @@ class utility(commands.Cog):
         """
         if post in self.close_tasks: 
             self.close_tasks[post].cancel()
-            self.close_tasks.pop(post)
+            del self.close_tasks[post]
         not_solved = post.parent.get_tag(NOT_SOLVED_TAG_ID)
         cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
         appeal = post.parent.get_tag(APPEAL_GG_TAG_ID)
@@ -192,9 +202,7 @@ class utility(commands.Cog):
         --Integrated with rtdr system
         """
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            experts = interaction.guild.get_role(EXPERTS_ROLE_ID)
-            mods = interaction.guild.get_role(MODERATORS_ROLE_ID)
-            return experts in interaction.user.roles or mods in interaction.user.roles or interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel.id)
+            return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID)) or interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel.id)
         else:
             return False
 
@@ -206,11 +214,8 @@ class utility(commands.Cog):
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
     async def solved(self, interaction: discord.Interaction):
-        support = interaction.channel.parent
-        ndr = support.get_tag(NEED_DEV_REVIEW_TAG_ID)
-        if ndr not in interaction.channel.applied_tags and "forwarded" not in interaction.channel.name.casefold():
-            solved = support.get_tag(SOLVED_TAG_ID)
-            if solved not in interaction.channel.applied_tags:
+        if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags and "forwarded" not in interaction.channel.name.casefold():
+            if SOLVED_TAG_ID not in interaction.channel._applied_tags:
                 await self.mark_post_as_solved(interaction.channel)
                 one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
                 try:
@@ -245,11 +250,11 @@ class utility(commands.Cog):
     async def remove(self, interaction: discord.Interaction, user: discord.Member):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             await interaction.channel.remove_user(user)
-            await interaction.response.send_message(content=f"Successfully removed {user.name} from this post.", ephemeral=True)
+            await interaction.response.send_message(content=f"Successfully removed {user.mention} from this post.", ephemeral=True)
             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
-            await alerts_thread.send(f"{interaction.user.name} removed {user.name} from {interaction.channel.mention}).")
+            await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}).", allowed_mentions=discord.AllowedMentions.none())
         else:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>")
 
@@ -257,10 +262,12 @@ class utility(commands.Cog):
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
     async def unsolved(self, interaction: discord.Interaction):
-        solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)     
-        if interaction.channel in self.close_tasks or solved in interaction.channel.applied_tags:
+        if interaction.channel in self.close_tasks or SOLVED_TAG_ID in interaction.channel._applied_tags:
             await self.unsolve_post(interaction.channel)
-            await interaction.response.send_message(content="Post successfully unsolved! Please send a message here explaining what you still need help with.")
+            content = f"Post successfully unsolved!\nPlease send a message here explaining what you still need help with.\n-# If the post is solved you may use </solved:{await self.get_solved_id()}> to mark it as solved."
+            if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID):
+                content = "Post successfully unsolved!"
+            await interaction.response.send_message(content=content)
         else:
             await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
 
@@ -269,8 +276,7 @@ class utility(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def need_dev_review(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            if ndr not in interaction.channel.applied_tags:
+            if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags:
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
             else:
                 await interaction.response.send_message(content="This post already has needs-dev-review tag.", ephemeral=True)
@@ -284,10 +290,11 @@ class utility(commands.Cog):
         if qr_logs_thread.archived:
             await qr_logs_thread.edit(archived=False)
         await webhook.send(
-            content=f"Message deleted by `@{user.name}` (`{user.id}`) in {message.channel.mention}\nMessage id: `{message.id}`",
+            content=f"Message deleted by {user.mention} in {message.channel.mention}\nMessage id: `{message.id}`",
             username=self.client.user.name,
             avatar_url=self.client.user.avatar.url,
-            thread=discord.Object(id=QR_LOG_THREAD_ID)
+            thread=discord.Object(id=QR_LOG_THREAD_ID),
+            allowed_mentions=discord.AllowedMentions.none()
         )
 
     @commands.Cog.listener('on_reaction_add')
@@ -297,8 +304,7 @@ class utility(commands.Cog):
         from_sapphire = reaction.message.author.id == 678344927997853742 # Sapphire's user id
         reaction_allowed = reaction.emoji in ["🗑️", "❌"]
         if in_support and from_sapphire and reaction_allowed:
-            experts = reaction.message.guild.get_role(EXPERTS_ROLE_ID)
-            if experts in user.roles:
+            if user.get_role(EXPERTS_ROLE_ID):
                 await reaction.message.delete()
                 await self.send_qr_log(reaction.message, user)
                 return
@@ -360,10 +366,8 @@ class utility(commands.Cog):
         await ctx.defer(ephemeral=True)
         if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
             user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
-            experts = ctx.guild.get_role(EXPERTS_ROLE_ID)
-            mods = ctx.guild.get_role(MODERATORS_ROLE_ID)
             content = None
-            if experts in ctx.author.roles or mods in ctx.author.roles:
+            if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID):
                 content = f"<@{user_id}>"
             embed = discord.Embed(
                 title="Incomplete support post",

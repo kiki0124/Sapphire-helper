@@ -50,9 +50,9 @@ class select_channels(ui.ChannelSelect):
 
     async def lock_channels(self, channels: list[discord.TextChannel|discord.ForumChannel], interaction: discord.Interaction):
         for channel in channels:
-            previous_permissions = channel.overwrites_for(channel.guild.default_role).pair()
+            previous_permissions = channel.overwrites_for(channel.guild.default_role).pair() # permissions bit of (allow, deny)
             await save_channel_permissions(channel.id, allow=previous_permissions[0].value, deny=previous_permissions[1].value)
-            permissions = discord.PermissionOverwrite(send_messages=False, create_public_threads=False, create_private_threads=False, send_messages_in_threads=False)
+            permissions = discord.PermissionOverwrite(send_messages=False, create_public_threads=False, create_private_threads=False, send_messages_in_threads=False) # the channel permissions for @everyone role
             experts_mods_overwrites = discord.PermissionOverwrite(send_messages=True, create_public_threads=True, send_messages_in_threads=True)
             experts = channel.guild.get_role(EXPERTS_ROLE_ID)
             mods = channel.guild.get_role(MODERATORS_ROLE_ID)
@@ -60,7 +60,7 @@ class select_channels(ui.ChannelSelect):
                 channel.guild.default_role: permissions,
                 experts: experts_mods_overwrites,
                 mods: experts_mods_overwrites
-            } 
+            }
             await channel.edit(overwrites=overwrites, reason=f"{interaction.user.name} ({interaction.user.id}) used /lock. Reason: {self.reason}")
             if isinstance(channel, discord.TextChannel):
                 embed = discord.Embed(
@@ -74,7 +74,7 @@ class select_channels(ui.ChannelSelect):
 
     async def unlock_channels(self, channels: list[discord.TextChannel|discord.ForumChannel], interaction: discord.Interaction):
         for channel in channels:
-            allow_deny = await get_channel_permissions(channel.id)
+            allow_deny = await get_channel_permissions(channel.id) # returns in the same way that TextChannel.overwrites_for(...).pair() does - (allow_bit, deny_bit)
             allow = discord.Permissions()._from_value(allow_deny[0])
             deny = discord.Permissions()._from_value(allow_deny[1])
             overwrites = discord.PermissionOverwrite().from_pair(allow=allow, deny=deny)
@@ -94,9 +94,9 @@ class select_channels(ui.ChannelSelect):
         await interaction.response.defer(ephemeral=True)
         channels = self.values # the selected channels
         fetched_channels: list[discord.TextChannel|discord.ForumChannel] = []
-        for c in channels:
+        for c in channels: # c (each item in the returned list of channels that were selected) is only a discord.AppCommandChannel which is missing some methods/attributes
             try:
-                channel = interaction.guild.get_channel(c.id) or await channel.fetch() # try to get the channel from the internal cache or fetch it if it isn't found
+                channel = interaction.guild.get_channel(c.id) or await c.fetch() # try to get the channel from the internal cache or fetch it if it isn't found
             except discord.HTTPException:
                 await interaction.followup.send(f"Couldn't fetch {c.mention}", ephemeral=True)
                 continue
@@ -130,25 +130,27 @@ class select_channels(ui.ChannelSelect):
                 case "lock":
                     await self.lock_channels(fetched_channels, interaction)
                     await webhook.send(
-                    content=f"{interaction.user.name} locked {','.join(c.mention for c in fetched_channels)}. Reason: {self.reason}",
-                    username="EPI logging",
+                    content=f"{interaction.user.mention} locked {', '.join(c.mention for c in fetched_channels)}. Reason: {self.reason}",
+                    username=interaction.client.user.name,
                     avatar_url=interaction.client.user.avatar.url,
                     thread=discord.Object(id=EPI_LOG_THREAD_ID),
-                    wait=False
+                    wait=False,
+                    allowed_mentions=discord.AllowedMentions.none()
                     )
                 case "unlock":
                     await self.unlock_channels(fetched_channels, interaction)
                     await webhook.send(
-                    content=f"{interaction.user.name} unlocked {','.join(c.mention for c in fetched_channels)}. Reason: `{self.reason}`",
-                    username="EPI logging",
+                    content=f"{interaction.user.mention} unlocked {', '.join(c.mention for c in fetched_channels)}. Reason: `{self.reason}`",
+                    username=interaction.client.user.name,
                     avatar_url=interaction.client.user.avatar.url,
                     thread=epi_thread,
-                    wait=False
+                    wait=False,
+                    allowed_mentions=discord.AllowedMentions.none()
                     )
                 case "slowmode":
                     await webhook.send(
-                        content=f"{interaction.user.name} {'set slowmode of' + self.slowmode if self.slowmode > 0 else 'disabled slowmode'} in {','.join(c.mention for c in fetched_channels)}",
-                        username="EPI logging",
+                        content=f"{interaction.user.mention} {'set slowmode of' + self.slowmode if self.slowmode > 0 else 'disabled slowmode'} in {', '.join(c.mention for c in fetched_channels)}",
+                        username=interaction.client.user.name,
                         avatar_url=interaction.client.user.avatar.url,
                         thread=epi_thread,
                         wait=False
@@ -162,7 +164,7 @@ class epi(commands.Cog):
     epi_data: dict[discord.Message|str, list[discord.Message]] = {} # the custom set message: list of mssages to be edited to remove the get notified button
     group = app_commands.Group(name="epi", description="Commands related to Emergency Post Information system")
     sticky_message: discord.Message|None = None
-    recent_page: dict | None = None # {"user_id": 1234, "message": "low taper fade is still massive", "timestamp": 1234.56, "priority": 1, "service": "Sapphire - bot", "cb_affected": False, "id": "AbC123"}
+    recent_page: dict | None = None # {"user_id": 1234, "message": "low taper fade is still massive", "timestamp": 1234.56, "priority": 1, "service": "Sapphire - bot", "cb_affected": False, "id": "AbC123"} , used for "a page was made 3 minutes ago, are you sure you want to continue?" for pages up to 5 minutes old
 
     async def send_epi_log(self, content: str):
         epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID)
@@ -216,7 +218,7 @@ class epi(commands.Cog):
     
     @group.command(name="disable", description="Disable EPI mode- mark the issue as solved & ping all users that asked to be pinged")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
-    async def epi_disable(self, interaction: discord.Interaction):
+    async def epi_disable(self, interaction: discord.Interaction, message: str = None):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
             button = discord.ui.Button(
@@ -229,25 +231,29 @@ class epi(commands.Cog):
                 await i.response.defer(ephemeral=True)
                 await i.delete_original_response()
                 index = list(self.epi_data)[0]
-                for message in self.epi_data[index]:
-                    if message.channel:
-                        if not message.channel.archived:
-                            await message.edit(view=None)
-                            await message.reply(
-                                content="Hey, this issue is fixed now!\n-# Thank you for your patience.",
+                content = "Hey, this issue is fixed now!\n-# Thank you for your patience."
+                if message:
+                    content += f"\n> {message}"    
+                for msg in self.epi_data[index]:
+                    if msg.channel:
+                        if not msg.channel.archived:
+                            await msg.edit(view=None)
+                            await msg.reply(
+                                content= content,
                                 mention_author=False
                             )
                         else:
-                            await message.channel.edit(archived=False)
-                            await message.reply(
-                                content="Hey, this issue is fixed now!\n-# Thank you for your patience.",
+                            await msg.channel.edit(archived=False)
+                            msg.edit(view=None)
+                            await msg.reply(
+                                content= content,
                                 mention_author=False
                             )
-                            await message.channel.edit(archived=True)
+                            await msg.channel.edit(archived=True)
                     else:
                         continue
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
-                main_message = await general.send(content="Hey, this issue is now fixed!\n-# Thank you for your patience.")
+                main_message = await general.send(content=content)
                 if epi_users:
                     mentions: list[discord.Member|discord.User] = []
                     for user_id in epi_users:
@@ -415,6 +421,11 @@ class epi(commands.Cog):
     page_websockets: dict[str, asyncio.Task] = {} # id: task
 
     async def handle_websocket(self, message: discord.WebhookMessage|discord.Message, id: str):
+        """  
+        The way this system works is that a notification ("page") is sent to
+        another ntfy topic (NTFY_SECOND_TOPIC_ID from .env) when a button from the notification
+        is clicked while SH is listening to events in that topic
+        """
         await self.send_epi_log(f"Attempting to connect to WS.\nID: `{id}`")
         async with aiohttp.ClientSession() as cs:
             async with cs.ws_connect(f"https://ntfy.sh/{NTFY_SECOND_TOPIC}/ws") as ws:
@@ -471,13 +482,13 @@ class epi(commands.Cog):
         }
         tags = [severity_emojis.get(priority, "question")]
         if cb_affected:
-            tags.append("moneybag")
-        if not user:
-            tags.append("robot")
+            tags.append("moneybag") # 💰
+        if not user: # an automated page for rate limits
+            tags.append("robot") # 🤖
         if user:
             title.join(f" | Sent by @{user.name}")
         async with aiohttp.ClientSession(trust_env=True) as cs:
-            random_id = generate_random_id()
+            random_id = generate_random_id() # a unique random id for when there are multiple open websockets
             self.recent_page["id"] = random_id
             data = {
                 "topic": NTFY_TOPIC_NAME,
@@ -485,7 +496,7 @@ class epi(commands.Cog):
                 "title": title,
                 "tags": tags,
                 "click": followup.jump_url,
-                "actions": [
+                "actions": [ # the hedaers in each button is {"Title": "the message that will be sent in the channel", "message": "the unique id"}
                     {
                         "action": "http",
                         "label": "On it",
@@ -515,7 +526,7 @@ class epi(commands.Cog):
                 data["icon"] = user.avatar.url
             try:
                 async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
-                    if req.status == 200:
+                    if req.status == 200: # OK
                         if user:
                             service = title.removesuffix(f" | Sent by @{user.name}")
                             await self.send_epi_log(f"{user.mention} used /page. Service: {service} | Message: `{message}` | Priority: {priority} | Custom Branding Affected: {cb_affected}.\n-# ID: {random_id}")
@@ -647,10 +658,10 @@ class epi(commands.Cog):
                             close = self.page_websockets[key].cancel()
                             closed.append(key) if close else not_closed.append(key)
                             continue
-                        closed_str = ", ".join(f"`{closed}`") if closed else None
-                        not_closed_str = ",".join(f"`{not_closed}`") if not_closed else None
+                        closed_str = ", ".join(closed) if closed else None
+                        not_closed_str = ",".join(not_closed) if not_closed else None
                         await i.followup.send(
-                            content=f"{'Successfully closed: ' + closed_str if closed_str else ''}.\n{'not closed: ' + not_closed_str if not_closed_str else ''}",
+                            content=f"{'Successfully closed: ' + closed_str if closed_str else ''}.\n{'Not closed: ' + not_closed_str if not_closed_str else ''}",
                             ephemeral=True
                         )
                         await interaction.edit_original_response(view=None)
