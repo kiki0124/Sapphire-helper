@@ -123,7 +123,7 @@ class bot(commands.Cog):
         )
         embed.add_field(name="CPU Count:", value=os.cpu_count(), inline=False)
         embed.add_field(name="CPU Load:", value=f"{psutil.cpu_percent()}%", inline=False)
-        embed.add_field(name="Available Memory:", value=f"{str(psutil.virtual_memory()[1]/1000000000)[:4]}GB", inline=False)
+        embed.add_field(name="Available Memory:", value=f"{str(round(psutil.virtual_memory()[0]/1000000000))}GB", inline=False)
         embed.add_field(name="Memory Usage:", value=f"{psutil.virtual_memory()[2]}%", inline=False)
         embed.set_footer(text=f"Discord.py version {discord.__version__}")
         await ctx.reply(embed=embed, mention_author=False)
