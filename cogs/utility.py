@@ -202,7 +202,8 @@ class utility(commands.Cog):
         --Integrated with rtdr system
         """
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID)) or interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel.id)
+            owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+            return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID)) or interaction.user.id == owner_id
         else:
             return False
 
