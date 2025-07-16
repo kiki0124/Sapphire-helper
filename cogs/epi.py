@@ -48,68 +48,79 @@ class select_channels(ui.ChannelSelect):
         self.slowmode = slowmode
         self.i = i
 
-    async def lock_channels(self, channels: list[discord.TextChannel|discord.ForumChannel], interaction: discord.Interaction):
-        for channel in channels:
-            previous_permissions = channel.overwrites_for(channel.guild.default_role).pair() # permissions bit of (allow, deny)
-            await save_channel_permissions(channel.id, allow=previous_permissions[0].value, deny=previous_permissions[1].value)
-            permissions = discord.PermissionOverwrite(send_messages=False, create_public_threads=False, create_private_threads=False, send_messages_in_threads=False) # the channel permissions for @everyone role
-            experts_mods_overwrites = discord.PermissionOverwrite(send_messages=True, create_public_threads=True, send_messages_in_threads=True)
-            experts = channel.guild.get_role(EXPERTS_ROLE_ID)
-            mods = channel.guild.get_role(MODERATORS_ROLE_ID)
-            overwrites = {
-                channel.guild.default_role: permissions,
-                experts: experts_mods_overwrites,
-                mods: experts_mods_overwrites
-            }
-            await channel.edit(overwrites=overwrites, reason=f"{interaction.user.name} ({interaction.user.id}) used /lock. Reason: {self.reason}")
-            if isinstance(channel, discord.TextChannel):
-                embed = discord.Embed(
-                    title="Channel locked.",
-                    description=f"> {self.reason}",
-                    colour=0xFFA800 # Default 'warning' colour in Sapphire's default messages which I find quite nice and fitting
-                )
-                embed.set_footer(text=f"@{interaction.user.name}", icon_url=interaction.user.avatar.url)
-                await channel.send(embed=embed)
-            await interaction.followup.send(content=f"Successfully locked {channel.mention} with reason `{self.reason}`", ephemeral=True)
+    async def send_log(self, content: str):
+        epi_thread = self.i.guild.get_thread(EPI_LOG_THREAD_ID)
+        webhooks = await epi_thread.parent.webhooks()
+        webhook = webhooks[0] or await epi_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+        if epi_thread.archived:
+            await epi_thread.edit(archived=False)
+        await webhook.send(
+            content,
+            username=self.i.client.user.name,
+            avatar_url=self.i.client.user.avatar.url,
+            allowed_mentions=discord.AllowedMentions.none(),
+            thread=epi_thread,
+            wait=False            
+            )
 
-    async def unlock_channels(self, channels: list[discord.TextChannel|discord.ForumChannel], interaction: discord.Interaction):
-        for channel in channels:
-            allow_deny = await get_channel_permissions(channel.id) # returns in the same way that TextChannel.overwrites_for(...).pair() does - (allow_bit, deny_bit)
-            allow = discord.Permissions()._from_value(allow_deny[0])
-            deny = discord.Permissions()._from_value(allow_deny[1])
-            overwrites = discord.PermissionOverwrite().from_pair(allow=allow, deny=deny)
-            await channel.edit(overwrites={channel.guild.default_role: overwrites}, reason=f"{interaction.user.name} ({interaction.user.id}) used /unlock. Reason: {self.reason}")
-            if isinstance(channel, discord.TextChannel):
-                embed = discord.Embed(
-                    title="Channel unlocked",
-                    description=f"> {self.reason}",
-                    colour=0x36CE36
-                    )
-                embed.set_footer(text=f"@{interaction.user.name}", icon_url=interaction.user.avatar.url)
-                await channel.send(embed=embed)
-            await delete_channel_permissions(channel.id)
-            await interaction.followup.send(f"Successfully unlocked {channel.mention} with reason `{self.reason}`", ephemeral=True)
+    async def lock_channel(self, channel: discord.TextChannel|discord.ForumChannel, interaction: discord.Interaction):
+        previous_permissions = channel.overwrites_for(channel.guild.default_role).pair() # permissions bit of (allow, deny)
+        await save_channel_permissions(channel.id, allow=previous_permissions[0].value, deny=previous_permissions[1].value)
+        permissions = discord.PermissionOverwrite(send_messages=False, create_public_threads=False, create_private_threads=False, send_messages_in_threads=False) # the channel permissions for @everyone role
+        experts_mods_overwrites = discord.PermissionOverwrite(send_messages=True, create_public_threads=True, send_messages_in_threads=True)
+        experts = channel.guild.get_role(EXPERTS_ROLE_ID)
+        mods = channel.guild.get_role(MODERATORS_ROLE_ID)
+        overwrites = {
+            channel.guild.default_role: permissions, # @everyone role
+            experts: experts_mods_overwrites,
+            mods: experts_mods_overwrites
+        }
+        await channel.edit(overwrites=overwrites, reason=f"{interaction.user.name} ({interaction.user.id}) used /lock. Reason: {self.reason}")
+        if isinstance(channel, discord.TextChannel):
+            embed = discord.Embed(
+                title="Channel locked.",
+                description=f"> {self.reason}",
+                colour=0xFFA800 # Default 'warning' colour in Sapphire's default messages which I find quite nice and fitting
+            )
+            embed.set_footer(text=f"@{interaction.user.name}", icon_url=interaction.user.avatar.url)
+            await channel.send(embed=embed)
+        await interaction.followup.send(content=f"Successfully locked {channel.mention} with reason `{self.reason}`", ephemeral=True)
+
+    async def unlock_channel(self, channel: discord.TextChannel|discord.ForumChannel, interaction: discord.Interaction):
+        allow_deny = await get_channel_permissions(channel.id) # returns in the same way that TextChannel.overwrites_for(...).pair() does - (allow_bit, deny_bit)
+        allow = discord.Permissions()._from_value(allow_deny[0])
+        deny = discord.Permissions()._from_value(allow_deny[1])
+        overwrites = discord.PermissionOverwrite().from_pair(allow=allow, deny=deny)
+        await channel.edit(overwrites={channel.guild.default_role: overwrites}, reason=f"{interaction.user.name} ({interaction.user.id}) used /unlock. Reason: {self.reason}")
+        if isinstance(channel, discord.TextChannel):
+            embed = discord.Embed(
+                title="Channel unlocked",
+                description=f"> {self.reason}",
+                colour=0x36CE36
+                )
+            embed.set_footer(text=f"@{interaction.user.name}", icon_url=interaction.user.avatar.url)
+            await channel.send(embed=embed)
+        await delete_channel_permissions(channel.id)
+        await interaction.followup.send(f"Successfully unlocked {channel.mention} with reason `{self.reason}`", ephemeral=True)
 
     async def callback(self, interaction):
         await interaction.response.defer(ephemeral=True)
         channels = self.values # the selected channels
-        fetched_channels: list[discord.TextChannel|discord.ForumChannel] = []
-        for c in channels: # c (each item in the returned list of channels that were selected) is only a discord.AppCommandChannel which is missing some methods/attributes
-            try:
-                channel = interaction.guild.get_channel(c.id) or await c.fetch() # try to get the channel from the internal cache or fetch it if it isn't found
-            except discord.HTTPException:
-                await interaction.followup.send(f"Couldn't fetch {c.mention}", ephemeral=True)
-                continue
+        fetched_channels: list[discord.TextChannel|discord.ForumChannel] = [interaction.guild.get_channel(c.id) or await c.fetch() for c in channels]
+        successful: list[int] = [] # list of channel ids that were successfully locked/unlocked/set slowmode in
+        for channel in fetched_channels:
             if channel.permissions_for(interaction.user).send_messages and channel.permissions_for(interaction.guild.default_role).view_channel:                    
                 match self.action:
                     case "lock":
                         if channel.id not in await get_locked_channels():
-                            fetched_channels.append(channel)
+                            await self.lock_channel(channel, interaction)
+                            successful.append(channel.id)
                         else:
                             await interaction.followup.send(f"You cannot lock {channel.mention} as its already locked!", ephemeral=True)
                     case "unlock":
                         if channel.id in await get_locked_channels():
-                            fetched_channels.append(channel)
+                            await self.unlock_channel(channel, interaction)
+                            successful.append(channel.id)
                         else:
                             await interaction.followup.send(f"You cannot unlock {channel.mention} as it isn't locked!", ephemeral=True)
                     case "slowmode":
@@ -118,43 +129,11 @@ class select_channels(ui.ChannelSelect):
                             await interaction.followup.send(f"Successfully set slowmode in {channel.mention} to {self.slowmode} seconds with reason: {self.reason}", ephemeral=True)
                         elif self.slowmode == 0:
                             await interaction.followup.send(f"Successfully disabled slowmode in {channel.mention}!", ephemeral=True)
+                        successful.append(channel.id)
             else:
                 await interaction.followup.send(f"You can only {self.action} channels you can send messages in and `@everyone` can view!\n-# {channel.mention}", ephemeral=True)
-        epi_thread = interaction.guild.get_thread(EPI_LOG_THREAD_ID)
-        webhooks = await epi_thread.parent.webhooks()
-        webhook = webhooks[0] or await epi_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        if epi_thread.archived:
-            await epi_thread.edit(archived=False)
-        if fetched_channels:
-            match self.action:
-                case "lock":
-                    await self.lock_channels(fetched_channels, interaction)
-                    await webhook.send(
-                    content=f"{interaction.user.mention} locked {', '.join(c.mention for c in fetched_channels)}. Reason: {self.reason}",
-                    username=interaction.client.user.name,
-                    avatar_url=interaction.client.user.avatar.url,
-                    thread=discord.Object(id=EPI_LOG_THREAD_ID),
-                    wait=False,
-                    allowed_mentions=discord.AllowedMentions.none()
-                    )
-                case "unlock":
-                    await self.unlock_channels(fetched_channels, interaction)
-                    await webhook.send(
-                    content=f"{interaction.user.mention} unlocked {', '.join(c.mention for c in fetched_channels)}. Reason: `{self.reason}`",
-                    username=interaction.client.user.name,
-                    avatar_url=interaction.client.user.avatar.url,
-                    thread=epi_thread,
-                    wait=False,
-                    allowed_mentions=discord.AllowedMentions.none()
-                    )
-                case "slowmode":
-                    await webhook.send(
-                        content=f"{interaction.user.mention} {'set slowmode of' + self.slowmode if self.slowmode > 0 else 'disabled slowmode'} in {', '.join(c.mention for c in fetched_channels)}",
-                        username=interaction.client.user.name,
-                        avatar_url=interaction.client.user.avatar.url,
-                        thread=epi_thread,
-                        wait=False
-                    )
+        action_str = self.action + "ed" if self.slowmode is None else f"set slowmode to {self.slowmode}" if self.slowmode > 0 else "disabled slowmode"
+        await self.send_log(f"{interaction.user.mention} {action_str} in {', '.join([f'<#{c}>' for c in successful])}. Reason: {self.reason}")
         await self.i.edit_original_response(view=None)
 
 class epi(commands.Cog):
