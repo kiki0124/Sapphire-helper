@@ -96,7 +96,10 @@ class utility(commands.Cog):
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
         webhooks = await alerts_thread.parent.webhooks()
-        webhook = webhooks[0] or await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+        try:
+            webhook = webhooks[0] 
+        except IndexError:
+            webhook = await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
         await webhook.send(
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
             username=self.client.user.name,
@@ -287,7 +290,10 @@ class utility(commands.Cog):
     async def send_qr_log(self, message: discord.Message, user: discord.Member):
         qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID)
         webhooks = await qr_logs_thread.parent.webhooks()
-        webhook = webhooks[0] or await qr_logs_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+        try:
+            webhook = webhooks[0]
+        except IndexError:
+            webhook = await qr_logs_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
         if qr_logs_thread.archived:
             await qr_logs_thread.edit(archived=False)
         await webhook.send(

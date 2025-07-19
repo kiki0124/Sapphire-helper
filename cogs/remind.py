@@ -80,7 +80,10 @@ class remind(commands.Cog):
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
         webhooks = await alerts_thread.parent.webhooks()
-        webhook = webhooks[0] or await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+        try:
+            webhook = webhooks[0]
+        except IndexError:
+            webhook = await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
         await webhook.send(
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
             username=self.client.user.name,
