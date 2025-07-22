@@ -225,12 +225,6 @@ class utility(commands.Cog):
                 try:
                     await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
                 except discord.NotFound:
-                    alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
-                    if alerts_thread.archived:
-                        await alerts_thread.edit(archived=False)
-                    await alerts_thread.send(
-                        f"/solved raised NotFound <@1105414178937774150>. Created at {interaction.created_at.timestamp()} <t:{round(interaction.created_at.timestamp())}:T>, now {datetime.datetime.now().timestamp()}, <t:{round(datetime.datetime.now().timestamp())}:T>\n"
-                    )
                     await interaction.channel.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
             else:
                 await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
