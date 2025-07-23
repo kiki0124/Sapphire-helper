@@ -372,7 +372,7 @@ class utility(commands.Cog):
                 content = f"<@{user_id}>"
             embed = discord.Embed(
                 title="Incomplete support post",
-                description="Hey, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible'",
+                description="Hey, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible",
                 colour=0xFFA800
             )
             embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.avatar.url)
