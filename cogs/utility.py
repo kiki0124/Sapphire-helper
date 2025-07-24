@@ -366,21 +366,32 @@ class utility(commands.Cog):
     async def incomplete_post(self, ctx: commands.Context):
         await ctx.defer(ephemeral=True)
         if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
-            user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
-            content = None
-            if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID):
-                content = f"<@{user_id}>"
-            embed = discord.Embed(
-                title="Incomplete support post",
-                description="Hey, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible",
-                colour=0xFFA800
-            )
-            embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.avatar.url)
-            if not ctx.interaction:
-                await ctx.message.delete()
-            elif ctx.interaction:
-                await ctx.interaction.delete_original_response()
-            await ctx.channel.send(content=content, embed=embed)
+            if SOLVED_TAG_ID not in ctx.channel._applied_tags and NEED_DEV_REVIEW_TAG_ID not in ctx.channel._applied_tags:
+                user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
+                content = None
+                if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID):
+                    content = f"<@{user_id}>"
+                embed = discord.Embed(
+                    title="Incomplete support post",
+                    description="Hey, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible",
+                    colour=0xFFA800
+                )
+                embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.avatar.url)
+                if not ctx.interaction:
+                    await ctx.message.delete()
+                elif ctx.interaction:
+                    await ctx.interaction.delete_original_response()
+                tags = [ctx.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+                if CUSTOM_BRANDING_TAG_ID in ctx.channel._applied_tags:
+                    tags.append(ctx.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                if APPEAL_GG_TAG_ID in ctx.channel._applied_tags:
+                    tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
+                await ctx.channel.send(content=content, embed=embed)
+                action_id = generate_random_id()
+                await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
+                await self.send_action_log(action_id, ctx.channel.mention, tags, "/incomplete-post used")
+            else:
+                await ctx.reply("You cannot use this command as this post has the *Solved* tag.", ephemeral=True)
         else:
             await ctx.reply(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
 
