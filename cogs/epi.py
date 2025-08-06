@@ -546,20 +546,17 @@ class epi(commands.Cog):
                 await interaction.response.defer(ephemeral=True)
                 button = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page-confirm")
                 async def callback(i: discord.Interaction):
-                    if i.user.id == interaction.user.id:
-                        followup = await i.channel.send("Sending...")
-                        await interaction.delete_original_response()
-                        self.recent_page = {
-                        "user_id": interaction.user.id,
-                        "message": message,
-                        "timestamp": round(datetime.datetime.now().timestamp()),
-                        "priority": priority,
-                        "service": service,
-                        "cb_affected": cb_affected
-                        }
-                        await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
-                    else:
-                        await i.followup.send(f"Only the user who executed the command ({interaction.user.mention}) can use this button.", ephemeral=True)
+                    followup = await i.channel.send("Sending...")
+                    await interaction.delete_original_response()
+                    self.recent_page = {
+                    "user_id": interaction.user.id,
+                    "message": message,
+                    "timestamp": round(datetime.datetime.now().timestamp()),
+                    "priority": priority,
+                    "service": service,
+                    "cb_affected": cb_affected
+                    }
+                    await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
                 button.callback = callback
                 view = ui.View()
                 view.add_item(button)
@@ -591,7 +588,7 @@ class epi(commands.Cog):
     @commands.Cog.listener("on_message")
     async def autopage_on_ratelimit(self, message: discord.Message):
         if message.channel.id in [1023568468206956554, 1146016865345343531] and message.author.bot: # #cluster-log and the id of the channel in testing server as I don't want to add another .env variable
-            if 265236642476982273 in [user.id for user in message.mentions]: #! IMPORTANT: please make sure that this is Xge's user ID. For testing I had to switch it with my own as messages' mentions field only shows for users who are in the server
+            if 265236642476982273 in [user.id for user in message.mentions]: #! IMPORTANT: please make sure that this is Xge's user ID. For testing I had to switch it with my own as messages' .mentions field only shows for users who are in the server
                 experts_channel = self.client.get_channel(EPI_LOG_THREAD_ID).parent
                 msg = await experts_channel.send(f"Sending automated page for {message.jump_url}")
                 priority = 3
