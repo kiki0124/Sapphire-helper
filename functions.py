@@ -1,5 +1,5 @@
 import datetime
-import aiosqlite as sql
+import asqlite as sql
 from string import ascii_letters, digits
 import random
 
@@ -18,6 +18,7 @@ async def main():
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS quick_replies(id STRING UNIQUE NOT NULL, title STRING NOT NULL, description STRING NULL, emoji STRING NULL, reply_content STRING NULL, embed_data STRING NULL)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -224,3 +225,9 @@ async def delete_channel_permissions(channel_id: int) -> None:
         async with conn.cursor() as cu:
             await cu.execute("DELETE FROM locked_channels_permissions WHERE channel_id=?", (channel_id,))
             await conn.commit()
+
+# quick replies
+
+async def save_quick_reply(title: str, description: str = None, emoji: str = None, content: str = None, embed_data: dict = None):
+    # INSERT INTO quick_replies (id, title, description, emoji, reply_content, embed_data) VALUES (?, ?, ?, ?, ?) (title, description, emoji, content, str(embed_data),)
+    pass
