@@ -147,6 +147,8 @@ class epi(commands.Cog):
     group = app_commands.Group(name="epi", description="Commands related to Emergency Post Information system")
     sticky_message: discord.Message|None = None
     recent_page: dict | None = None # {"user_id": 1234, "message": "low taper fade is still massive", "timestamp": 1234.56, "priority": 1, "service": "Sapphire - bot", "cb_affected": False, "id": "AbC123"} , used for "a page was made 3 minutes ago, are you sure you want to continue?" for pages up to 5 minutes old
+    sticky_task: asyncio.Task|None = None
+    is_being_executed: bool = False
 
     async def send_epi_log(self, content: str):
         epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID)
@@ -178,7 +180,12 @@ class epi(commands.Cog):
                 await self.send_epi_log(content=f"EPI mode enabled by {interaction.user.mention}\n`{info}`")
                 if sticky:
                     general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
-                    msg = await general.send(f"## The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {info}", view=get_notified())
+                    embed = discord.Embed(
+                        title="A notice has been put up!",
+                        description=f"Any issues you're experiencing are most likely related to this.\n> {info}",
+                        colour=discord.Colour.orange()
+                    )
+                    msg = await general.send(embed=embed, view=get_notified())
                     self.sticky_message = msg
             elif info.isdigit():
                 status_channel = discord.utils.get(interaction.guild.channels, name="status", type=discord.ChannelType.news)
@@ -191,7 +198,12 @@ class epi(commands.Cog):
                 await self.send_epi_log(content=f"EPI mode enabled by {interaction.user.mention}\n{message.jump_url}")
                 if sticky:
                     general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
-                    msg = await general.send(f"## Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {message.jump_url}", view=get_notified())
+                    embed = discord.Embed(
+                        title="Sapphire is currently experiencing some issues",
+                        description=f"> {message.jump_url}",
+                        colour=discord.Colour.orange()
+                    )
+                    msg = await general.send(embed=embed, view=get_notified())
                     self.sticky_message = msg
         else:
             url_or_text = list(self.epi_data)[0]
@@ -314,10 +326,19 @@ class epi(commands.Cog):
                         general = self.client.get_channel(GENERAL_CHANNEL_ID)
                         msg_or_text = list(self.epi_data.keys())[0]
                         if isinstance(msg_or_text, str):
-                            msg = await general.send(f"## The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_text}", view=get_notified())
+                            embed = discord.Embed(
+                                title="A notice has been put up!",
+                                description=f"Any issues you're experiencing are most likely related to this.\n> {msg_or_text}",
+                                colour=discord.Colour.orange()
+                                )
                         elif isinstance(msg_or_text, discord.Message):
-                            msg = await general.send(f"## Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}", view=get_notified())
-                        self.sticky_message = msg
+                            embed = discord.Embed(
+                                title="Sapphire is currently experiencing some issues",
+                                description=f"> {msg_or_text.jump_url}",
+                                colour=discord.Colour.orange()
+                            )
+                        embed.set_footer(text="Thank you for your patience!")
+                        self.sticky_message = await general.send(embed=embed, view=get_notified())
                         await interaction.followup.send("Successfully enabled sticky messages!", ephemeral=True)
                         await self.send_epi_log(f"EPI mode edited by {interaction.user.mention} - Enabled sticky messages.")
                     elif self.sticky_message:
@@ -348,16 +369,42 @@ class epi(commands.Cog):
                 await msg_or_txt.forward(thread)
             self.epi_data[msg_or_txt].append(message)
 
+    async def handle_sticky_message(self, channel: discord.TextChannel):
+        print("handle sticky message called")
+        msg_or_text = list(self.epi_data.keys())[0]
+        if isinstance(msg_or_text, str):
+            embed = discord.Embed(
+                title="A notice has been put up!",
+                description=f"Any issues you're experiencing are most likely related to this.\n> {msg_or_text}",
+                colour=discord.Colour.orange()
+            )
+        elif isinstance(msg_or_text, discord.Message):
+            embed = discord.Embed(
+                title="Sapphire is currently experiencing some issues",
+                description=f"> {msg_or_text.jump_url}",
+                colour=discord.Colour.orange()
+            )
+        embed.set_footer(text="Thank you for your patience!")
+        await asyncio.sleep(4)
+        print("Waited for delay")
+        self.is_being_executed = True
+        await self.sticky_message.delete()
+        self.sticky_message = await channel.send(embed=embed, view=get_notified())
+        self.sticky_task = None
+        self.is_being_executed = False
+
     @commands.Cog.listener('on_message')
     async def epi_sticky_message(self, message: discord.Message):
         if self.epi_data and not message.author.bot and message.channel.id == GENERAL_CHANNEL_ID and self.sticky_message:
-            await self.sticky_message.delete()
-            msg_or_text = list(self.epi_data.keys())[0]
-            if isinstance(msg_or_text, str):
-                msg = await message.channel.send(f"## The following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_text}", view=get_notified())
-            elif isinstance(msg_or_text, discord.Message):
-                msg = await message.channel.send(f"## Sapphire is currently experiencing some issues. The developers are aware.\nYou can view more information here {msg_or_text.jump_url}", view=get_notified())
-            self.sticky_message = msg
+            if not self.is_being_executed and self.sticky_task:
+                print("not being executed, sticky task")
+                self.sticky_task.cancel()
+                self.sticky_task = asyncio.create_task(self.handle_sticky_message(message.channel))
+                print("task canceled and set to None")
+            elif not self.is_being_executed and not self.sticky_task:
+                print("not being executed and not sticky task")
+                self.sticky_task = asyncio.create_task(self.handle_sticky_message(message.channel))
+                print("task created")
 
     channel_permissions: dict[discord.TextChannel | discord.ForumChannel, dict[discord.Role|discord.Member|discord.Object, discord.PermissionOverwrite]] = {}
 
