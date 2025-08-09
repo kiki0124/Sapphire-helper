@@ -200,7 +200,7 @@ class epi(commands.Cog):
                     general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                     embed = discord.Embed(
                         title="Sapphire is currently experiencing some issues",
-                        description=f"> {message.jump_url}",
+                        description=f"> **{message.content}**\n-# {message.jump_url}",
                         colour=discord.Colour.orange()
                     )
                     msg = await general.send(embed=embed, view=get_notified())
@@ -334,7 +334,7 @@ class epi(commands.Cog):
                         elif isinstance(msg_or_text, discord.Message):
                             embed = discord.Embed(
                                 title="Sapphire is currently experiencing some issues",
-                                description=f"> {msg_or_text.jump_url}",
+                                description=f"> **{msg_or_text.content}**\n-# {msg_or_text.jump_url}",
                                 colour=discord.Colour.orange()
                             )
                         embed.set_footer(text="Thank you for your patience!")
@@ -380,7 +380,7 @@ class epi(commands.Cog):
         elif isinstance(msg_or_text, discord.Message):
             embed = discord.Embed(
                 title="Sapphire is currently experiencing some issues",
-                description=f"> {msg_or_text.jump_url}",
+                description=f"> **{msg_or_text.content}**\n-# {msg_or_text.jump_url}",
                 colour=discord.Colour.orange()
             )
         embed.set_footer(text="Thank you for your patience!")
