@@ -370,7 +370,6 @@ class epi(commands.Cog):
             self.epi_data[msg_or_txt].append(message)
 
     async def handle_sticky_message(self, channel: discord.TextChannel):
-        print("handle sticky message called")
         msg_or_text = list(self.epi_data.keys())[0]
         if isinstance(msg_or_text, str):
             embed = discord.Embed(
@@ -386,7 +385,6 @@ class epi(commands.Cog):
             )
         embed.set_footer(text="Thank you for your patience!")
         await asyncio.sleep(4)
-        print("Waited for delay")
         self.is_being_executed = True
         await self.sticky_message.delete()
         self.sticky_message = await channel.send(embed=embed, view=get_notified())
@@ -397,14 +395,10 @@ class epi(commands.Cog):
     async def epi_sticky_message(self, message: discord.Message):
         if self.epi_data and not message.author.bot and message.channel.id == GENERAL_CHANNEL_ID and self.sticky_message:
             if not self.is_being_executed and self.sticky_task:
-                print("not being executed, sticky task")
                 self.sticky_task.cancel()
                 self.sticky_task = asyncio.create_task(self.handle_sticky_message(message.channel))
-                print("task canceled and set to None")
             elif not self.is_being_executed and not self.sticky_task:
-                print("not being executed and not sticky task")
                 self.sticky_task = asyncio.create_task(self.handle_sticky_message(message.channel))
-                print("task created")
 
     channel_permissions: dict[discord.TextChannel | discord.ForumChannel, dict[discord.Role|discord.Member|discord.Object, discord.PermissionOverwrite]] = {}
 
