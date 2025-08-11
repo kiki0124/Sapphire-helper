@@ -1,7 +1,8 @@
 import datetime
-import aiosqlite as sql
+import asqlite as sql
 from string import ascii_letters, digits
 import random
+from typing import Optional
 
 DB_PATH = "database\data.db"
 
@@ -18,6 +19,9 @@ async def main():
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS epi_config(started_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP, message STRING NULL DEFAULT NULL, message_id INTEGER NULL DEFAULT NULL, sticky BOOL NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS epi_users(user_id INTEGER UNIQUE NOT NULL)")
+            await cu.execute("CREATE TABLE IF ONT EXISTS epi_messages(thread_id INTEGER UNIQUE NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -38,7 +42,7 @@ def check_time_more_than_day(timestamp: int) -> bool:
 
 # reminder system related functions
 
-async def execute_sql(cmd: str) -> tuple|Exception|None:
+async def execute_sql(cmd: str) -> Optional[tuple|Exception]:
     """  
     Execute the given sql command and return the result or None if there is no result, if an error was raised when executing the sql command it will be returned
     """
@@ -79,7 +83,7 @@ async def remove_post_from_pending(post_id: int) -> None:
             await cu.execute(f"DELETE FROM pending_posts WHERE post_id=?", (post_id,))
             await conn.commit()
 
-async def get_post_timestamp(post_id: int) -> int|None:
+async def get_post_timestamp(post_id: int) -> Optional[int]:
     """  
     Returns the saved timestamp for the post with given id or None if its not in the db
     """
@@ -110,7 +114,7 @@ async def add_post_to_rtdr(post_id: int, user_id: int) -> None:
             await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, user_id,))
             await conn.commit()
 
-async def get_post_creator_id(post_id: int) -> int|None:
+async def get_post_creator_id(post_id: int) -> Optional[int]:
     """  
     Get the id of whoever the post was created for if its part of readthedamnrules system
     """
@@ -223,4 +227,100 @@ async def delete_channel_permissions(channel_id: int) -> None:
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             await cu.execute("DELETE FROM locked_channels_permissions WHERE channel_id=?", (channel_id,))
+            await conn.commit()
+
+# EPI
+
+async def save_epi_config(sticky: bool, message: str = None, message_id: int = None) -> None:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("INSERT INTO epi_config (message, message_id, sticky) VALUES (?, ?, ?)", (message, message_id, sticky,))
+            await conn.commit()
+
+async def toggle_epi_user(user_id: int) -> None:
+    """  
+    Add the user id to the list if they aren't in it, and remove them from it if they are in it.
+    """
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("INSERT INTO epi_users (user_id) VALUES (?) ON CONFLICT (user_id) DO DELETE FROM epi_users WHERE user_id=? ", (user_id, user_id,))
+            await conn.commit()
+
+async def get_epi_users() -> list[Optional[int]]:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT user_id FROM epi_users")
+            result = await cu.fetchall()
+            if result: 
+                return [int(user_id) for user_id in result]
+            else: 
+                return []
+
+async def get_epi_config() -> Optional[dict[str, int, str, str, str, int, str, bool]]: # {"started_ts": 123, "message": "low taper fade is still massive", "message_id": 123, sticky: True}
+    """  
+    Returns a dict of the saved config in this format
+    {
+        "started_ts": int(123),
+        "message": str("low taper fade is still massive") | None,
+        "message_id": int(123456) | None,
+        "sticky": bool(False)
+        }
+    """
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT * FROM epi_config")
+            result = await cu.fetchall()
+            if result:
+                return {
+                    "started_ts": result[0],
+                    "message": result[1],
+                    "message_id": result[2],
+                    "sticky": result[3]
+                }
+""" 
+async def get_epi_msg() -> Optional[str]:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT message FROM epi_config")
+            result = await cu.fetchone()
+            if result:
+                return result[0]
+            else:
+                None
+
+async def get_epi_message_id() -> Optional[int]:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT message_id FROM epi_config")
+            result = await cu.fetchone()
+            if result:
+                return result[0]
+            else:
+                return None """
+
+async def add_epi_message(message_id: int, thread_id: int) -> None:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("INSERT INTO epi_messages (thread_id, message_id) VALUES (?, ?) ON CONFLICT (thread_id, message_id) DO NOTHING", (thread_id, message_id,))
+
+async def get_epi_messages() -> dict[int, int]: # {thread_id: message_id}
+    """  
+    Get a dict of {int(thread_id): int(message_id)} of all saved epi messages
+    """
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT * FROM epi_messages")
+            result = await cu.fetchall()
+            data = {}
+            for row in result:
+                data[row[0]] = row[1] # row[0] - thread id, row[1] - message id
+            return data
+
+async def delete_epi_messages() -> None:
+    """  
+    Delete all epi messages from the DB
+    """
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("DELETE FROM epi_messages")
             await conn.commit()
