@@ -1,13 +1,9 @@
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
-import os
 from dotenv import load_dotenv
-from functions import get_post_creator_id, save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, toggle_epi_user, get_epi_users, save_epi_config, get_epi_config, get_epi_messages
-import asyncio
-import aiohttp, json
-import datetime
-import re
+from functions import get_post_creator_id, save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, toggle_epi_user, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config
+import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
 from typing import Literal, Optional
 
 load_dotenv()
@@ -28,6 +24,7 @@ class get_notified(ui.View):
     
     @ui.button(label="Notify me when this issue is resolved", custom_id="epi-get-notified", style=discord.ButtonStyle.grey)
     async def on_get_notified_click(self, interaction: discord.Interaction, button: ui.button):
+        await toggle_epi_user()
         if interaction.user.id not in epi_users:
             epi_users.append(interaction.user.id)
             await interaction.response.send_message(content="You will now be notified when this issue is fixed!", ephemeral=True)
@@ -150,13 +147,13 @@ class epi(commands.Cog):
     is_being_executed: bool = False
     epi_msg: Optional[str] = None
     epi_Message: Optional[discord.Message] = None
-    epi_data: dict[int, list[discord.Message|discord.PartialMessage]] = {}
+    epi_data: dict[int, dict[int, int]] = {} # {int(started_ts: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
 
     def generate_epi_embed(self) -> discord.Embed:
         embed_data = {
             "title": "Some services are currently experiencing issues",
-            "description": list(self.epi_data.keys())[0],
-            "timestamp": round(datetime.datetime.now().timestamp()),
+            "description": "",
+            "timestamp": datetime.datetime.now().isoformat(),
             "color": 0x16749824,
             "footer": {
                 "text": "We're sorry for the inconvenience caused and thank you for your patience!"
@@ -198,36 +195,47 @@ class epi(commands.Cog):
         self.sticky_task = None
         self.is_being_executed = False
 
-    @commands.Cog.listener("setup_hook") # called once on bot startup
-    async def restore_epi_config(self):
-        epi_data = await get_epi_config()
-        if epi_data:
-            raw_messages = await get_epi_messages()
-            messages: list[Optional[discord.PartialMessage]] = []
-            """  
-            A discord.PartialMessage object is similar to a full discord.Message
-            object in the sense that you can use it for api calls (deleting it, replying to it, editting it...)
-            but it's fully local - just a way of using a given message id without using an api call to fetch it
-            which means that it doesn't include properties like content, author... perfect for this case
-            """
+    async def disable_sticky_message(self):
+        while self.is_being_executed:
+            await asyncio.sleep(0.1) # self.is_being_executed is true at lines 196-197 - async handle_sticky_message, when the previous sticky message is deleted and the new one is being sent. 0.1 should probably be enough for these things to happen
+        try:
+            await self.sticky_message.delete()
+        except discord.NotFound:
+            pass # message was not found, probably already deleted - do nothing
+        self.sticky_message = None
+        self.sticky_task = None
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print("epi on ready called")
+        self.client.add_view(get_notified())
+
+    async def cog_load(self):
+        print("epi setup hook called")
+        self.pool = await sql.create_pool("database\data.db")
+        epi_config = await get_epi_config(self.pool)
+        if epi_config:
+            raw_messages = await get_epi_messages(self.pool)
+            messages = {}
             for thread_id, message_id in raw_messages:
-                thread = self.client.get_channel(thread_id)
-                if thread:
-                    messages.append(thread.get_partial_message(message_id))
-                else:
-                    continue # the thread was most likely deleted
-            self.epi_data["started_ts"] = messages
-            self.epi_msg = epi_data["message"]
-            if epi_data["message_id"]:
+                messages[thread_id] = message_id
+            self.epi_data[epi_config["started_ts"]] = messages
+            self.epi_msg = epi_config["message"]
+            if epi_config["message_id"]:
                 status = discord.utils.get(self.client.get_all_channels(), name="status")
                 if status:
                     try:
-                        Message = await status.fetch_message(epi_data["message_id"])
+                        Message = await status.fetch_message(epi_config["message_id"])
                     except discord.NotFound as e:
                         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-                        await alerts_thread.send(f"Tried to fetch epi Message from {status.mention} with id {epi_data['message_id']}.\n{e.status} {e.text}")
+                        await alerts_thread.send(f"Tried to fetch epi Message from {status.mention} with id {epi_config['message_id']}.\n{e.status} {e.text}")
                     else:
                         self.epi_Message = Message
+            epi_users.append(user_id for user_id in await get_epi_users(self.pool))
+
+    async def close(self):
+        await self.pool.close()
+        await super().close()
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
@@ -238,6 +246,7 @@ class epi(commands.Cog):
             self.epi_data[round(datetime.datetime.now().timestamp())] = []
             if message:
                 self.epi_msg = message
+            _message = None
             if message_id:
                 status = discord.utils.get(interaction.channel.text_channels, name="status")
                 if status:
@@ -249,6 +258,8 @@ class epi(commands.Cog):
                         self.epi_Message = _message
                 else:
                     await interaction.followup.send("Couldn't get status channel, try again later...-# **Note:** EPI mode was still activated without the message. You may use /epi edit to include the message")
+            saved_message_id = message_id if _message else None
+            await save_epi_config(self.pool, sticky=sticky, message=message, message_id=saved_message_id)
             if sticky:
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
@@ -305,22 +316,24 @@ class epi(commands.Cog):
                 content = "Hey, this issue is fixed now!\n-# Thank you for your patience."
                 if message:
                     content += f"\n> {message}"    
-                for msg in self.epi_data[index]:
-                    if msg.channel:
-                        if not msg.channel.archived:
+                for thread_id, message_id in self.epi_data[index]:
+                    thread = self.client.get_channel(thread_id)
+                    if thread:
+                        msg = thread.get_partial_message(message_id)
+                        if not thread.archived:
                             await msg.edit(view=None)
                             await msg.reply(
                                 content= content,
                                 mention_author=False
                             )
                         else:
-                            await msg.channel.edit(archived=False)
+                            await thread.edit(archived=False)
                             msg.edit(view=None)
                             await msg.reply(
                                 content= content,
                                 mention_author=False
                             )
-                            await msg.channel.edit(archived=True)
+                            await thread.edit(archived=True)
                     else:
                         continue
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
@@ -339,7 +352,9 @@ class epi(commands.Cog):
                 else:
                     mentioned = False
                 epi_users.clear()
+                await clear_epi_users(self.pool)
                 self.epi_data.clear() # remove the custom status/message
+                await clear_epi_config(self.pool)
                 if self.sticky_message:
                     await self.sticky_message.delete()
                     self.sticky_message = None
@@ -377,6 +392,7 @@ class epi(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
             self.epi_data.update(round(datetime.datetime.now().timestamp()), list(self.epi_data.values())[0])
+            _message = None
             if message:
                 self.epi_msg = message
             if message_id:
@@ -394,7 +410,9 @@ class epi(commands.Cog):
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
             elif sticky == False and self.sticky_message or self.sticky_task:
-                pass
+                await self.disable_sticky_message()
+            saved_message_id = message_id if _message else None
+            await save_epi_config(self.pool, sticky, message, saved_message_id)
 
             """ if info:
                 previous = list(self.epi_data.keys())[0]
@@ -455,13 +473,10 @@ class epi(commands.Cog):
     async def send_epi_info(self, thread: discord.Thread):
         if thread.parent_id == SUPPORT_CHANNEL_ID and self.epi_data:
             await asyncio.sleep(3) # make sure that epi messages will be sent last (after more info message)
-            owner_id = await get_post_creator_id(thread.id) or thread.owner_id
             msg_or_txt = list(self.epi_data.keys())[0]
-            if isinstance(msg_or_txt, str):
-                message = await thread.send(content=f"## Hey <@{owner_id}>, the following notice has been put up. Any issues you may be experiencing are most likely related to this:\n-# The devs are already notified - thanks for your patience!\n\n> {msg_or_txt}", view=get_notified())                
-            elif isinstance(msg_or_txt, discord.Message):
-                message = await thread.send(content=f"## Hey <@{owner_id}>, Sapphire is currently having some trouble. Take a look at the message below for more details:\n-# The devs are already on it - thanks for your patience!", view=get_notified())
-                await msg_or_txt.forward(thread)
+            embed = self.generate_epi_embed()
+            message = await thread.send(embed=embed, view=get_notified())
+            await add_epi_message(self.pool, message.id, thread.id)
             self.epi_data[msg_or_txt].append(message)
 
     @commands.Cog.listener('on_message')

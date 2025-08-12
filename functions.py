@@ -19,9 +19,9 @@ async def main():
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS epi_config(started_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP, message STRING NULL DEFAULT NULL, message_id INTEGER NULL DEFAULT NULL, sticky BOOL NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS epi_config(started_ts INTEGER NOT NULL, message STRING NOT NULL, message_id INTEGER NOT NULL, sticky BOOL NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS epi_users(user_id INTEGER UNIQUE NOT NULL)")
-            await cu.execute("CREATE TABLE IF ONT EXISTS epi_messages(thread_id INTEGER UNIQUE NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS epi_messages(thread_id INTEGER UNIQUE NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -231,32 +231,29 @@ async def delete_channel_permissions(channel_id: int) -> None:
 
 # EPI
 
-async def save_epi_config(sticky: bool, message: str = None, message_id: int = None) -> None:
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("INSERT INTO epi_config (message, message_id, sticky) VALUES (?, ?, ?)", (message, message_id, sticky,))
-            await conn.commit()
+async def save_epi_config(pool: sql.Pool ,sticky: bool, message: str = '-', message_id: int = 0) -> None:
+    async with pool.acquire() as conn:
+        now_timestamp = round(datetime.datetime.now().timestamp())
+        await conn.execute("INSERT INTO epi_config (started_ts, message, message_id, sticky) VALUES (?, ?, ?, ?)", (now_timestamp, message, message_id, sticky,))
+        await conn.commit()
 
 async def toggle_epi_user(user_id: int) -> None:
     """  
     Add the user id to the list if they aren't in it, and remove them from it if they are in it.
     """
     async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("INSERT INTO epi_users (user_id) VALUES (?) ON CONFLICT (user_id) DO DELETE FROM epi_users WHERE user_id=? ", (user_id, user_id,))
-            await conn.commit()
+        await conn.execute("INSERT INTO epi_users (user_id) VALUES (?) ON CONFLICT (user_id) DO DELETE FROM epi_users WHERE user_id=? ", (user_id, user_id,))
+        await conn.commit()
 
-async def get_epi_users() -> list[Optional[int]]:
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("SELECT user_id FROM epi_users")
-            result = await cu.fetchall()
-            if result: 
-                return [int(user_id) for user_id in result]
-            else: 
-                return []
+async def get_epi_users(pool: sql.Pool) -> list[Optional[int]]:
+    async with pool.acquire() as conn:
+        result = await conn.fetchall("SELECT user_id FROM epi_users")
+        if result: 
+            return [int(user_id) for user_id in result]
+        else: 
+            return []
 
-async def get_epi_config() -> Optional[dict[str, int, str, str, str, int, str, bool]]: # {"started_ts": 123, "message": "low taper fade is still massive", "message_id": 123, sticky: True}
+async def get_epi_config(pool: sql.Pool) -> Optional[dict[str, int, str, str, str, int, str, bool]]: # {"started_ts": 123, "message": "low taper fade is still massive", "message_id": 123, sticky: True}
     """  
     Returns a dict of the saved config in this format
     {
@@ -266,17 +263,32 @@ async def get_epi_config() -> Optional[dict[str, int, str, str, str, int, str, b
         "sticky": bool(False)
         }
     """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("SELECT * FROM epi_config")
-            result = await cu.fetchall()
-            if result:
-                return {
-                    "started_ts": result[0],
-                    "message": result[1],
-                    "message_id": result[2],
-                    "sticky": result[3]
-                }
+    async with pool.acquire() as conn:
+        result = await conn.fetchall("SELECT * FROM epi_config")
+        print(result[0].keys())
+        for row in result:
+            for item in row:
+                print(item)
+        """ print("result:", result)
+        print("---")
+        for row in result:
+            print(row.keys())
+            for item in row:
+                print(item, row.keys)
+        print("---")
+        if result:
+            return {
+                "started_ts": result[0],
+                "message": result[1],
+                "message_id": result[2],
+                "sticky": result[3]
+            }"""
+import asyncio
+async def f():
+    pool = await sql.create_pool(DB_PATH)
+    print(await get_epi_config(pool))
+asyncio.run(f())
+
 """ 
 async def get_epi_msg() -> Optional[str]:
     async with sql.connect(DB_PATH) as conn:
@@ -298,29 +310,42 @@ async def get_epi_message_id() -> Optional[int]:
             else:
                 return None """
 
-async def add_epi_message(message_id: int, thread_id: int) -> None:
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("INSERT INTO epi_messages (thread_id, message_id) VALUES (?, ?) ON CONFLICT (thread_id, message_id) DO NOTHING", (thread_id, message_id,))
+async def add_epi_message(pool: sql.Pool, message_id: int, thread_id: int) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute("INSERT INTO epi_messages (thread_id, message_id) VALUES (?, ?) ON CONFLICT (thread_id, message_id) DO NOTHING", (thread_id, message_id,))
+        await conn.commit()
 
-async def get_epi_messages() -> dict[int, int]: # {thread_id: message_id}
+async def get_epi_messages(pool: sql.Pool) -> dict[int, int]: # {thread_id: message_id}
     """  
     Get a dict of {int(thread_id): int(message_id)} of all saved epi messages
     """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("SELECT * FROM epi_messages")
-            result = await cu.fetchall()
-            data = {}
-            for row in result:
-                data[row[0]] = row[1] # row[0] - thread id, row[1] - message id
-            return data
+    async with pool.acquire() as conn:
+        result = await conn.fetchall("SELECT * FROM epi_messages")
+        data = {}
+        for row in result:
+            data[row[0]] = row[1] # row[0] - thread id, row[1] - message id
+        return data
 
-async def delete_epi_messages() -> None:
+async def clear_epi_messages(pool: sql.Pool) -> None:
     """  
     Delete all epi messages from the DB
     """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("DELETE FROM epi_messages")
-            await conn.commit()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM epi_messages")
+        await conn.commit()
+
+async def clear_epi_users(pool: sql.Pool) -> None:
+    """  
+    Delete all epi user ids from the DB
+    """
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM epi_users")
+        await conn.commit()
+
+async def clear_epi_config(pool: sql.Pool) -> None:
+    """ 
+    Delete all data from epi_config table
+    """
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM epi_config")
+        await conn.commit()
