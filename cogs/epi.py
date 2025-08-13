@@ -147,14 +147,14 @@ class epi(commands.Cog):
     is_being_executed: bool = False
     epi_msg: Optional[str] = None
     epi_Message: Optional[discord.Message] = None
-    epi_data: dict[int, dict[int, int]] = {} # {int(started_ts: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
+    epi_data: dict[str, dict[int, int]] = {} # {str(started_iso_format: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
 
     def generate_epi_embed(self) -> discord.Embed:
         embed_data = {
             "title": "Some services are currently experiencing issues",
             "description": "",
-            "timestamp": datetime.datetime.now().isoformat(),
-            "color": 0x16749824,
+            "timestamp": list(self.epi_data.keys())[0],
+            "color": 16749824,
             "footer": {
                 "text": "We're sorry for the inconvenience caused and thank you for your patience!"
                 }
@@ -186,11 +186,12 @@ class epi(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none()
         )
 
-    async def handle_sticky_message(self, channel: discord.TextChannel):
+    async def handle_sticky_message(self, channel: discord.TextChannel, delay: float = 4):
         embed = self.generate_epi_embed()
-        await asyncio.sleep(4)
+        await asyncio.sleep(delay)
         self.is_being_executed = True
-        await self.sticky_message.delete()
+        if self.sticky_message:
+            await self.sticky_message.delete()
         self.sticky_message = await channel.send(embed=embed, view=get_notified())
         self.sticky_task = None
         self.is_being_executed = False
@@ -217,7 +218,7 @@ class epi(commands.Cog):
             messages = {}
             for thread_id, message_id in raw_messages:
                 messages[thread_id] = message_id
-            self.epi_data[epi_config["started_ts"]] = messages
+            self.epi_data[epi_config["started_iso"]] = messages
             msg = epi_config["message"]
             self.epi_msg = msg if msg != "-" else None
             if epi_config["message_id"] and epi_config["message_id"] != 0:
@@ -258,7 +259,7 @@ class epi(commands.Cog):
                 else:
                     await interaction.followup.send("Couldn't get status channel, try again later...-# **Note:** EPI mode was still activated without the message. You may use /epi edit to include the message")
             saved_message_id = message_id if _message else None
-            await save_epi_config(self.pool, sticky=sticky, message=message, message_id=saved_message_id)
+            await save_epi_config(self.pool, sticky=sticky, message=message or "-", message_id=saved_message_id or 0) # message arg defaults to '-' if its None (not provided) and message id to 0
             if sticky:
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)

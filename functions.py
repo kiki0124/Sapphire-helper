@@ -19,7 +19,7 @@ async def main():
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS epi_config(started_ts INTEGER NOT NULL, message STRING NOT NULL, message_id INTEGER NOT NULL, sticky BOOL NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS epi_config(started_iso STRING NOT NULL, message STRING NOT NULL, message_id INTEGER NOT NULL, sticky BOOL NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS epi_users(user_id INTEGER UNIQUE NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS epi_messages(thread_id INTEGER UNIQUE NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
             await conn.commit()
@@ -233,8 +233,8 @@ async def delete_channel_permissions(channel_id: int) -> None:
 
 async def save_epi_config(pool: sql.Pool ,sticky: bool, message: str = '-', message_id: int = 0) -> None:
     async with pool.acquire() as conn:
-        now_timestamp = round(datetime.datetime.now().timestamp())
-        await conn.execute("INSERT INTO epi_config (started_ts, message, message_id, sticky) VALUES (?, ?, ?, ?)", (now_timestamp, message, message_id, sticky,))
+        now_timestamp = datetime.datetime.now().isoformat()
+        await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky) VALUES (?, ?, ?, ?)", (now_timestamp, message, message_id, sticky,))
         await conn.commit()
 
 async def toggle_epi_user(user_id: int) -> None:
@@ -257,7 +257,7 @@ async def get_epi_config(pool: sql.Pool) -> Optional[dict[str, int, str, str, st
     """  
     Returns a dict of the saved config in this format
     {
-        "started_ts": int(123),
+        "started_iso": int(123),
         "message": str("low taper fade is still massive") | None,
         "message_id": int(123456) | None,
         "sticky": bool(False)
@@ -277,7 +277,7 @@ async def get_epi_config(pool: sql.Pool) -> Optional[dict[str, int, str, str, st
                 print(item, row.keys)"""
         if result:
             return {
-                "started_ts": result[0],
+                "started_iso": result[0],
                 "message": result[1],
                 "message_id": result[2],
                 "sticky": result[3]
