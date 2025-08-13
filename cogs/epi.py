@@ -207,11 +207,9 @@ class epi(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print("epi on ready called")
         self.client.add_view(get_notified())
 
     async def cog_load(self):
-        print("epi setup hook called")
         self.pool = await sql.create_pool("database\data.db")
         epi_config = await get_epi_config(self.pool)
         if epi_config:
@@ -220,8 +218,9 @@ class epi(commands.Cog):
             for thread_id, message_id in raw_messages:
                 messages[thread_id] = message_id
             self.epi_data[epi_config["started_ts"]] = messages
-            self.epi_msg = epi_config["message"]
-            if epi_config["message_id"]:
+            msg = epi_config["message"]
+            self.epi_msg = msg if msg != "-" else None
+            if epi_config["message_id"] and epi_config["message_id"] != 0:
                 status = discord.utils.get(self.client.get_all_channels(), name="status")
                 if status:
                     try:
