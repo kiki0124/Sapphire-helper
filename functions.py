@@ -249,7 +249,7 @@ async def get_epi_users(pool: sql.Pool) -> list[Optional[int]]:
     async with pool.acquire() as conn:
         result = await conn.fetchall("SELECT user_id FROM epi_users")
         if result: 
-            return [int(user_id) for user_id in result]
+            return [row[0] for row in result] # the first (and only) item in the user's id as an integer
         else: 
             return []
 
@@ -264,30 +264,26 @@ async def get_epi_config(pool: sql.Pool) -> Optional[dict[str, int, str, str, st
         }
     """
     async with pool.acquire() as conn:
-        result = await conn.fetchall("SELECT * FROM epi_config")
-        print(result[0].keys())
-        for row in result:
+        result = await conn.fetchone("SELECT * FROM epi_config")
+        #print(result[0].keys())
+        """ for row in result:
             for item in row:
                 print(item)
-        """ print("result:", result)
+        print("result:", result)
         print("---")
         for row in result:
             print(row.keys())
             for item in row:
-                print(item, row.keys)
-        print("---")
+                print(item, row.keys)"""
         if result:
             return {
                 "started_ts": result[0],
                 "message": result[1],
                 "message_id": result[2],
                 "sticky": result[3]
-            }"""
-import asyncio
-async def f():
-    pool = await sql.create_pool(DB_PATH)
-    print(await get_epi_config(pool))
-asyncio.run(f())
+            }
+        else:
+            return {}
 
 """ 
 async def get_epi_msg() -> Optional[str]:
