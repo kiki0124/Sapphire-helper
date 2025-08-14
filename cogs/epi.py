@@ -263,38 +263,6 @@ class epi(commands.Cog):
             if sticky:
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
-
-            """ if not info.isdigit():
-                self.epi_data[info] = []
-                await interaction.followup.send(content=f"Successfully enabled EPI mode with the following text `{info}`", ephemeral=True)
-                await self.send_epi_log(content=f"EPI mode enabled by {interaction.user.mention}\n`{info}`")
-                if sticky:
-                    general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
-                    embed = discord.Embed(
-                        title="A notice has been put up!",
-                        description=f"Any issues you're experiencing are most likely related to this.\n> {info}",
-                        colour=discord.Colour.orange()
-                    )
-                    msg = await general.send(embed=embed, view=get_notified())
-                    self.sticky_message = msg
-            elif info.isdigit():
-                status_channel = discord.utils.get(interaction.guild.channels, name="status", type=discord.ChannelType.news)
-                try:
-                    message = await status_channel.fetch_message(int(info))
-                except discord.NotFound or discord.HTTPException as exc:
-                    return await interaction.followup.send(content=f"Unable to fetch message from {status_channel.mention} with ID of `{info}`.\n`{exc.status}`, `{exc.text}`", ephemeral=True)
-                self.epi_data[message] = []
-                await interaction.followup.send(content=f"Successfully enabled EPI mode with {message.jump_url}", ephemeral=True)
-                await self.send_epi_log(content=f"EPI mode enabled by {interaction.user.mention}\n{message.jump_url}")
-                if sticky:
-                    general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
-                    embed = discord.Embed(
-                        title="Sapphire is currently experiencing some issues",
-                        description=f"> **{message.content}**\n-# {message.jump_url}",
-                        colour=discord.Colour.orange()
-                    )
-                    msg = await general.send(embed=embed, view=get_notified())
-                    self.sticky_message = msg"""
         else:
             await interaction.followup.send(content=f"EPI Mode is already enabled!", ephemeral=True)
     
