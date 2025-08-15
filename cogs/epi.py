@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands, ui
 from dotenv import load_dotenv
-from functions import get_post_creator_id, save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, toggle_epi_user, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config
+from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, toggle_epi_user, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
 from typing import Literal, Optional
 
@@ -212,6 +212,7 @@ class epi(commands.Cog):
 
     async def cog_load(self):
         self.pool = await sql.create_pool("database\data.db")
+        self.pool.close = self.pool_close()
         epi_config = await get_epi_config(self.pool)
         if epi_config:
             raw_messages = await get_epi_messages(self.pool)
@@ -233,7 +234,7 @@ class epi(commands.Cog):
                         self.epi_Message = Message
             epi_users.append(user_id for user_id in await get_epi_users(self.pool))
 
-    async def close(self):
+    async def pool_close(self):
         await self.pool.close()
         await super().close()
 
@@ -243,12 +244,12 @@ class epi(commands.Cog):
     async def epi_enable(self, interaction: discord.Interaction, message: Optional[str], message_id: Optional[int], sticky: bool):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
-            self.epi_data[round(datetime.datetime.now().timestamp())] = []
+            self.epi_data[datetime.datetime.now().isoformat()] = []
             if message:
                 self.epi_msg = message
             _message = None
             if message_id:
-                status = discord.utils.get(interaction.channel.text_channels, name="status")
+                status = discord.utils.get(interaction.guild.text_channels, name="status")
                 if status:
                     try:
                         _message = await status.fetch_message(message_id)
