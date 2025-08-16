@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands, ui
 from dotenv import load_dotenv
-from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages
+from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
 from typing import Literal, Optional
 
@@ -194,6 +194,7 @@ class epi(commands.Cog):
         if self.sticky_message:
             await self.sticky_message.delete()
         self.sticky_message = await channel.send(embed=embed, view=get_notified())
+        await update_sticky_message_id(self.pool, self.sticky_message.id)
         self.sticky_task = None
         self.is_being_executed = False
 
@@ -269,7 +270,7 @@ class epi(commands.Cog):
                 else:
                     command_response += "Status message: Failed - message_id argument must be made of digits only."
             saved_message_id = message_id if _message else None
-            await save_epi_config(self.pool, sticky=sticky, message=message or "-", message_id=saved_message_id or 0) # message arg defaults to '-' if its None (not provided) and message id to 0
+            await save_epi_config(self.pool, sticky=sticky, message=message or "-", message_id=saved_message_id, ) # message arg defaults to '-' if its None (not provided) and message id to 0
             if sticky:
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
@@ -315,6 +316,7 @@ class epi(commands.Cog):
                             await thread.edit(archived=True)
                     else:
                         continue
+                await clear_epi_messages(self.pool)
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 main_message = await general.send(content=content)
                 if epi_users:
@@ -366,32 +368,54 @@ class epi(commands.Cog):
 
     @group.command(name="edit", description="Edit current EPI information")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    @app_commands.describe(message="A custom text message to be displayed. Leave empty to not edit", message_id="ID of a message from #status to be displayed. Leave empty to not edit.", sticky="Should a sticky message be created in #general? Leave empty to not edit.")
-    async def edit(self, interaction: discord.Interaction, message: str = None, message_id: int = None, sticky: bool = None):
+    @app_commands.describe(message="A custom text message to be displayed. Leave empty to not edit or '-' to remove.", message_id="ID of a message from #status to be displayed. Leave empty to not edit or 0 to remove", sticky="Should a sticky message be created in #general? Leave empty to not edit.")
+    async def edit(self, interaction: discord.Interaction, message: str = None, message_id: str = None, sticky: bool = None):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
-            self.epi_data.update(round(datetime.datetime.now().timestamp()), list(self.epi_data.values())[0])
-            _message = None
-            if message:
-                self.epi_msg = message
-            if message_id:
-                status = discord.utils.get(interaction.channel.text_channels, name="status")
-                if status:
-                    try:
-                        _message = await status.fetch_message(message_id)
-                    except discord.NotFound as e:
-                        await interaction.followup.send(f"Couldn't fetch message from {status.mention} with id `{message_id}`. `{e.text}` `{e.status}`\n-# **Note:** EPI mode was still activated without the message. You may use  /epi edit to include it.")
-                    else: # the message was fetched successfully
-                        self.epi_Message = _message
-                else:
-                    await interaction.followup.send("Couldn't get status channel, try again later...-# **Note:** EPI mode was still activated without the message. You may use /epi edit to include the message")
-            if sticky and not self.sticky_message or not self.sticky_task:
-                general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
-                await self.handle_sticky_message(general)
-            elif sticky == False and self.sticky_message or self.sticky_task:
-                await self.disable_sticky_message()
-            saved_message_id = message_id if _message else None
-            await save_epi_config(self.pool, sticky, message, saved_message_id)
+            if message != None or message_id != None or sticky != None:
+                command_response = ["Successfully updated EPI mode!"]
+                self.epi_data.update(datetime.datetime.utcnow().isoformat(), list(self.epi_data.values()[0]))
+                _message = None
+                if message:
+                    if message == "-":
+                        self.epi_msg = None
+                    else:
+                        self.epi_msg = message
+                        command_response.append(f"Custom message: {message}")
+                if message_id:
+                    if message_id.isdigit() and int(message_id):
+                        if int(message_id) != 0:
+                            status = discord.utils.get(interaction.channel.text_channels, name="status")
+                            if status:
+                                try:
+                                    _message = await status.fetch_message(message_id)
+                                except discord.NotFound as e:
+                                    command_response.append(f"Couldn't fetch message from {status.mention} with id `{message_id}`. `{e.text}` `{e.status}")
+                                else: # the message was fetched successfully
+                                    self.epi_Message = _message
+                                    command_response.append(f"Status message: {_message.jump_url}")
+                            else:
+                                command_response.append("Couldn't get status channel, try again later...")
+                    else:
+                        self.epi_Message = None
+                if sticky:
+                    if not self.sticky_message or not self.sticky_task:
+                        general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
+                        await self.handle_sticky_message(general)
+                        command_response.append("Enabled sticky message")
+                    else:
+                        command_response.append("Couldn't enable sticky message: Already enabled.")
+                elif sticky == False:
+                    if self.sticky_message or self.sticky_task:
+                        await self.disable_sticky_message()
+                        command_response.append("Disabled sticky message")
+                    else:
+                        command_response.append("Couldn't disable sticky message: Already disabled.")
+                saved_message_id = message_id if _message else None
+                await save_epi_config(self.pool, sticky, message, saved_message_id)
+                await interaction.followup.send("\n".join(command_response), ephemeral=True)
+            else:
+                await interaction.followup.send("At least one of `message`, `message_id`, `sticky` argument must be provided!")
         else:
             await interaction.followup.send("EPI must be enabled for you to edit it! Use /epi enable to enable it.", ephemeral=True)
 
