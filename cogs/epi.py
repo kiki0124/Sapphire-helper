@@ -691,7 +691,7 @@ class epi(commands.Cog):
     async def autopage_on_ratelimit(self, message: discord.Message):
         if message.channel.id in [1023568468206956554, 1146016865345343531] and message.author.bot: # #cluster-log and the id of the channel in testing server as I don't want to add another .env variable
             if 265236642476982273 in [user.id for user in message.mentions]: #! IMPORTANT: please make sure that this is Xge's user ID. For testing I had to switch it with my own as messages' .mentions field only shows for users who are in the server
-                experts_channel = self.client.get_channel(EPI_LOG_THREAD_ID).parent
+                experts_channel = discord.utils.get(message.guild.text_channels, name="sapphire-experts") or self.client.get_channel(EPI_LOG_THREAD_ID).parent
                 msg = await experts_channel.send(f"Sending automated page for {message.jump_url}")
                 priority = 3
                 if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # 20 and 7 instead of 21 and 8 because it starts from 0 (0-23 rather than 1-24)
