@@ -248,11 +248,11 @@ class epi(commands.Cog):
     async def epi_enable(self, interaction: discord.Interaction, message: Optional[str], message_id: Optional[str], sticky: bool):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
-            command_response = "Successfully enabled EPI mode!"
+            command_response = ["Successfully enabled EPI mode!"]
             self.epi_data[datetime.datetime.utcnow().isoformat()] = []
             if message:
                 self.epi_msg = message
-                command_response += f"\nCustom message: {message}"
+                command_response.append(f"\nCustom message: {message}")
             _message = None
             if message_id:
                 if message_id.isdigit():
@@ -261,25 +261,27 @@ class epi(commands.Cog):
                         try:
                             _message = await status.fetch_message(message_id)
                         except discord.NotFound as e:
-                            command_response +=f"Status message: Failed. Tried fetching `{message_id}` from {status.mention}. `{e.text}` `{e.status}`"
+                            command_response.append(f"Status message: Failed. Tried fetching `{message_id}` from {status.mention}. `{e.text}` `{e.status}`")
                         else: # the message was fetched successfully
                             self.epi_Message = _message
-                            command_response += f"\nStatus message: {_message.jump_url}"
+                            command_response.append(f"\nStatus message: {_message.jump_url}")
                     else:
-                        command_response +="Status message: Failed - status channel not found."
+                        command_response.append("Status message: Failed - status channel not found.")
                 else:
-                    command_response += "Status message: Failed - message_id argument must be made of digits only."
+                    command_response.append("Status message: Failed - message_id argument must be made of digits only.")
             saved_message_id = message_id if _message else None
             await save_epi_config(self.pool, sticky=sticky, message=message or "-", message_id=saved_message_id, ) # message arg defaults to '-' if its None (not provided) and message id to 0
             if sticky:
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
-            await interaction.followup.send(command_response)
+            command_response.append(f"Sticky: {sticky}")
+            await interaction.followup.send('\n'.join(command_response), ephemeral=True)
         else:
             await interaction.followup.send(content=f"EPI Mode is already enabled!", ephemeral=True)
     
     @group.command(name="disable", description="Disable EPI mode- mark the issue as solved & ping all users that asked to be pinged")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
+    @app_commands.describe(message="[Optional] A custom message to be displayed with the \"Hey, this is fixed now!\" message")
     async def epi_disable(self, interaction: discord.Interaction, message: str = None):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
