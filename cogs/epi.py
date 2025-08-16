@@ -223,7 +223,7 @@ class epi(commands.Cog):
             msg = epi_config["message"]
             self.epi_msg = msg if msg != "-" else None
             if epi_config["message_id"] and epi_config["message_id"] != 0:
-                status = discord.utils.get(self.client.get_all_channels(), name="status")
+                status = discord.utils.get(self.client.get_all_channels(), name="status", type=discord.ChannelType.news)
                 if status:
                     try:
                         Message = await status.fetch_message(epi_config["message_id"])
@@ -244,9 +244,11 @@ class epi(commands.Cog):
     async def epi_enable(self, interaction: discord.Interaction, message: Optional[str], message_id: Optional[int], sticky: bool):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
+            command_response = "Successfully enabled EPI mode!"
             self.epi_data[datetime.datetime.now().isoformat()] = []
             if message:
                 self.epi_msg = message
+                command_response += f"\nCustom message: {message}"
             _message = None
             if message_id:
                 status = discord.utils.get(interaction.guild.text_channels, name="status")
@@ -254,16 +256,18 @@ class epi(commands.Cog):
                     try:
                         _message = await status.fetch_message(message_id)
                     except discord.NotFound as e:
-                        await interaction.followup.send(f"Couldn't fetch message from {status.mention} with id `{message_id}`. `{e.text}` `{e.status}`\n-# **Note:** EPI mode was still activated without the message. You may use  /epi edit to include it.")
+                        command_response +=f"Status message: Failed. Tried fetching `{message_id}` from {status.mention}. `{e.text}` `{e.status}`"
                     else: # the message was fetched successfully
                         self.epi_Message = _message
+                        command_response += f"\nStatus message: {_message.jump_url}"
                 else:
-                    await interaction.followup.send("Couldn't get status channel, try again later...-# **Note:** EPI mode was still activated without the message. You may use /epi edit to include the message")
+                    command_response +="Status message: Failed - status channel not found."
             saved_message_id = message_id if _message else None
             await save_epi_config(self.pool, sticky=sticky, message=message or "-", message_id=saved_message_id or 0) # message arg defaults to '-' if its None (not provided) and message id to 0
             if sticky:
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
+            await interaction.followup(command_response)
         else:
             await interaction.followup.send(content=f"EPI Mode is already enabled!", ephemeral=True)
     
@@ -314,7 +318,7 @@ class epi(commands.Cog):
                             mentions.append(f"<@{user_id}>")
                         else:
                             await main_message.reply(content=", ".join(mentions), mention_author=False)
-                            mentions = [] # reset both for another pinging message
+                            mentions = [] # reset list for another pinging message with other users
                     if mentions:
                         await main_message.reply(content=", ".join(mentions), mention_author=False)
                     mentioned = True
