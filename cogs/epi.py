@@ -186,7 +186,7 @@ class epi(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none()
         )
 
-    async def handle_sticky_message(self, channel: discord.TextChannel, delay: float = 4):
+    async def handle_sticky_message(self, channel: discord.TextChannel | discord.PartialMessageable, delay: float = 4):
         embed = self.generate_epi_embed()
         await asyncio.sleep(delay)
         self.is_being_executed = True
@@ -235,6 +235,9 @@ class epi(commands.Cog):
                     else:
                         self.epi_Message = Message
             epi_users.append(user_id for user_id in await get_epi_users(self.pool))
+            if epi_config["sticky"]:
+                general = self.client.get_partial_messageable(id=GENERAL_CHANNEL_ID, type=discord.ChannelType.text)
+                await self.handle_sticky_message(general, delay=0)
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
