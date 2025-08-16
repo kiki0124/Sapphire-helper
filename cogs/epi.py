@@ -163,7 +163,7 @@ class epi(commands.Cog):
         if self.epi_msg:
             embed_data["description"] += self.epi_msg
         if self.epi_Message:
-            embed_data["description"] += f"\n\n> ### An official status update has been posted: {self.epi_Message.jump_url}"
+            embed_data["description"] += f"\n\n> ### An official status update has been posted: {self.epi_Message.jump_url}\n> {self.epi_Message.content if len(self.epi_Message.content) + len(self.epi_msg or '') + len(self.epi_Message.jump_url) < 1024 else self.epi_Message.content[:205:]+'*[...]*'}"
         if self.epi_Message or self.epi_msg:
             embed_data["description"] += "\n\n"
         embed_data["description"] += "-# You can also always check the [Sapphire status page](https://sapph.xyz/status)"
@@ -244,7 +244,7 @@ class epi(commands.Cog):
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     @app_commands.describe(message="A custom text message to be displayed", message_id="ID of a message from #status to be displayed", sticky="Should a sticky message be created in #general?")
-    async def epi_enable(self, interaction: discord.Interaction, message: Optional[str], message_id: Optional[int], sticky: bool):
+    async def epi_enable(self, interaction: discord.Interaction, message: Optional[str], message_id: Optional[str], sticky: bool):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
             command_response = "Successfully enabled EPI mode!"
@@ -254,17 +254,20 @@ class epi(commands.Cog):
                 command_response += f"\nCustom message: {message}"
             _message = None
             if message_id:
-                status = discord.utils.get(interaction.guild.text_channels, name="status")
-                if status:
-                    try:
-                        _message = await status.fetch_message(message_id)
-                    except discord.NotFound as e:
-                        command_response +=f"Status message: Failed. Tried fetching `{message_id}` from {status.mention}. `{e.text}` `{e.status}`"
-                    else: # the message was fetched successfully
-                        self.epi_Message = _message
-                        command_response += f"\nStatus message: {_message.jump_url}"
+                if message_id.isdigit():
+                    status = discord.utils.get(interaction.guild.text_channels, name="status")
+                    if status:
+                        try:
+                            _message = await status.fetch_message(message_id)
+                        except discord.NotFound as e:
+                            command_response +=f"Status message: Failed. Tried fetching `{message_id}` from {status.mention}. `{e.text}` `{e.status}`"
+                        else: # the message was fetched successfully
+                            self.epi_Message = _message
+                            command_response += f"\nStatus message: {_message.jump_url}"
+                    else:
+                        command_response +="Status message: Failed - status channel not found."
                 else:
-                    command_response +="Status message: Failed - status channel not found."
+                    command_response += "Status message: Failed - message_id argument must be made of digits only."
             saved_message_id = message_id if _message else None
             await save_epi_config(self.pool, sticky=sticky, message=message or "-", message_id=saved_message_id or 0) # message arg defaults to '-' if its None (not provided) and message id to 0
             if sticky:
