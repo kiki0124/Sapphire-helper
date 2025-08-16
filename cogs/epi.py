@@ -210,9 +210,11 @@ class epi(commands.Cog):
     async def on_ready(self):
         self.client.add_view(get_notified())
 
+    async def cog_unload(self):
+        await self.pool.close()
+
     async def cog_load(self):
         self.pool = await sql.create_pool("database\data.db")
-        self.pool.close = self.pool_close()
         epi_config = await get_epi_config(self.pool)
         if epi_config:
             raw_messages = await get_epi_messages(self.pool)
@@ -233,10 +235,6 @@ class epi(commands.Cog):
                     else:
                         self.epi_Message = Message
             epi_users.append(user_id for user_id in await get_epi_users(self.pool))
-
-    async def pool_close(self):
-        await self.pool.close()
-        await super().close()
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
@@ -386,59 +384,6 @@ class epi(commands.Cog):
                 await self.disable_sticky_message()
             saved_message_id = message_id if _message else None
             await save_epi_config(self.pool, sticky, message, saved_message_id)
-
-            """ if info:
-                previous = list(self.epi_data.keys())[0]
-                if not info.isdigit():
-                    msg_or_text = info
-                elif info.isdigit():
-                    status_channel = discord.utils.get(interaction.guild.channels, name="status", type=discord.ChannelType.news)
-                    try:
-                        msg_or_text = await status_channel.fetch_message(int(info))
-                    except discord.NotFound or discord.HTTPException as exc:
-                        return await interaction.followup.send(content=f"Unable to fetch message from {status_channel.mention} with ID `{info}`.\n`{exc.status}`, `{exc.text}`", ephemeral=True)
-                if isinstance(msg_or_text, str):
-                    url_or_text = f"`{msg_or_text}`"
-                elif isinstance(msg_or_text, discord.Message):
-                    url_or_text = msg_or_text.jump_url
-                messages = list(self.epi_data.values())[0]
-                self.epi_data.pop(previous)
-                self.epi_data.update({msg_or_text: messages})
-                await interaction.followup.send(f"Successfully updated EPI info to {url_or_text}", ephemeral=True)
-                await self.send_epi_log(f"EPI mode edited by {interaction.user.mention} - Changed info to {url_or_text}")
-            if sticky != None:
-                if sticky:
-                    if not self.sticky_message:
-                        general = self.client.get_channel(GENERAL_CHANNEL_ID)
-                        msg_or_text = list(self.epi_data.keys())[0]
-                        if isinstance(msg_or_text, str):
-                            embed = discord.Embed(
-                                title="A notice has been put up!",
-                                description=f"Any issues you're experiencing are most likely related to this.\n> {msg_or_text}",
-                                colour=discord.Colour.orange()
-                                )
-                        elif isinstance(msg_or_text, discord.Message):
-                            embed = discord.Embed(
-                                title="Sapphire is currently experiencing some issues",
-                                description=f"> **{msg_or_text.content}**\n-# {msg_or_text.jump_url}",
-                                colour=discord.Colour.orange()
-                            )
-                        embed.set_footer(text="Thank you for your patience!")
-                        self.sticky_message = await general.send(embed=embed, view=get_notified())
-                        await interaction.followup.send("Successfully enabled sticky messages!", ephemeral=True)
-                        await self.send_epi_log(f"EPI mode edited by {interaction.user.mention} - Enabled sticky messages.")
-                    elif self.sticky_message:
-                        await interaction.followup.send("Cannot enable sticky messages as its already enabled!", ephemeral=True)
-                elif sticky == False:
-                    if self.sticky_message:
-                        await self.sticky_message.delete()
-                        self.sticky_message = None
-                        await interaction.followup.send("Successfully disabled sticky messages!", ephemeral=True)
-                        await self.send_epi_log(f"EPI edited by {interaction.user.mention} - disabled sticky messages.")
-                    elif not self.sticky_message:
-                        await interaction.followup.send("Cannot disable sticky messages as its already disabled!", ephemeral=True)
-            if info == None and sticky == None:
-                await interaction.followup.send("You must provide at least one of `info` or `sticky` parameters and both were left empty.", ephemeral=True) """
         else:
             await interaction.followup.send("EPI must be enabled for you to edit it! Use /epi enable to enable it.", ephemeral=True)
 
