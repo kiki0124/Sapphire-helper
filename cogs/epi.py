@@ -248,7 +248,7 @@ class epi(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
             command_response = "Successfully enabled EPI mode!"
-            self.epi_data[datetime.datetime.now().isoformat()] = []
+            self.epi_data[datetime.datetime.utcnow().isoformat()] = []
             if message:
                 self.epi_msg = message
                 command_response += f"\nCustom message: {message}"
@@ -399,11 +399,11 @@ class epi(commands.Cog):
     async def send_epi_info(self, thread: discord.Thread):
         if thread.parent_id == SUPPORT_CHANNEL_ID and self.epi_data:
             await asyncio.sleep(3) # make sure that epi messages will be sent last (after more info message)
-            msg_or_txt = list(self.epi_data.keys())[0]
             embed = self.generate_epi_embed()
             message = await thread.send(embed=embed, view=get_notified())
             await add_epi_message(self.pool, message.id, thread.id)
-            self.epi_data[msg_or_txt].append(message)
+            index = list(self.epi_data.keys())[0]
+            self.epi_data[index][thread.id] = message.id
 
     @commands.Cog.listener('on_message')
     async def epi_sticky_message(self, message: discord.Message):

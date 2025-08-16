@@ -233,7 +233,7 @@ async def delete_channel_permissions(channel_id: int) -> None:
 
 async def save_epi_config(pool: sql.Pool ,sticky: bool, message: str = '-', message_id: int = 0) -> None:
     async with pool.acquire() as conn:
-        now_timestamp = datetime.datetime.now().isoformat()
+        now_timestamp = datetime.datetime.utcnow().isoformat()
         await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky) VALUES (?, ?, ?, ?)", (now_timestamp, message, message_id, sticky,))
         await conn.commit()
 
@@ -310,7 +310,7 @@ async def get_epi_message_id() -> Optional[int]:
 
 async def add_epi_message(pool: sql.Pool, message_id: int, thread_id: int) -> None:
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO epi_messages (thread_id, message_id) VALUES (?, ?) ON CONFLICT (thread_id, message_id) DO NOTHING", (thread_id, message_id,))
+        await conn.execute("INSERT INTO epi_messages (thread_id, message_id) VALUES (?, ?)", (thread_id, message_id,))
         await conn.commit()
 
 async def get_epi_messages(pool: sql.Pool) -> dict[int, int]: # {thread_id: message_id}
