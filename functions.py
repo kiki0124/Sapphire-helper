@@ -237,12 +237,14 @@ async def save_epi_config(pool: sql.Pool ,sticky: bool, message: str = '-', mess
         await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky) VALUES (?, ?, ?, ?)", (now_timestamp, message, message_id, sticky,))
         await conn.commit()
 
-async def toggle_epi_user(user_id: int) -> None:
-    """  
-    Add the user id to the list if they aren't in it, and remove them from it if they are in it.
-    """
+async def add_epi_user(user_id: int) -> None:
     async with sql.connect(DB_PATH) as conn:
-        await conn.execute("INSERT INTO epi_users (user_id) VALUES (?) ON CONFLICT (user_id) DO DELETE FROM epi_users WHERE user_id=? ", (user_id, user_id,))
+        await conn.execute("INSERT INTO epi_users (user_id) VALUES (?)", (user_id,))
+        await conn.commit()
+
+async def delete_epi_user(user_id: int) -> None:
+    async with sql.connect(DB_PATH) as conn:
+        await conn.execute("DELETE FROM epi_users WHERE user_id=?", (user_id,))
         await conn.commit()
 
 async def get_epi_users(pool: sql.Pool) -> list[Optional[int]]:
