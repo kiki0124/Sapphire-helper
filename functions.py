@@ -19,7 +19,7 @@ async def main():
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS epi_config(started_iso STRING NOT NULL, message STRING NOT NULL, message_id INTEGER NOT NULL, sticky BOOL NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS epi_config(started_iso STRING NOT NULL, message STRING NOT NULL, message_id INTEGER NOT NULL, sticky BOOL NOT NULL, sticky_message_id INTEGER NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS epi_users(user_id INTEGER UNIQUE NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS epi_messages(thread_id INTEGER UNIQUE NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
             await conn.commit()
@@ -231,10 +231,10 @@ async def delete_channel_permissions(channel_id: int) -> None:
 
 # EPI
 
-async def save_epi_config(pool: sql.Pool ,sticky: bool, message: str = '-', message_id: int = 0) -> None:
+async def save_epi_config(pool: sql.Pool ,sticky: bool, message: str = '-', message_id: int = 0, sticky_message_id: int | None = None) -> None:
     async with pool.acquire() as conn:
         now_timestamp = datetime.datetime.utcnow().isoformat()
-        await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky) VALUES (?, ?, ?, ?)", (now_timestamp, message, message_id, sticky,))
+        await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky, sticky_message_id) VALUES (?, ?, ?, ?, ?)", (now_timestamp, message, message_id, sticky, sticky_message_id,))
         await conn.commit()
 
 async def add_epi_user(user_id: int) -> None:
@@ -262,51 +262,22 @@ async def get_epi_config(pool: sql.Pool) -> Optional[dict[str, int, str, str, st
         "started_iso": int(123),
         "message": str("low taper fade is still massive") | None,
         "message_id": int(123456) | None,
-        "sticky": bool(False)
+        "sticky": bool(False),
+        "sticky_message_id": int(123456) | None
         }
     """
     async with pool.acquire() as conn:
         result = await conn.fetchone("SELECT * FROM epi_config")
-        #print(result[0].keys())
-        """ for row in result:
-            for item in row:
-                print(item)
-        print("result:", result)
-        print("---")
-        for row in result:
-            print(row.keys())
-            for item in row:
-                print(item, row.keys)"""
         if result:
             return {
                 "started_iso": result[0],
                 "message": result[1],
                 "message_id": result[2],
-                "sticky": result[3]
+                "sticky": result[3],
+                "sticky_message_id": result[4]
             }
         else:
             return {}
-
-""" 
-async def get_epi_msg() -> Optional[str]:
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("SELECT message FROM epi_config")
-            result = await cu.fetchone()
-            if result:
-                return result[0]
-            else:
-                None
-
-async def get_epi_message_id() -> Optional[int]:
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("SELECT message_id FROM epi_config")
-            result = await cu.fetchone()
-            if result:
-                return result[0]
-            else:
-                return None """
 
 async def add_epi_message(pool: sql.Pool, message_id: int, thread_id: int) -> None:
     async with pool.acquire() as conn:
@@ -347,3 +318,10 @@ async def clear_epi_config(pool: sql.Pool) -> None:
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM epi_config")
         await conn.commit()
+
+async def update_sticky_message_id(pool: sql.Pool, id: int) -> None:
+    """  
+    Insert the sticky message id to epi config table if there isn't a message id there and update if there is one
+    """
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE epi_config (sticky_message_id) VALUES (?)", (id,))
