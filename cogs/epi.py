@@ -265,7 +265,7 @@ class epi(commands.Cog):
             if sticky:
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
-            await interaction.followup(command_response)
+            await interaction.followup.send(command_response)
         else:
             await interaction.followup.send(content=f"EPI Mode is already enabled!", ephemeral=True)
     
