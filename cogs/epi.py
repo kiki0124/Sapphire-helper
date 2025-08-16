@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands, ui
 from dotenv import load_dotenv
-from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, toggle_epi_user, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config
+from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
 from typing import Literal, Optional
 
@@ -24,11 +24,12 @@ class get_notified(ui.View):
     
     @ui.button(label="Notify me when this issue is resolved", custom_id="epi-get-notified", style=discord.ButtonStyle.grey)
     async def on_get_notified_click(self, interaction: discord.Interaction, button: ui.button):
-        await toggle_epi_user()
         if interaction.user.id not in epi_users:
+            await add_epi_user(interaction.user.id)
             epi_users.append(interaction.user.id)
             await interaction.response.send_message(content="You will now be notified when this issue is fixed!", ephemeral=True)
         else:
+            await delete_epi_user(interaction.user.id)
             epi_users.remove(interaction.user.id)
             await interaction.response.send_message(content="You will no longer be notified for this issue!", ephemeral=True)
 
@@ -234,7 +235,8 @@ class epi(commands.Cog):
                         await alerts_thread.send(f"Tried to fetch epi Message from {status.mention} with id {epi_config['message_id']}.\n{e.status} {e.text}")
                     else:
                         self.epi_Message = Message
-            epi_users.append(user_id for user_id in await get_epi_users(self.pool))
+            for user_id in await get_epi_users(self.pool):
+                epi_users.append(user_id)
             if epi_config["sticky"]:
                 general = self.client.get_partial_messageable(id=GENERAL_CHANNEL_ID, type=discord.ChannelType.text)
                 await self.handle_sticky_message(general, delay=0)
