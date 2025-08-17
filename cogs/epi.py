@@ -269,8 +269,8 @@ class epi(commands.Cog):
                         command_response.append("Status message: Failed - status channel not found.")
                 else:
                     command_response.append("Status message: Failed - message_id argument must be made of digits only.")
-            saved_message_id = message_id if _message else None
-            await save_epi_config(self.pool, sticky=sticky, message=message or "-", message_id=saved_message_id, ) # message arg defaults to '-' if its None (not provided) and message id to 0
+            saved_message_id = message_id if _message else 0
+            await save_epi_config(self.pool, sticky=sticky, message=message or "-", message_id=saved_message_id) # message arg defaults to '-' if its None (not provided) and message id to 0
             if sticky:
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
