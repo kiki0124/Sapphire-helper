@@ -269,6 +269,7 @@ async def get_epi_config(pool: sql.Pool) -> Optional[dict[str, int, str, str, st
     async with pool.acquire() as conn:
         result = await conn.fetchone("SELECT * FROM epi_config")
         if result:
+            print(result)
             return {
                 "started_iso": result[0],
                 "message": result[1],
@@ -324,4 +325,4 @@ async def update_sticky_message_id(pool: sql.Pool, id: int) -> None:
     Insert the sticky message id to epi config table if there isn't a message id there and update if there is one
     """
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE epi_config (sticky_message_id) VALUES (?)", (id,))
+        await conn.execute("UPDATE epi_config SET sticky_message_id=?", (id,))
