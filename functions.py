@@ -326,3 +326,19 @@ async def update_sticky_message_id(pool: sql.Pool, id: int) -> None:
     """
     async with pool.acquire() as conn:
         await conn.execute("UPDATE epi_config SET sticky_message_id=?", (id,))
+        await conn.commit()
+
+async def update_epi_message_id(pool: sql.Pool, id: int) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute('UPDATE epi_config SET message_id=?', (id,))
+        await conn.commit()
+
+async def update_epi_message(pool: sql.Pool, message: str) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE epi_config SET message=?", (message,))
+        await conn.commit()
+
+async def update_epi_sticky(pool: sql.Pool, value: bool) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE epi_config SET sticky=?", (value,))
+        await conn.commit()
