@@ -249,7 +249,7 @@ class epi(commands.Cog):
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    @app_commands.describe(message="A custom text message to be displayed", message_id="ID of a message from #status to be displayed", sticky="Should a sticky message be created in #general?")
+    @app_commands.describe(message="[Optional] A custom text message to be displayed", message_id="[Optional] ID of a message from #status to be displayed", sticky="Should a sticky message be created in #general?")
     async def epi_enable(self, interaction: discord.Interaction, message: Optional[str], message_id: Optional[str], sticky: bool):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
@@ -267,6 +267,7 @@ class epi(commands.Cog):
                             _message = await status.fetch_message(message_id)
                         except discord.NotFound as e:
                             command_response.append(f"Status message: Failed. Tried fetching `{message_id}` from {status.mention}. `{e.text}` `{e.status}`")
+                            _message = None
                         else: # the message was fetched successfully
                             self.epi_Message = _message
                             command_response.append(f"\nStatus message: {_message.jump_url}")
@@ -280,6 +281,7 @@ class epi(commands.Cog):
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
             command_response.append(f"Sticky: {sticky}")
+            await self.send_epi_log(f"EPI mode enabled by {interaction.user.mention}.\nCustom message: {message or 'not set'} | Status message: {_message.jump_url if _message else 'Not set'} | Sticky: {sticky}")
             await interaction.followup.send('\n'.join(command_response), ephemeral=True)
         else:
             await interaction.followup.send(content=f"EPI Mode is already enabled!", ephemeral=True)
@@ -347,7 +349,7 @@ class epi(commands.Cog):
                     await self.sticky_message.delete()
                     self.sticky_message = None
                 await interaction.channel.send(content=f"EPI mode successfully disabled by {interaction.user.name}.\nMentioned users: {mentioned}")
-                await self.send_epi_log(f"EPI mode disabled by {interaction.user.mention}")
+                await self.send_epi_log(f"EPI mode disabled by {interaction.user.mention}\nCustom message: {message or 'not set'}")
             button.callback = on_button_click
             view = discord.ui.View()
             view.add_item(button)
