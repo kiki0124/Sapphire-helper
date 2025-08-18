@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands, ui
 from dotenv import load_dotenv
-from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id
+from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, update_epi_message_id, update_epi_sticky
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
 from typing import Literal, Optional
 
@@ -253,11 +253,11 @@ class epi(commands.Cog):
     async def epi_enable(self, interaction: discord.Interaction, message: Optional[str], message_id: Optional[str], sticky: bool):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
-            command_response = ["Successfully enabled EPI mode!"]
+            command_response = "Successfully enabled EPI mode!\n"
             self.epi_data[datetime.datetime.utcnow().isoformat()] = []
             if message:
                 self.epi_msg = message
-                command_response.append(f"\nCustom message: {message}")
+                command_response += f"\nCustom message: {message}"
             _message = None
             if message_id:
                 if message_id.isdigit():
@@ -266,23 +266,23 @@ class epi(commands.Cog):
                         try:
                             _message = await status.fetch_message(message_id)
                         except discord.NotFound as e:
-                            command_response.append(f"Status message: Failed. Tried fetching `{message_id}` from {status.mention}. `{e.text}` `{e.status}`")
+                            command_response += f"Status message: Failed. Tried fetching `{message_id}` from {status.mention}. `{e.text}` `{e.status}`\n"
                             _message = None
                         else: # the message was fetched successfully
                             self.epi_Message = _message
-                            command_response.append(f"\nStatus message: {_message.jump_url}")
+                            command_response += f"\nStatus message: {_message.jump_url}\n"                    
                     else:
-                        command_response.append("Status message: Failed - status channel not found.")
+                        command_response += "Status message: Failed - status channel not found.\n"
                 else:
-                    command_response.append("Status message: Failed - message_id argument must be made of digits only.")
+                    command_response += "Status message: Failed - message_id argument must be made of digits only.\n"
             saved_message_id = message_id if _message else 0
             await save_epi_config(self.pool, sticky=sticky, message=message or "-", message_id=saved_message_id) # message arg defaults to '-' if its None (not provided) and message id to 0
             if sticky:
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
-            command_response.append(f"Sticky: {sticky}")
+            command_response += f"Sticky: {sticky}"
             await self.send_epi_log(f"EPI mode enabled by {interaction.user.mention}.\nCustom message: {message or 'not set'} | Status message: {_message.jump_url if _message else 'Not set'} | Sticky: {sticky}")
-            await interaction.followup.send('\n'.join(command_response), ephemeral=True)
+            await interaction.followup.send(command_response, ephemeral=True)
         else:
             await interaction.followup.send(content=f"EPI Mode is already enabled!", ephemeral=True)
     
@@ -382,15 +382,17 @@ class epi(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
             if message != None or message_id != None or sticky != None:
-                command_response = ["Successfully updated EPI mode!"]
+                command_response = "Successfully updated EPI mode!"
                 self.epi_data.update(datetime.datetime.utcnow().isoformat(), list(self.epi_data.values()[0]))
                 _message = None
                 if message:
+                    await update_epi_message(self.pool, message)
                     if message == "-":
                         self.epi_msg = None
+                        command_response += "Custom message: None"
                     else:
                         self.epi_msg = message
-                        command_response.append(f"Custom message: {message}")
+                        command_response += f"Custom message: {message}"
                 if message_id:
                     if message_id.isdigit() and int(message_id):
                         if int(message_id) != 0:
@@ -399,30 +401,33 @@ class epi(commands.Cog):
                                 try:
                                     _message = await status.fetch_message(message_id)
                                 except discord.NotFound as e:
-                                    command_response.append(f"Couldn't fetch message from {status.mention} with id `{message_id}`. `{e.text}` `{e.status}")
+                                    command_response += f"Couldn't fetch message from {status.mention} with id `{message_id}`. `{e.text}` `{e.status}"
                                 else: # the message was fetched successfully
+                                    await update_epi_message_id(self.pool, message_id)
                                     self.epi_Message = _message
-                                    command_response.append(f"Status message: {_message.jump_url}")
+                                    command_response += f"Status message: {_message.jump_url}"
                             else:
-                                command_response.append("Couldn't get status channel, try again later...")
+                                command_response += "Couldn't get status channel, try again later..."
                     else:
                         self.epi_Message = None
                 if sticky:
                     if not self.sticky_message or not self.sticky_task:
+                        await update_epi_sticky(self.pool, sticky)
                         general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                         await self.handle_sticky_message(general)
-                        command_response.append("Enabled sticky message")
+                        command_response += "Enabled sticky message"
                     else:
-                        command_response.append("Couldn't enable sticky message: Already enabled.")
+                        command_response += "Couldn't enable sticky message: Already enabled."
                 elif sticky == False:
                     if self.sticky_message or self.sticky_task:
+                        await update_epi_sticky(self.pool, sticky)
                         await self.disable_sticky_message()
-                        command_response.append("Disabled sticky message")
+                        command_response += "Disabled sticky message"
                     else:
-                        command_response.append("Couldn't disable sticky message: Already disabled.")
+                        command_response += "Couldn't disable sticky message: Already disabled."
                 saved_message_id = message_id if _message else None
                 await save_epi_config(self.pool, sticky, message, saved_message_id)
-                await interaction.followup.send("\n".join(command_response), ephemeral=True)
+                await interaction.followup.send(command_response, ephemeral=True)
             else:
                 await interaction.followup.send("At least one of `message`, `message_id`, `sticky` argument must be provided!")
         else:
