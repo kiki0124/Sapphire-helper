@@ -192,7 +192,10 @@ class epi(commands.Cog):
         await asyncio.sleep(delay)
         self.is_being_executed = True
         if self.sticky_message:
-            await self.sticky_message.delete()
+            try:
+                await self.sticky_message.delete()
+            except discord.NotFound:
+                pass
         self.sticky_message = await channel.send(embed=embed, view=get_notified())
         await update_sticky_message_id(self.pool, self.sticky_message.id)
         self.sticky_task = None
@@ -239,7 +242,9 @@ class epi(commands.Cog):
             for user_id in await get_epi_users(self.pool):
                 epi_users.append(user_id)
             if epi_config["sticky"]:
-                general = self.client.get_partial_messageable(id=GENERAL_CHANNEL_ID, type=discord.ChannelType.text)
+                general = self.client.get_partial_messageable(GENERAL_CHANNEL_ID)
+                if epi_config["sticky_message_id"]:
+                    self.sticky_message = general.get_partial_message(epi_config["sticky_message_id"])
                 await self.handle_sticky_message(general, delay=0)
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
