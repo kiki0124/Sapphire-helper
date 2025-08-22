@@ -342,3 +342,11 @@ async def update_epi_sticky(pool: sql.Pool, value: bool) -> None:
     async with pool.acquire() as conn:
         await conn.execute("UPDATE epi_config SET sticky=?", (value,))
         await conn.commit()
+
+async def update_epi_iso(pool: sql.Pool, value: str) -> None:
+    """  
+    Takes the value as a string of utcnow.isoformat
+    """
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE epi_config SET started_iso=?", (value,))
+        await conn.commit()

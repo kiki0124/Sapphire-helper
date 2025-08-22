@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands, ui
 from dotenv import load_dotenv
-from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, update_epi_message_id, update_epi_sticky
+from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, update_epi_message_id, update_epi_sticky, update_epi_iso
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
 from typing import Literal, Optional
 
@@ -383,7 +383,9 @@ class epi(commands.Cog):
         if self.epi_data:
             if message != None or message_id != None or sticky != None:
                 command_response = "Successfully updated EPI mode!"
-                self.epi_data.update(datetime.datetime.utcnow().isoformat(), list(self.epi_data.values()[0]))
+                iso = datetime.datetime.utcnow().isoformat()
+                self.epi_data.update(iso, list(self.epi_data.values()[0]))
+                await update_epi_iso(self.pool, iso)
                 _message = None
                 if message:
                     await update_epi_message(self.pool, message)
