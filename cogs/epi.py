@@ -254,7 +254,7 @@ class epi(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
             command_response = "Successfully enabled EPI mode!\n"
-            self.epi_data[datetime.datetime.utcnow().isoformat()] = []
+            self.epi_data[datetime.datetime.now(tz=datetime.timezone.utc).isoformat()] = []
             if message:
                 self.epi_msg = message
                 command_response += f"\nCustom message: {message}"
@@ -383,7 +383,7 @@ class epi(commands.Cog):
         if self.epi_data:
             if message != None or message_id != None or sticky != None:
                 command_response = "Successfully updated EPI mode!"
-                iso = datetime.datetime.utcnow().isoformat()
+                iso = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
                 self.epi_data.update(iso, list(self.epi_data.values()[0]))
                 await update_epi_iso(self.pool, iso)
                 _message = None
