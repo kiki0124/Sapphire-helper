@@ -436,16 +436,6 @@ class utility(commands.Cog):
 
         await interaction.channel.send(content=content, embed=embed)
         await interaction.delete_original_response()
-    
-    @wrong_server.error
-    async def on_wrong_server_error(self, interaction: discord.Interaction, error: commands.CommandError):
-        if isinstance(error, commands.CommandOnCooldown):
-            interaction.response.send_message(
-                f"This command is still on cooldown. It can be used in this channel again in **{error.retry_after:.2f}s**",
-                ephemeral=True
-            )
-        else:
-            interaction.response.send_message("An error occurred executing `/unrelated`")
 
 async def setup(client):
     await client.add_cog(utility(client))
