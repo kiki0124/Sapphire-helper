@@ -395,31 +395,57 @@ class utility(commands.Cog):
         else:
             await ctx.reply(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
 
-    @commands.hybrid_command(
+
+    async def non_expert_mod_cooldown(interaction: discord.Interaction):
+        """
+        Returns a cooldown of 1 use per 5 minutes if the command author is not expert or mod
+        """
+        if interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(EXPERTS_ROLE_ID):
+            return None
+        
+        return commands.Cooldown(1,  5.0 * 60.0)
+
+    # def unrelated_cooldown_key(interaction: discord.Interaction):
+    #     """
+    #     The key used to define the cooldown by
+    #     """
+    #     return interaction.channel_id
+    # this is only here because it may be useful someday idk
+
+
+    @app_commands.command(
             name='unrelated',
             description='Inform the post creator that their question/issue is not Sapphire/appeal.gg related.'
     )
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    async def wrong_server(self, ctx: commands.Context):
-        await ctx.defer(ephemeral=True)
-        if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
-            user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
-            if ctx.interaction:
-                await ctx.interaction.delete_original_response()
-            elif not ctx.interaction:
-                await ctx.message.delete()
+    @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
+    async def wrong_server(self, interaction: discord.Interaction):
+        await interaction.response.defer()
 
-            embed = discord.Embed(
-                title='Unrelated question/issue',
-                description='Hey, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query.',
-                colour=discord.Colour.purple()
+        embed = discord.Embed(
+            title="Unrelated question/issue",
+            description="Hey, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query.",
+            colour=discord.Colour.purple()
+        )
+
+        content = ""
+        if isinstance(interaction.channel, discord.Thread) and await self.one_of_mod_expert_op(interaction=interaction):
+            if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+                user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+                content = f"<@{user_id}>"
+                self.lock_unrelated_post(interaction.channel)
+
+        await interaction.channel.send(content=content, embed=embed)
+        await interaction.delete_original_response()
+    
+    @wrong_server.error
+    async def on_wrong_server_error(self, interaction: discord.Interaction, error: commands.CommandError):
+        if isinstance(error, commands.CommandOnCooldown):
+            interaction.response.send_message(
+                f"This command is still on cooldown. It can be used in this channel again in **{error.retry_after:.2f}s**",
+                ephemeral=True
             )
-            embed.set_footer(text=f'Recommended by @{ctx.author.name}', icon_url=ctx.author.avatar.url)
-
-            await self.lock_unrelated_post(ctx.channel)
-            await ctx.channel.send(embed=embed, content=f'<@{user_id}>')
         else:
-            await ctx.reply(content=f'This command can only be used in <#{SUPPORT_CHANNEL_ID}>!', ephemeral=True)
+            interaction.response.send_message("An error occurred executing `/unrelated`")
 
 async def setup(client):
     await client.add_cog(utility(client))
