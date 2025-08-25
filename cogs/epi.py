@@ -224,7 +224,7 @@ class epi(commands.Cog):
         if epi_config:
             raw_messages = await get_epi_messages(self.pool)
             messages = {}
-            for thread_id, message_id in raw_messages:
+            for thread_id, message_id in raw_messages.items():
                 messages[thread_id] = message_id
             self.epi_data[epi_config["started_iso"]] = messages
             msg = epi_config["message"]
@@ -301,21 +301,22 @@ class epi(commands.Cog):
                 await i.channel.typing()
                 await i.response.defer(ephemeral=True)
                 await i.delete_original_response()
-                index = list(self.epi_data)[0]
                 content = "Hey, this issue is fixed now!\n-# Thank you for your patience."
                 if message:
                     content += f"\n> {message}"    
-                for thread_id, message_id in self.epi_data[index]:
+                for thread_id, message_id in list(self.epi_data.values())[0].items():
                     thread = self.client.get_channel(thread_id)
                     if thread:
                         msg = thread.get_partial_message(message_id)
                         if not thread.archived:
+                            print("epi disable thread-message iteration - not arcihved")
                             await msg.edit(view=None)
                             await msg.reply(
                                 content= content,
                                 mention_author=False
                             )
                         else:
+                            print("epi disable thread-message iteration - archived")
                             await thread.edit(archived=False)
                             msg.edit(view=None)
                             await msg.reply(
@@ -346,7 +347,10 @@ class epi(commands.Cog):
                 self.epi_data.clear() # remove the custom status/message
                 await clear_epi_config(self.pool)
                 if self.sticky_message:
-                    await self.sticky_message.delete()
+                    try:
+                        await self.sticky_message.delete()
+                    except discord.NotFound:
+                        pass
                     self.sticky_message = None
                 await interaction.channel.send(content=f"EPI mode successfully disabled by {interaction.user.name}.\nMentioned users: {mentioned}")
                 await self.send_epi_log(f"EPI mode disabled by {interaction.user.mention}\nCustom message: {message or 'not set'}")
@@ -382,53 +386,58 @@ class epi(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
             if message != None or message_id != None or sticky != None:
-                command_response = "Successfully updated EPI mode!"
-                iso = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
-                self.epi_data.update(iso, list(self.epi_data.values()[0]))
-                await update_epi_iso(self.pool, iso)
+                command_response = "\nSuccessfully updated EPI mode!"
+                new_key = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+                previous_key = list(self.epi_data.keys())[0]
+                self.epi_data[new_key] = list(self.epi_data.values())[0]
+                del self.epi_data[previous_key]
+                await update_epi_iso(self.pool, new_key)
                 _message = None
                 if message:
                     await update_epi_message(self.pool, message)
                     if message == "-":
                         self.epi_msg = None
-                        command_response += "Custom message: None"
+                        command_response += "\n Custom message: Disabled"
                     else:
                         self.epi_msg = message
-                        command_response += f"Custom message: {message}"
+                        command_response += f"\nCustom message: `{message}`"
                 if message_id:
-                    if message_id.isdigit() and int(message_id):
+                    if message_id.isdigit():
                         if int(message_id) != 0:
                             status = discord.utils.get(interaction.channel.text_channels, name="status")
                             if status:
                                 try:
-                                    _message = await status.fetch_message(message_id)
+                                    _message = await status.fetch_message(int(message_id))
                                 except discord.NotFound as e:
-                                    command_response += f"Couldn't fetch message from {status.mention} with id `{message_id}`. `{e.text}` `{e.status}"
+                                    command_response += f"\nCouldn't fetch message from {status.mention} with id `{message_id}`. `{e.text}` `{e.status}"
                                 else: # the message was fetched successfully
+                                    await update_epi_message_id(self.pool, int(message_id))
                                     await update_epi_message_id(self.pool, message_id)
                                     self.epi_Message = _message
-                                    command_response += f"Status message: {_message.jump_url}"
+                                    command_response += f"\nStatus message: {_message.jump_url}"
                             else:
-                                command_response += "Couldn't get status channel, try again later..."
+                                command_response += "\nCouldn't get status channel, try again later..."
+                        else:
+                            self.epi_Message = None
+                            await update_epi_message_id(self.pool, int(message_id))
+                            command_response += "Status message: Disabled"
                     else:
-                        self.epi_Message = None
+                        command_response += f"\nCouldn't fetch status message: `message_id` argument must be a valid integer (received `{message_id}`)"
                 if sticky:
                     if not self.sticky_message or not self.sticky_task:
                         await update_epi_sticky(self.pool, sticky)
                         general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                         await self.handle_sticky_message(general)
-                        command_response += "Enabled sticky message"
+                        command_response += "\nEnabled sticky message"
                     else:
-                        command_response += "Couldn't enable sticky message: Already enabled."
+                        command_response += "\nCouldn't enable sticky message: Already enabled."
                 elif sticky == False:
                     if self.sticky_message or self.sticky_task:
                         await update_epi_sticky(self.pool, sticky)
                         await self.disable_sticky_message()
-                        command_response += "Disabled sticky message"
+                        command_response += "\nDisabled sticky message"
                     else:
-                        command_response += "Couldn't disable sticky message: Already disabled."
-                saved_message_id = message_id if _message else None
-                await save_epi_config(self.pool, sticky, message, saved_message_id)
+                        command_response += "\nCouldn't disable sticky message: Already disabled."
                 await interaction.followup.send(command_response, ephemeral=True)
             else:
                 await interaction.followup.send("At least one of `message`, `message_id`, `sticky` argument must be provided!")
