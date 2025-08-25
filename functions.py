@@ -269,7 +269,6 @@ async def get_epi_config(pool: sql.Pool) -> Optional[dict[str, int, str, str, st
     async with pool.acquire() as conn:
         result = await conn.fetchone("SELECT * FROM epi_config")
         if result:
-            print(result)
             return {
                 "started_iso": result[0],
                 "message": result[1],
