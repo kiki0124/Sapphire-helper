@@ -303,7 +303,10 @@ class epi(commands.Cog):
                 await i.delete_original_response()
                 content = "Hey, this issue is fixed now!\n-# Thank you for your patience."
                 if message:
-                    content += f"\n> {message}"    
+                    if len(message) < 1_000: # the _ doesn't mean anything - just for readability
+                        content += f"\n> {message}"    
+                    else:
+                        content += f"\n> {message[:1_000:]}*[...]*"
                 for thread_id, message_id in list(self.epi_data.values())[0].items():
                     thread = self.client.get_channel(thread_id)
                     if thread:
