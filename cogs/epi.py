@@ -254,7 +254,7 @@ class epi(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
             command_response = "Successfully enabled EPI mode!\n"
-            self.epi_data[datetime.datetime.now(tz=datetime.timezone.utc).isoformat()] = []
+            self.epi_data[datetime.datetime.now(tz=datetime.timezone.utc).isoformat()] = {}
             if message:
                 self.epi_msg = message
                 command_response += f"\nCustom message: {message}"
@@ -310,20 +310,26 @@ class epi(commands.Cog):
                         msg = thread.get_partial_message(message_id)
                         if not thread.archived:
                             print("epi disable thread-message iteration - not arcihved")
-                            await msg.edit(view=None)
-                            await msg.reply(
-                                content= content,
-                                mention_author=False
-                            )
+                            try:
+                                await msg.edit(view=None)
+                                await msg.reply(
+                                    content= content,
+                                    mention_author=False
+                                )
+                            except discord.NotFound:
+                                pass # Message was most likely already deleted
                         else:
                             print("epi disable thread-message iteration - archived")
                             await thread.edit(archived=False)
-                            msg.edit(view=None)
-                            await msg.reply(
-                                content= content,
-                                mention_author=False
-                            )
-                            await thread.edit(archived=True)
+                            try:
+                                msg.edit(view=None)
+                                await msg.reply(
+                                    content= content,
+                                    mention_author=False
+                                )
+                                await thread.edit(archived=True)
+                            except discord.NotFound:
+                                pass # message was most likely already deleted
                     else:
                         continue
                 await clear_epi_messages(self.pool)
