@@ -309,7 +309,6 @@ class epi(commands.Cog):
                     if thread:
                         msg = thread.get_partial_message(message_id)
                         if not thread.archived:
-                            print("epi disable thread-message iteration - not arcihved")
                             try:
                                 await msg.edit(view=None)
                                 await msg.reply(
@@ -319,7 +318,6 @@ class epi(commands.Cog):
                             except discord.NotFound:
                                 pass # Message was most likely already deleted
                         else:
-                            print("epi disable thread-message iteration - archived")
                             await thread.edit(archived=False)
                             try:
                                 msg.edit(view=None)
