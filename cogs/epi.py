@@ -410,7 +410,7 @@ class epi(commands.Cog):
                 if message_id:
                     if message_id.isdigit():
                         if int(message_id) != 0:
-                            status = discord.utils.get(interaction.channel.text_channels, name="status")
+                            status = discord.utils.get(interaction.guild.text_channels, name="status")
                             if status:
                                 try:
                                     _message = await status.fetch_message(int(message_id))
