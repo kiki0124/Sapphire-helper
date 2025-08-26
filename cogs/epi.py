@@ -250,7 +250,7 @@ class epi(commands.Cog):
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     @app_commands.describe(message="[Optional] A custom text message to be displayed", message_id="[Optional] ID of a message from #status to be displayed", sticky="Should a sticky message be created in #general?")
-    async def epi_enable(self, interaction: discord.Interaction, message: Optional[str], message_id: Optional[str], sticky: bool):
+    async def epi_enable(self, interaction: discord.Interaction, message: Optional[app_commands.Range[str, 1, 1000]], message_id: Optional[str], sticky: bool):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
             command_response = "Successfully enabled EPI mode!"
@@ -289,7 +289,7 @@ class epi(commands.Cog):
     @group.command(name="disable", description="Disable EPI mode- mark the issue as solved & ping all users that asked to be pinged")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
     @app_commands.describe(message="[Optional] A custom message to be displayed with the \"Hey, this is fixed now!\" message")
-    async def epi_disable(self, interaction: discord.Interaction, message: str = None):
+    async def epi_disable(self, interaction: discord.Interaction, message: Optional[app_commands.Range[str, 1, 1000]]):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
             button = discord.ui.Button(
@@ -303,10 +303,7 @@ class epi(commands.Cog):
                 await i.delete_original_response()
                 content = "Hey, this issue is fixed now!\n-# Thank you for your patience."
                 if message:
-                    if len(message) < 1_000: # the _ doesn't mean anything - just for readability
-                        content += f"\n> {message}"    
-                    else:
-                        content += f"\n> {message[:1_000:]}*[...]*"
+                    content += f"\n> {message}"
                 for thread_id, message_id in list(self.epi_data.values())[0].items():
                     thread = self.client.get_channel(thread_id)
                     if thread:
