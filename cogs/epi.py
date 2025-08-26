@@ -426,7 +426,7 @@ class epi(commands.Cog):
                         else:
                             self.epi_Message = None
                             await update_epi_message_id(self.pool, int(message_id))
-                            command_response += "Status message: Disabled"
+                            command_response += "\nStatus message: Disabled"
                     else:
                         command_response += f"\nCouldn't fetch status message: `message_id` argument must be a valid integer (received `{message_id}`)"
                 if sticky:
