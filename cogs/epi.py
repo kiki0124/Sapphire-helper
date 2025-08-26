@@ -253,7 +253,7 @@ class epi(commands.Cog):
     async def epi_enable(self, interaction: discord.Interaction, message: Optional[str], message_id: Optional[str], sticky: bool):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
-            command_response = "Successfully enabled EPI mode!\n"
+            command_response = "Successfully enabled EPI mode!"
             self.epi_data[datetime.datetime.now(tz=datetime.timezone.utc).isoformat()] = {}
             if message:
                 self.epi_msg = message
