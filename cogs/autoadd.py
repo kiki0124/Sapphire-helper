@@ -117,7 +117,7 @@ class autoadd(commands.Cog):
         start_msg = thread.starter_message
         if start_msg.content and (len(start_msg.content) < 15 or start_msg.content.casefold() == thread.name.casefold()) or not start_msg.content:
             greets = ["Hi", "Hey", "Hello", "Hi there"]
-            await thread.starter_message.reply(content=f"{random.choices(greets)[0]}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
+            await thread.starter_message.reply(content=f"{random.choice(greets)}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
 
     async def send_suggestion_message(self, message: discord.Message):
         if message.author != self.client.user and message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id):
@@ -183,7 +183,7 @@ class autoadd(commands.Cog):
                 greetings = ["Hi", "Hey", "Hello", "Hi there"]
                 owner_id = await get_post_creator_id(payload.channel_id) or message_channel.owner_id
                 await message_channel.send(
-                    content=f"{random.choices(greetings)[0]} <@{owner_id}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.",
+                    content=f"{random.choice(greetings)} <@{owner_id}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.",
                     view=confirm_close()
                 )
                 
