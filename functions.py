@@ -2,9 +2,6 @@ import datetime
 import asqlite as sql
 from string import ascii_letters, digits
 import random
-import datetime
-
-from discord.utils import format_dt
 
 DB_PATH = "database\data.db"
 
@@ -21,6 +18,9 @@ async def main():
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS epi_config(started_iso STRING NOT NULL, message STRING NOT NULL, message_id INTEGER NOT NULL, sticky BOOL NOT NULL, sticky_message_id INTEGER NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS epi_users(user_id INTEGER UNIQUE NOT NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS epi_messages(thread_id INTEGER UNIQUE NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -41,7 +41,7 @@ def check_time_more_than_day(timestamp: int) -> bool:
 
 # reminder system related functions
 
-async def execute_sql(cmd: str) -> tuple|Exception|None:
+async def execute_sql(cmd: str) -> Optional[tuple|Exception]:
     """  
     Execute the given sql command and return the result or None if there is no result, if an error was raised when executing the sql command it will be returned
     """
@@ -82,7 +82,7 @@ async def remove_post_from_pending(post_id: int) -> None:
             await cu.execute(f"DELETE FROM pending_posts WHERE post_id=?", (post_id,))
             await conn.commit()
 
-async def get_post_timestamp(post_id: int) -> int|None:
+async def get_post_timestamp(post_id: int) -> Optional[int]:
     """  
     Returns the saved timestamp for the post with given id or None if its not in the db
     """
@@ -113,7 +113,7 @@ async def add_post_to_rtdr(post_id: int, user_id: int) -> None:
             await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, user_id,))
             await conn.commit()
 
-async def get_post_creator_id(post_id: int) -> int|None:
+async def get_post_creator_id(post_id: int) -> Optional[int]:
     """  
     Get the id of whoever the post was created for if its part of readthedamnrules system
     """
@@ -227,12 +227,3 @@ async def delete_channel_permissions(channel_id: int) -> None:
         async with conn.cursor() as cu:
             await cu.execute("DELETE FROM locked_channels_permissions WHERE channel_id=?", (channel_id,))
             await conn.commit()
-
-def humanize_duration(seconds: float) -> str:
-    """
-    Convert a duration in seconds to a human-readable format.
-    """
-    now = datetime.datetime.now()
-    delta = datetime.timedelta(seconds=seconds)
-    future = now + delta
-    return format_dt(future, 'R')

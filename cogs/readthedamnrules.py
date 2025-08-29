@@ -89,7 +89,7 @@ class readthedamnrules(commands.Cog):
     async def redirect_to_support(self, message: discord.Message):
         if not message.author.bot and message.reference and message.content.startswith(self.client.user.mention) and message.guild:
             everyone = message.guild.default_role
-            if message.channel.permissions_for(everyone).view_channel and message.channel.permissions_for(everyone).send_messages:
+            if message.channel.permissions_for(everyone).view_channel and message.channel.permissions_for(everyone).send_messages or message.channel.permissions_for(everyone).send_messages_in_threads:
                 if message.author.get_role(EXPERTS_ROLE_ID) or message.author.get_role(MODERATORS_ROLE_ID):
                     replied_message = message.reference.cached_message or await message.channel.fetch_message(message.reference.message_id)
                     if not replied_message.author == message.author:
