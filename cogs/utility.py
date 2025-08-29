@@ -436,15 +436,14 @@ class utility(commands.Cog):
         embed.set_footer(text=f"Recommended by @{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
 
         content = ""
-        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            if await self.is_mod_or_expert(interaction):
+        if isinstance(interaction.channel, discord.Thread) and await self.is_mod_or_expert(interaction=interaction):
+            if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
                 user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
                 content = f"<@{user_id}>"
                 await self.lock_unrelated_post(interaction.channel)
-            await interaction.channel.send(content=content, embed=embed)
-            await interaction.delete_original_response()
-        else:
-            await interaction.response.send_message(f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
+
+        await interaction.channel.send(content=content, embed=embed)
+        await interaction.delete_original_response()
 
 async def setup(client):
     await client.add_cog(utility(client))
