@@ -209,6 +209,13 @@ class utility(commands.Cog):
             return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID)) or interaction.user.id == owner_id
         else:
             return False
+        
+    @staticmethod
+    async def is_mod_or_expert(interaction: discord.Interaction):
+        """  
+        Checks if the interaction user is a Moderator or Community Expert
+        """
+        return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID))
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -302,10 +309,11 @@ class utility(commands.Cog):
     async def delete_accidental_qr(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         in_support = isinstance(reaction.message.channel, discord.Thread) \
             and reaction.message.channel.parent_id == SUPPORT_CHANNEL_ID
-        from_sapphire = reaction.message.author.id == 678344927997853742 # Sapphire's user id
+        from_sapphire_or_helper = reaction.message.author.id == 678344927997853742 or \
+                                reaction.message.author.id == self.client.user.id
         reaction_allowed = reaction.emoji in ["🗑️", "❌"]
-        if in_support and from_sapphire and reaction_allowed:
-            if user.get_role(EXPERTS_ROLE_ID):
+        if in_support and from_sapphire_or_helper and reaction_allowed:
+            if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID):
                 await reaction.message.delete()
                 await self.send_qr_log(reaction.message, user)
                 return
@@ -429,7 +437,7 @@ class utility(commands.Cog):
         embed.set_footer(text=f"Recommended by @{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
 
         content = ""
-        if isinstance(interaction.channel, discord.Thread) and await self.one_of_mod_expert_op(interaction=interaction):
+        if isinstance(interaction.channel, discord.Thread) and await self.is_mod_or_expert(interaction=interaction):
             if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
                 user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
                 content = f"<@{user_id}>"

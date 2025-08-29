@@ -1,7 +1,10 @@
 import datetime
-import asqlite as sql
+import aiosqlite as sql
 from string import ascii_letters, digits
 import random
+import datetime
+
+from discord.utils import format_dt
 
 DB_PATH = "database\data.db"
 
@@ -224,3 +227,12 @@ async def delete_channel_permissions(channel_id: int) -> None:
         async with conn.cursor() as cu:
             await cu.execute("DELETE FROM locked_channels_permissions WHERE channel_id=?", (channel_id,))
             await conn.commit()
+
+def humanize_duration(seconds: float) -> str:
+    """
+    Convert a duration in seconds to a human-readable format.
+    """
+    now = datetime.datetime.now()
+    delta = datetime.timedelta(seconds=seconds)
+    future = now + delta
+    return format_dt(future, 'R')
