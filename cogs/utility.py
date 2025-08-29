@@ -426,7 +426,7 @@ class utility(commands.Cog):
             description="Hey, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query.",
             colour=discord.Colour.purple()
         )
-        embed.set_footer(f"Recommended by @{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
+        embed.set_footer(text=f"Recommended by @{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
 
         content = ""
         if isinstance(interaction.channel, discord.Thread) and await self.one_of_mod_expert_op(interaction=interaction):
