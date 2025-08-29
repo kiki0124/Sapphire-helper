@@ -2,6 +2,7 @@ import datetime
 import asqlite as sql
 from string import ascii_letters, digits
 import random
+from typing import Optional
 
 DB_PATH = "database\data.db"
 
