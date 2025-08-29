@@ -176,8 +176,7 @@ class utility(commands.Cog):
         action_id = generate_random_id()
         await post.edit(locked=True, applied_tags=solved, reason=f'ID: {action_id}. Post locked as it was not sapphire related')
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=solved, context="/unrelated used")
-        task = asyncio.create_task(self.close_post(post=post, close_delay=600))
-        self.close_tasks[post] = task
+        asyncio.create_task(self.close_post(post=post, close_delay=600))
 
     async def unsolve_post(self, post: discord.Thread) -> None:
         """  
@@ -209,6 +208,13 @@ class utility(commands.Cog):
             return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID)) or interaction.user.id == owner_id
         else:
             return False
+        
+    @staticmethod
+    async def is_mod_or_expert(interaction: discord.Interaction):
+        """  
+        Checks if the interaction user is a Moderator or Community Expert
+        """
+        return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID))
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -302,10 +308,11 @@ class utility(commands.Cog):
     async def delete_accidental_qr(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         in_support = isinstance(reaction.message.channel, discord.Thread) \
             and reaction.message.channel.parent_id == SUPPORT_CHANNEL_ID
-        from_sapphire = reaction.message.author.id == 678344927997853742 # Sapphire's user id
+        from_sapphire_or_helper = reaction.message.author.id == 678344927997853742 or \
+                                reaction.message.author.id == self.client.user.id
         reaction_allowed = reaction.emoji in ["🗑️", "❌"]
-        if in_support and from_sapphire and reaction_allowed:
-            if user.get_role(EXPERTS_ROLE_ID):
+        if in_support and from_sapphire_or_helper and reaction_allowed:
+            if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID):
                 await reaction.message.delete()
                 await self.send_qr_log(reaction.message, user)
                 return
@@ -376,7 +383,7 @@ class utility(commands.Cog):
                     description="Hey, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible",
                     colour=0xFFA800
                 )
-                embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.avatar.url)
+                embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.display_avatar.url)
                 if not ctx.interaction:
                     await ctx.message.delete()
                 elif ctx.interaction:
@@ -395,31 +402,48 @@ class utility(commands.Cog):
         else:
             await ctx.reply(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
 
-    @commands.hybrid_command(
+
+    async def non_expert_mod_cooldown(interaction: discord.Interaction):
+        """
+        Returns a cooldown of 1 use per 5 minutes if the command author is not expert or mod
+        """
+        if interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(EXPERTS_ROLE_ID):
+            return None
+        
+        return commands.Cooldown(1,  5.0 * 60.0)
+
+    # def unrelated_cooldown_key(interaction: discord.Interaction):
+    #     """
+    #     The key used to define the cooldown by
+    #     """
+    #     return interaction.channel_id
+    # this is only here because it may be useful someday idk
+
+
+    @app_commands.command(
             name='unrelated',
             description='Inform the post creator that their question/issue is not Sapphire/appeal.gg related.'
     )
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    async def wrong_server(self, ctx: commands.Context):
-        await ctx.defer(ephemeral=True)
-        if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
-            user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
-            if ctx.interaction:
-                await ctx.interaction.delete_original_response()
-            elif not ctx.interaction:
-                await ctx.message.delete()
+    @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
+    async def wrong_server(self, interaction: discord.Interaction):
+        await interaction.response.defer()
 
-            embed = discord.Embed(
-                title='Unrelated question/issue',
-                description='Hey, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query.',
-                colour=discord.Colour.purple()
-            )
-            embed.set_footer(text=f'Recommended by @{ctx.author.name}', icon_url=ctx.author.avatar.url)
+        embed = discord.Embed(
+            title="Unrelated question/issue",
+            description="Hey, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query.",
+            colour=discord.Colour.purple()
+        )
+        embed.set_footer(text=f"Recommended by @{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
 
-            await self.lock_unrelated_post(ctx.channel)
-            await ctx.channel.send(embed=embed, content=f'<@{user_id}>')
-        else:
-            await ctx.reply(content=f'This command can only be used in <#{SUPPORT_CHANNEL_ID}>!', ephemeral=True)
+        content = ""
+        if isinstance(interaction.channel, discord.Thread) and await self.is_mod_or_expert(interaction=interaction):
+            if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+                user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+                content = f"<@{user_id}>"
+                await self.lock_unrelated_post(interaction.channel)
+
+        await interaction.channel.send(content=content, embed=embed)
+        await interaction.delete_original_response()
 
 async def setup(client):
     await client.add_cog(utility(client))
