@@ -176,8 +176,7 @@ class utility(commands.Cog):
         action_id = generate_random_id()
         await post.edit(locked=True, applied_tags=solved, reason=f'ID: {action_id}. Post locked as it was not sapphire related')
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=solved, context="/unrelated used")
-        task = asyncio.create_task(self.close_post(post=post, close_delay=600))
-        self.close_tasks[post] = task
+        asyncio.create_task(self.close_post(post=post, close_delay=600))
 
     async def unsolve_post(self, post: discord.Thread) -> None:
         """  
