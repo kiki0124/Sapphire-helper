@@ -1,5 +1,5 @@
 import datetime
-import aiosqlite as sql
+import asqlite as sql
 from string import ascii_letters, digits
 import random
 
