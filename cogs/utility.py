@@ -432,7 +432,7 @@ class utility(commands.Cog):
             if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
                 user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
                 content = f"<@{user_id}>"
-                self.lock_unrelated_post(interaction.channel)
+                await self.lock_unrelated_post(interaction.channel)
 
         await interaction.channel.send(content=content, embed=embed)
         await interaction.delete_original_response()
