@@ -376,7 +376,7 @@ class utility(commands.Cog):
                     description="Hey, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible",
                     colour=0xFFA800
                 )
-                embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.avatar.url)
+                embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.display_avatar.url)
                 if not ctx.interaction:
                     await ctx.message.delete()
                 elif ctx.interaction:
@@ -426,6 +426,7 @@ class utility(commands.Cog):
             description="Hey, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query.",
             colour=discord.Colour.purple()
         )
+        embed.set_footer(f"Recommended by @{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
 
         content = ""
         if isinstance(interaction.channel, discord.Thread) and await self.one_of_mod_expert_op(interaction=interaction):
