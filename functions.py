@@ -3,6 +3,7 @@ import asqlite as sql
 from string import ascii_letters, digits
 import random
 from typing import Optional
+from discord.utils import format_dt
 
 DB_PATH = "database\data.db"
 
@@ -39,6 +40,15 @@ def check_time_more_than_day(timestamp: int) -> bool:
     time = datetime.datetime.fromtimestamp(timestamp, tz=tz_info)
     one_day_ago = datetime.datetime.now(tz=tz_info) - datetime.timedelta(days=1)
     return not one_day_ago < time 
+
+def humanize_duration(seconds: float) -> str:
+    """
+    Convert a duration in seconds to a human-readable format.
+    """
+    now = datetime.datetime.now()
+    delta = datetime.timedelta(seconds=seconds)
+    future = now + delta
+    return format_dt(future, 'R')
 
 # reminder system related functions
 
