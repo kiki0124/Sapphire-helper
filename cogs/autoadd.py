@@ -20,6 +20,7 @@ ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 EXPERTS_ROLE_ID = int(os.getenv('EXPERTS_ROLE_ID'))
 MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
 APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
+DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class confirm_close(ui.View):
     def __init__(self):
@@ -28,7 +29,7 @@ class confirm_close(ui.View):
     @ui.button(label="Mark as solved", style=discord.ButtonStyle.green, custom_id="auto-close-confirm")
     async def on_confirm_click(self, interaction: discord.Interaction, button: ui.Button):
         is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
-        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or is_owner:
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner:
             await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# {interaction.user.name} clicked the confirm button", allowed_mentions=discord.AllowedMentions.none())
             solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
             appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
@@ -46,15 +47,15 @@ class confirm_close(ui.View):
             await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
             await remove_post_from_rtdr(interaction.channel_id)
         else:
-            await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
 
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
     async def on_cancel_click(self, interaction: discord.Interaction, button: ui.Button):
         is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
-        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or is_owner:
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner:
             await interaction.message.edit(content=f"~~{interaction.message.content}~~\n-# {interaction.user.name} has clicked the *cancel* button.", view=None, allowed_mentions=discord.AllowedMentions.none())
         else:
-            await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
 
 class autoadd(commands.Cog):
     def __init__(self, client: commands.Bot):
