@@ -15,6 +15,7 @@ GENERAL_CHANNEL_ID = int(os.getenv('GENERAL_CHANNEL_ID'))
 EPI_LOG_THREAD_ID = int(os.getenv("EPI_LOG_THREAD_ID"))
 NTFY_TOPIC_NAME = os.getenv("NTFY_TOPIC_NAME")
 NTFY_SECOND_TOPIC = os.getenv("NTFY_SECOND_TOPIC")
+DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 epi_users: list[int] = []
 
@@ -71,10 +72,12 @@ class select_channels(ui.ChannelSelect):
         experts_mods_overwrites = discord.PermissionOverwrite(send_messages=True, create_public_threads=True, send_messages_in_threads=True)
         experts = channel.guild.get_role(EXPERTS_ROLE_ID)
         mods = channel.guild.get_role(MODERATORS_ROLE_ID)
+        devs = channel.guild.get_role(DEVELOPERS_ROLE_ID)
         overwrites = {
             channel.guild.default_role: permissions, # @everyone role
             experts: experts_mods_overwrites,
-            mods: experts_mods_overwrites
+            mods: experts_mods_overwrites,
+            devs: experts_mods_overwrites
         }
         await channel.edit(overwrites=overwrites, reason=f"{interaction.user.name} ({interaction.user.id}) used /lock. Reason: {self.reason}")
         if isinstance(channel, discord.TextChannel):
@@ -248,7 +251,7 @@ class epi(commands.Cog):
                 await self.handle_sticky_message(general, delay=0)
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(message="[Optional] A custom text message to be displayed", message_id="[Optional] ID of a message from #status to be displayed", sticky="Should a sticky message be created in #general?")
     async def epi_enable(self, interaction: discord.Interaction, message: Optional[app_commands.Range[str, 1, 1000]], message_id: Optional[str], sticky: bool):
         await interaction.response.defer(ephemeral=True)
@@ -287,7 +290,7 @@ class epi(commands.Cog):
             await interaction.followup.send(content=f"EPI Mode is already enabled!", ephemeral=True)
     
     @group.command(name="disable", description="Disable EPI mode- mark the issue as solved & ping all users that asked to be pinged")
-    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
+    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(message="[Optional] A custom message to be displayed with the \"Hey, this is fixed now!\" message")
     async def epi_disable(self, interaction: discord.Interaction, message: Optional[app_commands.Range[str, 1, 1000]]):
         await interaction.response.defer(ephemeral=True)
@@ -366,7 +369,7 @@ class epi(commands.Cog):
             await interaction.followup.send(content="EPI mode is not currently enabled!", ephemeral=True)
 
     @group.command(name="view", description="View the current EPI mode status")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def epi_view(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
@@ -384,7 +387,7 @@ class epi(commands.Cog):
             await interaction.followup.send(content="EPI mode is not currently enabled! Run the command again if EPI mode is activated.")
 
     @group.command(name="edit", description="Edit current EPI information")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(message="A custom text message to be displayed. Leave empty to not edit or '-' to remove.", message_id="ID of a message from #status to be displayed. Leave empty to not edit or 0 to remove", sticky="Should a sticky message be created in #general? Leave empty to not edit.")
     async def edit(self, interaction: discord.Interaction, message: str = None, message_id: str = None, sticky: bool = None):
         await interaction.response.defer(ephemeral=True)
@@ -470,7 +473,7 @@ class epi(commands.Cog):
     channel_permissions: dict[discord.TextChannel | discord.ForumChannel, dict[discord.Role|discord.Member|discord.Object, discord.PermissionOverwrite]] = {}
 
     @app_commands.command(name="lock", description="Lock the given channels. Should only be used in emergencies.")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(reason="The reason for locking the channels.")
     async def lock(self, interaction: discord.Interaction, reason: str):
         await interaction.response.defer(ephemeral=True)
@@ -482,7 +485,7 @@ class epi(commands.Cog):
             await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
                 
     @app_commands.command(name="unlock", description="Unlock the given channels. Should only be used in emergencies.")
-    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
+    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(reason="What is the reason for unlocking the channels?")
     async def unlock(self, interaction: discord.Interaction, reason: str):
         await interaction.response.defer(ephemeral=True)
@@ -495,7 +498,7 @@ class epi(commands.Cog):
 
     @app_commands.command(name="slowmode", description="Set a specified slowmode time for the given channels. Should only be used in emergencies")
     @app_commands.describe(time="The new slowmode time for the channel, in seconds. Max 21600. Put 0 to disable slowmode.", reason="What's the reason for this slowmode?")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def slowmode(self, interaction: discord.Interaction, time: int, reason: str):
         await interaction.response.defer(ephemeral=True)
         if len(reason) < 200:
@@ -640,7 +643,7 @@ class epi(commands.Cog):
                 raise e
 
     @app_commands.command(name="page", description="Alert the developer of any downtime or critical issues")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(
         service="The affected service(s) - Sapphire- bot/dashboard | appeal.gg | All",
         message="The message to send", 
@@ -724,7 +727,7 @@ class epi(commands.Cog):
                 await self.send_page(f"{h} Ratelimited", page_msg, priority, msg, False, ratelimit_url=message.jump_url)
 
     @app_commands.command(name="page-ws-close", description="Manually close a websocket created after a /page")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(id="The id of the websocket to close. If none is provided all currently open websockets will be closed.")
     async def page_websockets_close(self, interaction: discord.Interaction, id: str = None):
         await interaction.response.defer(ephemeral=True)

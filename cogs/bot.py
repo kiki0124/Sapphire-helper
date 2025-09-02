@@ -14,6 +14,7 @@ load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
+DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class bot(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -30,7 +31,7 @@ class bot(commands.Cog):
             await alerts_thread.send(content=f"Interaction created at `{interaction.created_at.timestamp()}` <t:{round(interaction.created_at.timestamp())}:T>. Now `{datetime.datetime.now().timestamp()}` <t:{round(datetime.datetime.now().timestamp())}:T>\nCommand: `{interaction.command.name}`")
 
     @commands.command(name="ping")
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def ping(self, ctx: commands.Context):
         now = datetime.datetime.now()
         message = await ctx.reply(content=f"Pong!\nClient latency: {str(self.client.latency)[:4]}s", mention_author=False)
@@ -38,7 +39,7 @@ class bot(commands.Cog):
         await message.edit(content=f"{message.content}\nDiscord latency: {str(latency.total_seconds())[:4]}s")
 
     @commands.command(name="restart")
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def restart(self, ctx: commands.Context):
         extensions = os.listdir("./cogs")
         await ctx.reply(content=f"Reloading {len(extensions)} extension(s)", mention_author=False)
@@ -49,7 +50,7 @@ class bot(commands.Cog):
                 continue
 
     @commands.command()
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def sync(self, ctx: commands.Context):
         try:
             synced = await self.client.tree.sync()
@@ -74,19 +75,19 @@ class bot(commands.Cog):
 
     async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingAnyRole):
-            await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.NoPrivateMessage):
             await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
         elif isinstance(error, app_commands.CommandOnCooldown):
             await interaction.response.send_message(f"This command is on cooldown. You can run it again **{humanize_duration(error.retry_after)}**", ephemeral=True)
         elif isinstance(error, app_commands.CheckFailure): # raised when a user tries to use a command that only mods/experts/op can use, eg /solved
-            await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command and only in #support!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}, <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command and only in #support!", ephemeral=True)
         else:
             await self.send_unhandled_error(error=error, interaction=interaction)
             print_exception(error)
 
     @app_commands.command(name="debug", description="Debug for various systems")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def debug(self, interaction: discord.Interaction, debug: str, post: discord.Thread = None):
         if debug == "last message id":
             await interaction.response.send_message(content=post.last_message_id)
@@ -118,7 +119,7 @@ class bot(commands.Cog):
             await interaction.response.send_message(content="Debug not found...", ephemeral=True)
 
     @commands.command()
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def stats(self, ctx: commands.Context):
         embed = discord.Embed(
             title="Sapphire Helper | Version 4.1",

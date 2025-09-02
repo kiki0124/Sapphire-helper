@@ -21,6 +21,7 @@ EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
+DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 reminder_not_sent_posts: dict[int, int] = {} # dictionary of post ids: the amount of tries
 
@@ -31,7 +32,7 @@ class CloseNow(ui.View):
     @ui.button(label="Issue already solved? Close post now", custom_id="remind-close-now", style=discord.ButtonStyle.grey)
     async def on_close_now_click(self, interaction: discord.Interaction, button: ui.Button):
         owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
-        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.id == owner_id:
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or interaction.user.id == owner_id:
             await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
             tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
             cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
@@ -222,16 +223,6 @@ class remind(commands.Cog):
     @check_exception_posts.before_loop
     async def cep_before_loop(self):
         await self.client.wait_until_ready()
-
-    @commands.command()
-    @commands.has_role(EXPERTS_ROLE_ID)
-    async def check_running(self, ctx: commands.Context, task: str):
-        data = {
-            "cep": self.check_exception_posts.is_running(),
-            "cpp": self.close_pending_posts.is_running(),
-            "cfpp": self.check_for_pending_posts.is_running()
-        }
-        await ctx.reply(content=data.get(task.casefold(), "Task must be one of cep, cpp, cfpp"), mention_author=False)
 
 async def setup(client):
     await client.add_cog(remind(client))

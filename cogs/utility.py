@@ -26,6 +26,7 @@ QR_LOG_THREAD_ID = int(os.getenv("QR_LOG_THREAD_ID"))
 APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
 UNANSWERED_TAG_ID = int(os.getenv("UNANSWERED_TAG_ID"))
+DEVELOPERS_ROLE_ID = int(os.getenv('DEVELOPERS_ROLE_ID'))
 
 class need_dev_review_buttons(ui.View):
     def __init__(self):
@@ -207,7 +208,7 @@ class utility(commands.Cog):
         """
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
-            return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID)) or interaction.user.id == owner_id
+            return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)) or interaction.user.id == owner_id
         else:
             return False
         
@@ -216,7 +217,7 @@ class utility(commands.Cog):
         """  
         Checks if the interaction user is a Moderator or Community Expert
         """
-        return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID))
+        return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID))
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -252,7 +253,7 @@ class utility(commands.Cog):
     @app_commands.command(name="remove", description="Remove the given member from the current post")
     @app_commands.guild_only()
     @app_commands.describe(user="What user do you want to remove?")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def remove(self, interaction: discord.Interaction, user: discord.Member):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             await interaction.channel.remove_user(user)
@@ -271,7 +272,7 @@ class utility(commands.Cog):
         if interaction.channel in self.close_tasks or SOLVED_TAG_ID in interaction.channel._applied_tags:
             await self.unsolve_post(interaction.channel)
             content = f"Post successfully unsolved!\nPlease send a message here explaining what you still need help with.\n-# If the post is solved you may use </solved:{await self.get_solved_id()}> to mark it as solved."
-            if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID):
+            if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
                 content = "Post successfully unsolved!"
             await interaction.response.send_message(content=content)
         else:
@@ -279,7 +280,7 @@ class utility(commands.Cog):
 
     @app_commands.command(name="needs-dev-review", description="This post needs to be reviewed by the developer")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def need_dev_review(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags:
@@ -314,7 +315,7 @@ class utility(commands.Cog):
                                 reaction.message.author.id == self.client.user.id
         reaction_allowed = reaction.emoji in ["🗑️", "❌"]
         if in_support and from_sapphire_or_helper and reaction_allowed:
-            if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID):
+            if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
                 await reaction.message.delete()
                 await self.send_qr_log(reaction.message, user)
                 return
@@ -339,7 +340,7 @@ class utility(commands.Cog):
 
     @app_commands.command(name="atbl", description="Mark the current post as 'Added to bug list'")
     @app_commands.describe(priority="The priority of this issue")
-    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
+    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def atbl(self, interaction: discord.Interaction, priority: Literal["Very Low", "Low", "Medium", "High", "Special Issue"]):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             priority_texts = {
@@ -378,7 +379,7 @@ class utility(commands.Cog):
             if SOLVED_TAG_ID not in ctx.channel._applied_tags and NEED_DEV_REVIEW_TAG_ID not in ctx.channel._applied_tags:
                 user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
                 content = None
-                if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID):
+                if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
                     content = f"<@{user_id}>"
                 embed = discord.Embed(
                     title="Incomplete support post",
@@ -410,7 +411,7 @@ class utility(commands.Cog):
         """
         Returns a cooldown of 1 use per 5 minutes if the command author is not expert or mod
         """
-        if interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(EXPERTS_ROLE_ID):
+        if interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
             return None
         
         return commands.Cooldown(1,  5.0 * 60.0)
