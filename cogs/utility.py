@@ -391,7 +391,7 @@ class utility(commands.Cog):
                     await ctx.message.delete()
                 elif ctx.interaction:
                     await ctx.interaction.delete_original_response()
-                if WAITING_FOR_REPLY_TAG_ID in ctx.channel._applied_tags or UNANSWERED_TAG_ID:
+                if WAITING_FOR_REPLY_TAG_ID in ctx.channel._applied_tags or UNANSWERED_TAG_ID in ctx.channel._applied_tags:
                     tags = [ctx.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
                     if CUSTOM_BRANDING_TAG_ID in ctx.channel._applied_tags:
                         tags.append(ctx.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
