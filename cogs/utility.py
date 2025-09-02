@@ -24,6 +24,8 @@ NDR_CHANNEL_ID = int(os.getenv('NDR_CHANNEL_ID'))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 QR_LOG_THREAD_ID = int(os.getenv("QR_LOG_THREAD_ID"))
 APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
+WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
+UNANSWERED_TAG_ID = int(os.getenv("UNANSWERED_TAG_ID"))
 
 class need_dev_review_buttons(ui.View):
     def __init__(self):
@@ -388,15 +390,16 @@ class utility(commands.Cog):
                     await ctx.message.delete()
                 elif ctx.interaction:
                     await ctx.interaction.delete_original_response()
-                tags = [ctx.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-                if CUSTOM_BRANDING_TAG_ID in ctx.channel._applied_tags:
-                    tags.append(ctx.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                if APPEAL_GG_TAG_ID in ctx.channel._applied_tags:
-                    tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
+                if WAITING_FOR_REPLY_TAG_ID in ctx.channel._applied_tags or UNANSWERED_TAG_ID:
+                    tags = [ctx.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+                    if CUSTOM_BRANDING_TAG_ID in ctx.channel._applied_tags:
+                        tags.append(ctx.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                    if APPEAL_GG_TAG_ID in ctx.channel._applied_tags:
+                        tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
+                    action_id = generate_random_id()
+                    await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
+                    await self.send_action_log(action_id, ctx.channel.mention, tags, "/incomplete-post used")
                 await ctx.channel.send(content=content, embed=embed)
-                action_id = generate_random_id()
-                await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
-                await self.send_action_log(action_id, ctx.channel.mention, tags, "/incomplete-post used")
             else:
                 await ctx.reply("You cannot use this command as this post has the *Solved* tag.", ephemeral=True)
         else:
