@@ -18,10 +18,13 @@ class waiting_for_reply(commands.Cog):
         self.client: commands.Bot = client
         
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
-        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        try:
+            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
-        webhooks = await alerts_thread.parent.webhooks()
+        webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]
         except IndexError:
