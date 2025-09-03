@@ -40,7 +40,10 @@ class confirm_close(ui.View):
             if cb in interaction.channel.applied_tags:
                 tags.append(cb)
             action_id = generate_random_id()
-            alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID)
+            try:
+                alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
+            except discord.NotFound as e:
+                 raise e
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Post starter message delete and confirm button clicked- mark post as solved")
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
@@ -81,10 +84,13 @@ class autoadd(commands.Cog):
         return solved_id
 
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
-        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        try:
+            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
-        webhooks = await alerts_thread.parent.webhooks()
+        webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]
         except IndexError:
@@ -193,4 +199,5 @@ class autoadd(commands.Cog):
         await self.client.wait_until_ready()
 
 async def setup(client):
+
     await client.add_cog(autoadd(client))
