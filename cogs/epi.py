@@ -24,7 +24,7 @@ class get_notified(ui.View):
         super().__init__(timeout=None)
     
     @ui.button(label="Notify me when this issue is resolved", custom_id="epi-get-notified", style=discord.ButtonStyle.grey)
-    async def on_get_notified_click(self, interaction: discord.Interaction, button: ui.button):
+    async def on_get_notified_click(self, interaction: discord.Interaction, button: ui.Button):
         if interaction.user.id not in epi_users:
             await add_epi_user(interaction.user.id)
             epi_users.append(interaction.user.id)
@@ -35,7 +35,7 @@ class get_notified(ui.View):
             await interaction.response.send_message(content="You will no longer be notified for this issue!", ephemeral=True)
 
 class select_channels(ui.ChannelSelect):
-    def __init__(self, action: str, reason: str,i: discord.Interaction ,slowmode: int = None):
+    def __init__(self, action: str, reason: str,i: discord.Interaction ,slowmode: int | None = None):
         super().__init__(
             channel_types=[discord.ChannelType.text, discord.ChannelType.forum],
             placeholder=f"Select channels to",
@@ -44,12 +44,15 @@ class select_channels(ui.ChannelSelect):
         )
         self.action = action
         self.reason = reason
-        self.slowmode = slowmode
+        self.slowmode = slowmode or 0
         self.i = i
 
     async def send_log(self, content: str):
-        epi_thread = self.i.guild.get_thread(EPI_LOG_THREAD_ID)
-        webhooks = await epi_thread.parent.webhooks()
+        try:
+            epi_thread = self.i.guild.get_thread(EPI_LOG_THREAD_ID) or await self.i.guild.fetch_channel(EPI_LOG_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
+        webhooks = [webhook for webhook in await epi_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]
         except IndexError:
@@ -173,8 +176,11 @@ class epi(commands.Cog):
         return discord.Embed().from_dict(embed_data)
 
     async def send_epi_log(self, content: str):
-        epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID)
-        webhooks = await epi_thread.parent.webhooks()
+        try:
+            epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID) or await self.client.fetch_channel(EPI_LOG_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
+        webhooks = [webhook for webhook in await epi_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0] 
         except IndexError:
@@ -267,7 +273,7 @@ class epi(commands.Cog):
                     status = discord.utils.get(interaction.guild.text_channels, name="status")
                     if status:
                         try:
-                            _message = await status.fetch_message(message_id)
+                            _message = await status.fetch_message(int(message_id))
                         except discord.NotFound as e:
                             command_response += f"\nStatus message: Failed. Tried fetching `{message_id}` from {status.mention}. `{e.text}` `{e.status}`\n"
                             _message = None
@@ -419,7 +425,6 @@ class epi(commands.Cog):
                                     command_response += f"\nCouldn't fetch message from {status.mention} with id `{message_id}`. `{e.text}` `{e.status}"
                                 else: # the message was fetched successfully
                                     await update_epi_message_id(self.pool, int(message_id))
-                                    await update_epi_message_id(self.pool, message_id)
                                     self.epi_Message = _message
                                     command_response += f"\nStatus message: {_message.jump_url}"
                             else:
@@ -545,7 +550,7 @@ class epi(commands.Cog):
                                 await self.send_epi_log(f"Attempted to close WS. Closed: `{ws.closed}` | ID: `{data['message']}`")
                                 response = data["title"] # the button that Xge clicked in the notification
                                 channel = self.client.get_channel(message.channel.id)
-                                webhooks = await channel.webhooks()
+                                webhooks = [webhook for webhook in await channel.webhooks() if webhook.token]
                                 try:
                                     webhook = webhooks[0]
                                 except IndexError: # webhooks is an empty list - that channel has no webhooks
@@ -554,7 +559,7 @@ class epi(commands.Cog):
                                 await webhook.send(
                                     content=f"{response}\n-# Reply to {message.jump_url}",
                                     username=xge.global_name or xge.name, # global name or username if global name doesn't exist (is none)
-                                    avatar_url=xge.avatar.url
+                                    avatar_url=xge.display_avatar.url
                                 )
                                 del self.page_websockets[id]
                                 return
