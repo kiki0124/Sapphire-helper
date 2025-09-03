@@ -62,7 +62,10 @@ class ndr_options_buttons(ui.View):
         if appeal in post.applied_tags:
             tags.append(appeal)
         action_id = generate_random_id()
-        alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+        try:
+            alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
@@ -95,10 +98,13 @@ class utility(commands.Cog):
         self.client: commands.Bot = client
         
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
-        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        try:
+            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
-        webhooks = await alerts_thread.parent.webhooks()
+        webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0] 
         except IndexError:
@@ -258,7 +264,10 @@ class utility(commands.Cog):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             await interaction.channel.remove_user(user)
             await interaction.response.send_message(content=f"Successfully removed {user.mention} from this post.", ephemeral=True)
-            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+            try:
+                alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+            except discord.NotFound as e:
+                raise e
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
             await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}).", allowed_mentions=discord.AllowedMentions.none())
@@ -291,8 +300,11 @@ class utility(commands.Cog):
             await interaction.response.send_message(f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
     async def send_qr_log(self, message: discord.Message, user: discord.Member):
-        qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID)
-        webhooks = await qr_logs_thread.parent.webhooks()
+        try:
+            qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID) or await self.client.fetch_channel(QR_LOG_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
+        webhooks = [webhook for webhook in await qr_logs_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]
         except IndexError:
@@ -450,4 +462,5 @@ class utility(commands.Cog):
         await interaction.delete_original_response()
 
 async def setup(client):
+
     await client.add_cog(utility(client))
