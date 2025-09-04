@@ -44,7 +44,7 @@ class select_channels(ui.ChannelSelect):
         )
         self.action = action
         self.reason = reason
-        self.slowmode = slowmode or 0
+        self.slowmode = slowmode
         self.i = i
 
     async def send_log(self, content: str):
