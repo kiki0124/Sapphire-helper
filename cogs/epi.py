@@ -62,7 +62,7 @@ class select_channels(ui.ChannelSelect):
         await webhook.send(
             content,
             username=self.i.client.user.name,
-            avatar_url=self.i.client.user.avatar.url,
+            avatar_url=self.i.client.user.display_avatar.url,
             allowed_mentions=discord.AllowedMentions.none(),
             thread=epi_thread,
             wait=False            
@@ -89,7 +89,7 @@ class select_channels(ui.ChannelSelect):
                 description=f"> {self.reason}",
                 colour=0xFFA800 # Default 'warning' colour in Sapphire's default messages which I find quite nice and fitting
             )
-            embed.set_footer(text=f"@{interaction.user.name}", icon_url=interaction.user.avatar.url)
+            embed.set_footer(text=f"@{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
             await channel.send(embed=embed)
         await interaction.followup.send(content=f"Successfully locked {channel.mention} with reason `{self.reason}`", ephemeral=True)
 
@@ -105,7 +105,7 @@ class select_channels(ui.ChannelSelect):
                 description=f"> {self.reason}",
                 colour=0x36CE36
                 )
-            embed.set_footer(text=f"@{interaction.user.name}", icon_url=interaction.user.avatar.url)
+            embed.set_footer(text=f"@{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
             await channel.send(embed=embed)
         await delete_channel_permissions(channel.id)
         await interaction.followup.send(f"Successfully unlocked {channel.mention} with reason `{self.reason}`", ephemeral=True)
@@ -190,7 +190,7 @@ class epi(commands.Cog):
         await webhook.send(
             content=content,
             username=self.client.user.name,
-            avatar_url=self.client.user.avatar.url,
+            avatar_url=self.client.user.display_avatar.url,
             thread=discord.Object(id=EPI_LOG_THREAD_ID),
             wait=False,
             allowed_mentions=discord.AllowedMentions.none()
@@ -627,7 +627,7 @@ class epi(commands.Cog):
             if priority == 4:
                 data["priority"] = 5
             if user:
-                data["icon"] = user.avatar.url
+                data["icon"] = user.display_avatar.url
             try:
                 async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
                     if req.status == 200: # OK
