@@ -112,7 +112,7 @@ class utility(commands.Cog):
         await webhook.send(
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
             username=self.client.user.name,
-            avatar_url=self.client.user.avatar.url,
+            avatar_url=self.client.user.display_avatar.url,
             thread=discord.Object(id=ALERTS_THREAD_ID),
             wait=False
         )
@@ -314,7 +314,7 @@ class utility(commands.Cog):
         await webhook.send(
             content=f"Message deleted by {user.mention} in {message.channel.mention}\nMessage id: `{message.id}`",
             username=self.client.user.name,
-            avatar_url=self.client.user.avatar.url,
+            avatar_url=self.client.user.display_avatar.url,
             thread=discord.Object(id=QR_LOG_THREAD_ID),
             allowed_mentions=discord.AllowedMentions.none()
         )
@@ -464,3 +464,4 @@ class utility(commands.Cog):
 async def setup(client):
 
     await client.add_cog(utility(client))
+
