@@ -43,7 +43,10 @@ class CloseNow(ui.View):
                 tags.append(appeal)
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button", archived=True)
-            alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+            try:
+                alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
+            except discord.NotFound as e:
+                raise e
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: Close now button clicked")
@@ -77,10 +80,13 @@ class remind(commands.Cog):
             return False
         
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
-        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        try:
+            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
-        webhooks = await alerts_thread.parent.webhooks()
+        webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]
         except IndexError:
@@ -88,7 +94,7 @@ class remind(commands.Cog):
         await webhook.send(
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
             username=self.client.user.name,
-            avatar_url=self.client.user.avatar.url,
+            avatar_url=self.client.user.display_avatar.url,
             thread=discord.Object(id=ALERTS_THREAD_ID),
             wait=False
         )
@@ -225,4 +231,6 @@ class remind(commands.Cog):
         await self.client.wait_until_ready()
 
 async def setup(client):
+
     await client.add_cog(remind(client))
+
