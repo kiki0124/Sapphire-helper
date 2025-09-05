@@ -136,7 +136,10 @@ class remind(commands.Cog):
                 try:
                     message = await post.fetch_message(post.last_message_id)
                 except discord.HTTPException as e:
-                    alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+                    try:
+                        alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
+                    except discord.NotFound as e2:
+                        raise e2
                     if alerts_thread.archived:
                         await alerts_thread.edit(archived=False)
                     await alerts_thread.send(
@@ -166,7 +169,10 @@ class remind(commands.Cog):
                             reminder_not_sent_posts[post.id] = 1
                             continue
                         except discord.HTTPException as e:
-                            alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+                            try:
+                                alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
+                            except discord.NotFound as e2:
+                                raise e2
                             if alerts.archived:
                                 await alerts.edit(archived=False)
                             await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
@@ -233,4 +239,5 @@ class remind(commands.Cog):
 async def setup(client):
 
     await client.add_cog(remind(client))
+
 
