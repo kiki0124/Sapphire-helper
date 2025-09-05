@@ -354,7 +354,7 @@ class utility(commands.Cog):
                     footer = reaction.message.embeds[len(reaction.message.embeds)-1].footer
 
                     regex = f'(Recommended|Sent) by @{user.name}'
-                    if re.match(regex, footer.text, re.IGNORECASE):
+                    if footer.text and re.match(regex, footer.text, re.IGNORECASE):
                         await reaction.message.delete()
                         await self.send_qr_log(message=reaction.message, user=user)
                         return
@@ -485,3 +485,4 @@ class utility(commands.Cog):
 async def setup(client):
 
     await client.add_cog(utility(client))
+
