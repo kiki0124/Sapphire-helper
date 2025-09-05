@@ -501,7 +501,7 @@ class epi(commands.Cog):
     @app_commands.command(name="slowmode", description="Set a specified slowmode time for the given channels. Should only be used in emergencies")
     @app_commands.describe(time="The new slowmode time for the channel, in seconds. Max 21600. Put 0 to disable slowmode.", reason="What's the reason for this slowmode?")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def slowmode(self, interaction: discord.Interaction, time: app_commands.Range[int, 0, 21600], reason: app_commands.Range[str, 1, 199]):
+    async def slowmode(self, interaction: discord.Interaction, time: app_commands.Range[int, 0, 21600], reason: app_commands.Range[str, 1, 200]):
         await interaction.response.defer(ephemeral=True)
         view = ui.View()
         view.add_item(select_channels("slowmode", reason,interaction ,time))
