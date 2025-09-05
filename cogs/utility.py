@@ -319,6 +319,19 @@ class utility(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none()
         )
 
+    def get_user_id_from_avatar(self, avatar_url: str) -> int | None:
+        """Gets the user_id from a users avatar"""
+      
+        guild_member_avatar_regex = r"^https?:\/\/cdn\.discord(?:app)?\.com\/guilds\/\d+\/users\/\d+\/avatars\/"
+        user_avatar_regex = r"^https?:\/\/cdn\.discord(?:app)?\.com\/avatars\/\d+\/"
+        if re.match(user_avatar_regex, avatar_url, re.IGNORECASE):
+            user_id = int(avatar_url.split("/")[4]) #https://cdn.discordapp.com/avatars/user_id/user_avatar.png -> ['https:', '', 'cdn.discordapp.com', 'avatars', 'user_id', 'user_avatar.png']
+        elif re.match(guild_member_avatar_regex, avatar_url, re.IGNORECASE):
+            user_id = int(avatar_url.split("/")[6]) #https://cdn.discordapp.com/guilds/guild_id/users/user_id/avatars/member_avatar.png -> ['https:', '', 'cdn.discordapp.com', 'guilds', 'guild_id', 'users', 'user_id', 'avatars', 'member_avatar.png']
+        else:
+            user_id = None
+        return user_id
+
     @commands.Cog.listener('on_reaction_add')
     async def delete_accidental_qr(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         in_support = isinstance(reaction.message.channel, discord.Thread) \
@@ -338,12 +351,20 @@ class utility(commands.Cog):
                     return
             elif reaction.message.embeds:
                 if reaction.message.embeds[len(reaction.message.embeds)-1].footer:
+                    footer = reaction.message.embeds[len(reaction.message.embeds)-1].footer
+
                     regex = f'(Recommended|Sent) by @{user.name}'
-                    footer_text = reaction.message.embeds[len(reaction.message.embeds)-1].footer.text
-                    if re.match(regex, footer_text, re.IGNORECASE):
+                    if re.match(regex, footer.text, re.IGNORECASE):
                         await reaction.message.delete()
                         await self.send_qr_log(message=reaction.message, user=user)
                         return
+
+                    if footer.icon_url is not None:
+                        user_id = self.get_user_id_from_avatar(footer.icon_url)
+                        if user_id is not None and user_id == user.id:
+                            await reaction.message.delete()
+                            await self.send_qr_log(message=reaction.message, user=user)
+                            return
             if reaction.message.reference and reaction.message.reference.cached_message:
                 if user == reaction.message.reference.cached_message.author:
                     await reaction.message.delete()
@@ -462,4 +483,5 @@ class utility(commands.Cog):
         await interaction.delete_original_response()
 
 async def setup(client):
+
     await client.add_cog(utility(client))
