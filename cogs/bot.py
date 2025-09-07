@@ -110,7 +110,10 @@ class bot(commands.Cog):
             archived = not post.archived
             locked = not post.locked
             is_pending = post.id not in await functions.get_pending_posts()
-            last_message = post.last_message or await post.fetch_message(post.last_message_id) or None
+            try:
+                last_message = post.last_message or await post.fetch_message(post.last_message_id)
+            except discord.NotFound:
+                last_message = None
             message_time = False
             author_is_owner = False
             owner_id = await functions.get_post_creator_id(post.id) or post.owner_id
@@ -138,3 +141,4 @@ class bot(commands.Cog):
 async def setup(client: commands.Bot):
 
     await client.add_cog(bot(client))
+
