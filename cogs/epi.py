@@ -652,10 +652,10 @@ class epi(commands.Cog):
             "1 | Information" : 1
         }
 
+        priority_num = priority_dict[priority]
         if self.recent_page and datetime.datetime.fromtimestamp(self.recent_page["timestamp"]) > fifteen_minutes_ago:
             await interaction.response.defer(ephemeral=True)
             button = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page-confirm")
-            priority_num = priority_dict[priority]
             async def callback(i: discord.Interaction):
                 followup = await i.channel.send("Sending...")
                 await interaction.delete_original_response()
