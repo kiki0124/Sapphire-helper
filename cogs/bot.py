@@ -88,8 +88,11 @@ class bot(commands.Cog):
 
     @app_commands.command(name="debug", description="Debug for various systems")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    @app_commands.describe(debug = "Options: last message id | in db | timestamp | more than 24 hours | eval sql ... | check post", post = "The post to debug")
     async def debug(self, interaction: discord.Interaction, debug: str, post: discord.Thread = None):
-        if debug == "last message id":
+        if debug in ("last message id", "in db", "timestamp", "more than 24 hours", "check post") and post is None:
+            await interaction.response.send_message(f"To use the `{debug}` debug, a post must be provided.", ephemeral=True)
+        elif debug == "last message id":
             await interaction.response.send_message(content=post.last_message_id)
         elif debug == "in db":
             await interaction.response.send_message(content=post.id in await functions.get_pending_posts())
@@ -133,4 +136,5 @@ class bot(commands.Cog):
         await ctx.reply(embed=embed, mention_author=False)
 
 async def setup(client: commands.Bot):
+
     await client.add_cog(bot(client))
