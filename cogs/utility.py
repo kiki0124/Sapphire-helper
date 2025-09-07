@@ -359,7 +359,7 @@ class utility(commands.Cog):
                         await self.send_qr_log(message=reaction.message, user=user)
                         return
 
-                    if footer.icon_url is not None:
+                    if footer.icon_url:
                         user_id = self.get_user_id_from_avatar(footer.icon_url)
                         if user_id is not None and user_id == user.id:
                             await reaction.message.delete()
@@ -485,4 +485,5 @@ class utility(commands.Cog):
 async def setup(client):
 
     await client.add_cog(utility(client))
+
 
