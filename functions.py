@@ -381,6 +381,4 @@ async def update_epi_iso(pool: sql.Pool, value: str) -> None:
     """
     async with pool.acquire() as conn:
         await conn.execute("UPDATE epi_config SET started_iso=?", (value,))
-
         await conn.commit()
-
