@@ -102,7 +102,7 @@ class bot(commands.Cog):
             await interaction.response.send_message(content=await functions.check_post_last_message_time(post.id))
         elif debug.startswith("eval sql"):
             command = debug.removeprefix('eval sql ').strip("<>")
-            await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
+            await interaction.response.send_message(content=f"Executed SQL. Results: ```json\n{await functions.execute_sql(command)}```")
         elif debug == "check_post":
             applied_tags = post._applied_tags
             ndr = int(os.getenv("NEED_DEV_REVIEW_TAG_ID")) not in applied_tags
@@ -150,4 +150,5 @@ class bot(commands.Cog):
         await ctx.reply(embed=embed, mention_author=False)
 
 async def setup(client: commands.Bot):
+
     await client.add_cog(bot(client))
