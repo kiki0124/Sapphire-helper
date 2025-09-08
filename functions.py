@@ -2,7 +2,7 @@ import datetime
 import asqlite as sql
 from string import ascii_letters, digits
 import random
-from typing import Optional
+from typing import Optional, Any
 from discord.utils import format_dt
 
 DB_PATH = "database\data.db"
@@ -52,7 +52,28 @@ def humanize_duration(seconds: float) -> str:
 
 # reminder system related functions
 
-async def execute_sql(cmd: str) -> Optional[tuple|Exception]:
+def sql_to_dict(sql_results: list[tuple]) -> dict[str, Any]:
+    """Formats a sql.Row into dict"""
+
+    possible_queries = ('post_id', 'timestamp', 'user_id', 'channel_id', 'allow', 'deny', 'started_iso', 'message', 'message_id', 'sticky', 'sticky_message_id',
+                        'thread_id') #All the possible queries in all the tables
+    data = {}
+    for row in sql_results: # fetchall() returns a list of tuples, so we loop through the list
+        for query in possible_queries: 
+            try:
+                value = row[query] # Try to fetch the value from the row
+            except IndexError:
+                continue
+            if query in data: # For example 'SELECT user_id FROM epi_users', it will make user_id a list
+                if not isinstance(data[query], list):
+                    data[query] = [data[query]] if query in data else []
+                data[query].append(value)
+            else:
+                data[query] = value
+                
+    return data
+
+async def execute_sql(cmd: str) -> dict[str, Any]:
     """  
     Execute the given sql command and return the result or None if there is no result, if an error was raised when executing the sql command it will be returned
     """
@@ -63,7 +84,8 @@ async def execute_sql(cmd: str) -> Optional[tuple|Exception]:
             except Exception as e: # could be an invalid command or any other sql error
                 return e
             await conn.commit()
-            return await cu.fetchall()
+            result = await cu.fetchall()
+            return sql_to_dict(result)
 
 async def add_post_to_pending(post_id: int) -> None:
     """
@@ -361,3 +383,4 @@ async def update_epi_iso(pool: sql.Pool, value: str) -> None:
         await conn.execute("UPDATE epi_config SET started_iso=?", (value,))
 
         await conn.commit()
+
