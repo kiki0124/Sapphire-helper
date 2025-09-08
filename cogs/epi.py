@@ -247,7 +247,7 @@ class epi(commands.Cog):
                         try:
                             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
                         except discord.NotFound as e2:
-                            raise e2
+                            raise ExceptionGroup('Tried to fetch message and Alerts Thread', [e, e2])
                         await alerts_thread.send(f"Tried to fetch epi Message from {status.mention} with id {epi_config['message_id']}.\n{e.status} {e.text}")
                     else:
                         self.epi_Message = Message
