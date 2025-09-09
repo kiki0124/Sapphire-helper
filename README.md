@@ -1,3 +1,11 @@
+# START HERE IF THIS IS YOUR FIRST TIME VISITING THIS REPOSITORY:
+  * Hi there, I've made this repository public on 9.9.25 (9.9.25 for the Americans between us) for the purpose of continuosly improving Sapphire Helper with both better features & performance, and for allowing people to learn from it.
+  * If you've found an issue/bug - please create an issue on this github repository with as many details as possible including: reproduction steps, expected result, actual result and any other info that may be relevant.
+  * If you'd like to suggest a new feature or an improvement to an existing feature - create a pull request with as many details as possible and if applicable relevant code (written by you) to be used.
+
+### NOTICE:
+  The information below is very outdated. Even though some of it is still relevant like [setup](#setup) it is still recommended to have some basic Python knowledge and for you to go over the files before you attempt to run the bot yourself.
+
 ## Setup
 
 ### 1. Rename `_.env` to `.env` and replace each variable with its actual value.
@@ -39,4 +47,5 @@ pip install -r requirements.txt
   ## functions.py- Functions to add/remove/view data from/to the database- Doesn't directly communicate with discord, these functions are used in the files that do communicate with discord though.
 
 ### Function tests:
+
   To run the tests (only tests functions.check_time_more_than_day) run test_functions.py
