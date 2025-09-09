@@ -35,7 +35,7 @@ class need_dev_review_buttons(ui.View):
     @ui.button(label="Show an example of the questions answered", style=discord.ButtonStyle.grey, custom_id="need-dev-review-example")
     async def on_show_example_click(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_message(
-            content="## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\n3. Join Roles are not being assigned. Steps:\\- Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n\\- Worked fine for two months.\n\\- Suddenly stopped.\n4. Yes, in one server as well but not in another.\n5. IDs:\n\\- 678279978244374528 (my main server)\n\\- 181730794815881216 (does not work as well)\n\\- 288847386002980875 (works there)\n6. I did:\\- Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much", 
+            content="## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\n3. Join Roles are not being assigned. Steps:\\- Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n\\- Worked fine for two months.\n\\- Suddenly stopped.\n4. Yes, in one server as well but not in another.\n5. IDs:\n\\- 678279978244374528 (my main server)\n\\- 181730794815881216 (does not work as well)\n\\- 288847386002980875 (works there)\n6. I did:\n\\- Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much", 
             ephemeral=True
             )
     @ui.button(label="How to get a server's ID?", style=discord.ButtonStyle.grey, custom_id="how-to-get-server-id")
@@ -272,7 +272,7 @@ class utility(commands.Cog):
                 await alerts_thread.edit(archived=False)
             await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}).", allowed_mentions=discord.AllowedMentions.none())
         else:
-            await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>")
+            await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
     @app_commands.command(name="unsolve", description="Cancel the post from being closed")
     @app_commands.check(one_of_mod_expert_op)
@@ -319,6 +319,19 @@ class utility(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none()
         )
 
+    def get_user_id_from_avatar(self, avatar_url: str) -> int | None:
+        """Gets the user_id from a users avatar"""
+
+        guild_member_avatar_regex = r"^https?:\/\/cdn\.discord(?:app)?\.com\/guilds\/\d+\/users\/\d+\/avatars\/"
+        user_avatar_regex = r"^https?:\/\/cdn\.discord(?:app)?\.com\/avatars\/\d+\/"
+        if re.match(user_avatar_regex, avatar_url, re.IGNORECASE):
+            user_id = int(avatar_url.split("/")[4]) #https://cdn.discordapp.com/avatars/user_id/user_avatar.png -> ['https:', '', 'cdn.discordapp.com', 'avatars', 'user_id', 'user_avatar.png']
+        elif re.match(guild_member_avatar_regex, avatar_url, re.IGNORECASE):
+            user_id = int(avatar_url.split("/")[6]) #https://cdn.discordapp.com/guilds/guild_id/users/user_id/avatars/member_avatar.png -> ['https:', '', 'cdn.discordapp.com', 'guilds', 'guild_id', 'users', 'user_id', 'avatars', 'member_avatar.png']
+        else:
+            user_id = None
+        return user_id
+
     @commands.Cog.listener('on_reaction_add')
     async def delete_accidental_qr(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         in_support = isinstance(reaction.message.channel, discord.Thread) \
@@ -338,12 +351,20 @@ class utility(commands.Cog):
                     return
             elif reaction.message.embeds:
                 if reaction.message.embeds[len(reaction.message.embeds)-1].footer:
+                    footer = reaction.message.embeds[len(reaction.message.embeds)-1].footer
+
                     regex = f'(Recommended|Sent) by @{user.name}'
-                    footer_text = reaction.message.embeds[len(reaction.message.embeds)-1].footer.text
-                    if re.match(regex, footer_text, re.IGNORECASE):
+                    if footer.text and re.match(regex, footer.text, re.IGNORECASE):
                         await reaction.message.delete()
                         await self.send_qr_log(message=reaction.message, user=user)
                         return
+
+                    if footer.icon_url:
+                        user_id = self.get_user_id_from_avatar(footer.icon_url)
+                        if user_id is not None and user_id == user.id:
+                            await reaction.message.delete()
+                            await self.send_qr_log(message=reaction.message, user=user)
+                            return
             if reaction.message.reference and reaction.message.reference.cached_message:
                 if user == reaction.message.reference.cached_message.author:
                     await reaction.message.delete()

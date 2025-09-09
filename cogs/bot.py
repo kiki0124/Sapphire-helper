@@ -88,26 +88,32 @@ class bot(commands.Cog):
 
     @app_commands.command(name="debug", description="Debug for various systems")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    @app_commands.describe(debug = "Options: last message id | in db | timestamp | more than 24 hours | eval sql ... | check post", post = "The post to debug")
     async def debug(self, interaction: discord.Interaction, debug: str, post: discord.Thread = None):
-        if debug == "last message id":
+        if debug in ("last_message_id", "in_db", "timestamp", "more_than_24_hours", "check_post") and post is None:
+            await interaction.response.send_message(f"To use the `{debug}` debug, a post must be provided.", ephemeral=True)
+        elif debug == "last_message_id":
             await interaction.response.send_message(content=post.last_message_id)
-        elif debug == "in db":
+        elif debug == "in_db":
             await interaction.response.send_message(content=post.id in await functions.get_pending_posts())
         elif debug == "timestamp":
-            await interaction.response.send_message(content=await functions.get_post_timestamp(post.id))
-        elif debug == "more than 24 hours":
+            await interaction.response.send_message(content=await functions.get_post_timestamp(post.id) or 'Unknown')
+        elif debug == "more_than_24_hours":
             await interaction.response.send_message(content=await functions.check_post_last_message_time(post.id))
         elif debug.startswith("eval sql"):
-            command = debug.removeprefix('eval sql ')
-            await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
-        elif debug == "check post":
+            command = debug.removeprefix('eval sql ').strip("<>")
+            await interaction.response.send_message(content=f"Executed SQL. Results: ```json\n{await functions.execute_sql(command)}```")
+        elif debug == "check_post":
             applied_tags = post._applied_tags
             ndr = int(os.getenv("NEED_DEV_REVIEW_TAG_ID")) not in applied_tags
             solved = int(os.getenv("SOLVED_TAG_ID")) not in applied_tags
             archived = not post.archived
             locked = not post.locked
             is_pending = post.id not in await functions.get_pending_posts()
-            last_message = post.last_message or await post.fetch_message(post.last_message_id) or None
+            try:
+                last_message = post.last_message or await post.fetch_message(post.last_message_id)
+            except discord.NotFound:
+                last_message = None
             message_time = False
             author_is_owner = False
             owner_id = await functions.get_post_creator_id(post.id) or post.owner_id
@@ -117,6 +123,17 @@ class bot(commands.Cog):
             await interaction.response.send_message(f"NDR: {ndr} | solved: {solved} | archived: {archived} | locked: {locked} | message time: {message_time} | author is owner: {author_is_owner} | pending: {is_pending} | **total: {ndr and solved and archived and locked and author_is_owner and message_time and is_pending}**")
         else:
             await interaction.response.send_message(content="Debug not found...", ephemeral=True)
+
+    @debug.autocomplete('debug')
+    async def debug_autocomplete(self, interaction: discord.Interaction, current: str):
+        return [
+            app_commands.Choice(name='last message id', value='last_message_id'),
+            app_commands.Choice(name='in db', value= 'in_db'),
+            app_commands.Choice(name='timestamp', value='timestamp'),
+            app_commands.Choice(name='more than 24 hours', value='more_than_24_hours'),
+            app_commands.Choice(name='eval sql <command>', value='eval sql'),
+            app_commands.Choice(name='check post', value='check_post')
+        ]
 
     @commands.command()
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)

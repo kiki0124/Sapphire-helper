@@ -2,7 +2,7 @@ import datetime
 import asqlite as sql
 from string import ascii_letters, digits
 import random
-from typing import Optional
+from typing import Optional, Any
 from discord.utils import format_dt
 
 DB_PATH = "database\data.db"
@@ -52,7 +52,28 @@ def humanize_duration(seconds: float) -> str:
 
 # reminder system related functions
 
-async def execute_sql(cmd: str) -> Optional[tuple|Exception]:
+def sql_to_dict(sql_results: list[tuple]) -> dict[str, Any]:
+    """Formats a sql.Row into dict"""
+
+    possible_queries = ('post_id', 'timestamp', 'user_id', 'channel_id', 'allow', 'deny', 'started_iso', 'message', 'message_id', 'sticky', 'sticky_message_id',
+                        'thread_id') #All the possible queries in all the tables
+    data = {}
+    for row in sql_results: # fetchall() returns a list of tuples, so we loop through the list
+        for query in possible_queries: 
+            try:
+                value = row[query] # Try to fetch the value from the row
+            except IndexError:
+                continue
+            if query in data: # For example 'SELECT user_id FROM epi_users', it will make user_id a list
+                if not isinstance(data[query], list):
+                    data[query] = [data[query]] if query in data else []
+                data[query].append(value)
+            else:
+                data[query] = value
+                
+    return data
+
+async def execute_sql(cmd: str) -> dict[str, Any]:
     """  
     Execute the given sql command and return the result or None if there is no result, if an error was raised when executing the sql command it will be returned
     """
@@ -63,7 +84,8 @@ async def execute_sql(cmd: str) -> Optional[tuple|Exception]:
             except Exception as e: # could be an invalid command or any other sql error
                 return e
             await conn.commit()
-            return await cu.fetchall()
+            result = await cu.fetchall()
+            return sql_to_dict(result)
 
 async def add_post_to_pending(post_id: int) -> None:
     """
@@ -82,7 +104,7 @@ async def get_pending_posts():
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             await cu.execute("SELECT post_id FROM pending_posts")
-            return [row[0] for row in await cu.fetchall()]
+            return [row['post_id'] for row in await cu.fetchall()]
 
 async def remove_post_from_pending(post_id: int) -> None:
     """  
@@ -102,7 +124,7 @@ async def get_post_timestamp(post_id: int) -> Optional[int]:
             await cu.execute(f"SELECT timestamp FROM pending_posts WHERE post_id=?", (post_id,))
             result = await cu.fetchone()
             if result:
-                return result[0]
+                return result['timestamp']
             else:
                 return None
 
@@ -133,7 +155,7 @@ async def get_post_creator_id(post_id: int) -> Optional[int]:
             await cu.execute(f"SELECT user_id FROM readthedamnrules WHERE post_id=?", (post_id,))
             result = None
             result = await cu.fetchone()
-            return result[0] if result else None
+            return result['user_id'] if result else None
 
 async def remove_post_from_rtdr(post_id: int) -> None:
     """  
@@ -153,7 +175,7 @@ async def get_rtdr_posts() -> list[int]:
             await cu.execute("SELECT post_id FROM readthedamnrules")
             result = await cu.fetchall()
             if result:
-                return [row[0] for row in result]
+                return [row['post_id'] for row in result]
             else:
                 return []
 
@@ -186,7 +208,7 @@ async def get_waiting_posts() -> list[int]:
             await cu.execute("SELECT post_id FROM reminder_waiting")
             result = await cu.fetchall()
             if result:
-                return [row[0] for row in result]
+                return [row['post_id'] for row in result]
             else:
                 return []
 
@@ -229,7 +251,7 @@ async def get_locked_channels() -> list[int]:
             await cu.execute("SELECT channel_id FROM locked_channels_permissions")
             result = await cu.fetchall()
             if result:
-                return [int(row[0]) for row in result]
+                return [row['channel_id'] for row in result]
             else:
                 return []
 
@@ -262,7 +284,7 @@ async def get_epi_users(pool: sql.Pool) -> list[Optional[int]]:
     async with pool.acquire() as conn:
         result = await conn.fetchall("SELECT user_id FROM epi_users")
         if result: 
-            return [row[0] for row in result] # the first (and only) item in the user's id as an integer
+            return [row['user_id'] for row in result] # the first (and only) item in the user's id as an integer
         else: 
             return []
 
@@ -281,11 +303,11 @@ async def get_epi_config(pool: sql.Pool) -> Optional[dict[str, int, str, str, st
         result = await conn.fetchone("SELECT * FROM epi_config")
         if result:
             return {
-                "started_iso": result[0],
-                "message": result[1],
-                "message_id": result[2],
-                "sticky": result[3],
-                "sticky_message_id": result[4]
+                "started_iso": result['started_iso'],
+                "message": result['message'],
+                "message_id": result['message_id'],
+                "sticky": result['sticky'],
+                "sticky_message_id": result['sticky_message_id']
             }
         else:
             return {}
@@ -303,7 +325,7 @@ async def get_epi_messages(pool: sql.Pool) -> dict[int, int]: # {thread_id: mess
         result = await conn.fetchall("SELECT * FROM epi_messages")
         data = {}
         for row in result:
-            data[row[0]] = row[1] # row[0] - thread id, row[1] - message id
+            data[row['thread_id']] = row['message_id']
         return data
 
 async def clear_epi_messages(pool: sql.Pool) -> None:

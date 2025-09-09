@@ -244,7 +244,11 @@ class epi(commands.Cog):
                     try:
                         Message = await status.fetch_message(epi_config["message_id"])
                     except discord.NotFound as e:
-                        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+                        await update_epi_message_id(self.pool, 0) # remove the message id from the db
+                        try:
+                            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+                        except discord.NotFound as e2:
+                            raise ExceptionGroup('Tried to fetch message and Alerts Thread', [e, e2])
                         await alerts_thread.send(f"Tried to fetch epi Message from {status.mention} with id {epi_config['message_id']}.\n{e.status} {e.text}")
                     else:
                         self.epi_Message = Message
@@ -399,7 +403,7 @@ class epi(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
             if message != None or message_id != None or sticky != None:
-                command_response = "\nSuccessfully updated EPI mode!"
+                command_response = "Successfully updated EPI mode!"
                 new_key = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
                 previous_key = list(self.epi_data.keys())[0]
                 self.epi_data[new_key] = list(self.epi_data.values())[0]
@@ -480,44 +484,29 @@ class epi(commands.Cog):
     @app_commands.command(name="lock", description="Lock the given channels. Should only be used in emergencies.")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(reason="The reason for locking the channels.")
-    async def lock(self, interaction: discord.Interaction, reason: str):
+    async def lock(self, interaction: discord.Interaction, reason: app_commands.Range[str, 1, 200]):
         await interaction.response.defer(ephemeral=True)
-        if len(reason) < 200:
-            view = ui.View()
-            view.add_item(select_channels("lock", reason, interaction))
-            await interaction.followup.send(content="Select the channels to be locked below.\n-# Minimum of 1, maximum of 5.", view=view)
-        else:
-            await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
+        view = ui.View()
+        view.add_item(select_channels("lock", reason, interaction))
+        await interaction.followup.send(content="Select the channels to be locked below.\n-# Minimum of 1, maximum of 5.", view=view)
                 
     @app_commands.command(name="unlock", description="Unlock the given channels. Should only be used in emergencies.")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(reason="What is the reason for unlocking the channels?")
-    async def unlock(self, interaction: discord.Interaction, reason: str):
+    async def unlock(self, interaction: discord.Interaction, reason: app_commands.Range[str, 1, 200]):
         await interaction.response.defer(ephemeral=True)
-        if len(reason) < 200:
-            view = ui.View()
-            view.add_item(select_channels("unlock", reason, interaction))
-            await interaction.followup.send("Select the channels that should be unlocked below.\n-# Minimum of 1, maximum of 5.", view=view, ephemeral=True)
-        else:
-            await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
+        view = ui.View()
+        view.add_item(select_channels("unlock", reason, interaction))
+        await interaction.followup.send("Select the channels that should be unlocked below.\n-# Minimum of 1, maximum of 5.", view=view, ephemeral=True)
 
     @app_commands.command(name="slowmode", description="Set a specified slowmode time for the given channels. Should only be used in emergencies")
     @app_commands.describe(time="The new slowmode time for the channel, in seconds. Max 21600. Put 0 to disable slowmode.", reason="What's the reason for this slowmode?")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def slowmode(self, interaction: discord.Interaction, time: int, reason: str):
+    async def slowmode(self, interaction: discord.Interaction, time: app_commands.Range[int, 0, 21600], reason: app_commands.Range[str, 1, 200]):
         await interaction.response.defer(ephemeral=True)
-        if len(reason) < 200:
-            if time >= 0:
-                if time <= 21600:
-                    view = ui.View()
-                    view.add_item(select_channels("slowmode", reason,interaction ,time))
-                    await interaction.followup.send(content="Select the channels where the given slowmode should be applied below.\n-# Minimum of 1, maximum of 5.", view=view)
-                else:
-                    await interaction.followup.send(content=f"The highest slowmode possible is 21600 and you provided `{time}`.")
-            else:
-                await interaction.followup.send("Achievement unlocked: How did we get here?", ephemeral=True)
-        else:
-            await interaction.followup.send(content="The `reason` parameter must be less than 200 characters!", ephemeral=True)
+        view = ui.View()
+        view.add_item(select_channels("slowmode", reason,interaction ,time))
+        await interaction.followup.send(content="Select the channels where the given slowmode should be applied below.\n-# Minimum of 1, maximum of 5.", view=view)
 
     page_websockets: dict[str, asyncio.Task] = {} # id: task
 
@@ -655,51 +644,47 @@ class epi(commands.Cog):
         priority="The severity, 1 = lowest, 4 = critical (highest)", 
         cb_affected="Whether custom branding is affected or not (for Sapphire outages)"
     )
-    async def page(self, interaction: discord.Interaction, service: Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"], message: str, priority: int, cb_affected: bool):
-        if 1 <= priority <= 4:
-            fifteen_minutes_ago = datetime.datetime.now() - datetime.timedelta(minutes=15)
-            if self.recent_page and datetime.datetime.fromtimestamp(self.recent_page["timestamp"]) > fifteen_minutes_ago:
-                await interaction.response.defer(ephemeral=True)
-                button = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page-confirm")
-                async def callback(i: discord.Interaction):
-                    followup = await i.channel.send("Sending...")
-                    await interaction.delete_original_response()
-                    self.recent_page = {
-                    "user_id": interaction.user.id,
-                    "message": message,
-                    "timestamp": round(datetime.datetime.now().timestamp()),
-                    "priority": priority,
-                    "service": service,
-                    "cb_affected": cb_affected
-                    }
-                    await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
-                button.callback = callback
-                view = ui.View()
-                view.add_item(button)
-                await interaction.followup.send(f"A page was sent <t:{self.recent_page['timestamp']}:R> by <@{self.recent_page['user_id']}>. Service: `{self.recent_page['service']}` | Message: `{self.recent_page['message']}` | Priority: `{self.recent_page['priority']}` | CB affected: `{self.recent_page['cb_affected']}` | ID: `{self.recent_page['id']}`.\nAre you sure you would like to send this one?\n-# Click *confirm* button to confirm, dismiss message to cancel.", ephemeral=True, view=view)
-            else:
-                await interaction.response.defer()
-                followup = await interaction.followup.send("Sending...", wait=True)
+    async def page(self, interaction: discord.Interaction, service: Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"], message: str, priority: Literal["4 | Night", "3 | Major issue", "2 | Minor issue", "1 | Information"], cb_affected: bool):
+        fifteen_minutes_ago = datetime.datetime.now() - datetime.timedelta(minutes=15)
+        priority_dict : dict[str, int] = {
+            "4 | Night" : 4,
+            "3 | Major issue" : 3,
+            "2 | Minor issue" : 2,
+            "1 | Information" : 1
+        }
+
+        priority_num = priority_dict[priority]
+        if self.recent_page and datetime.datetime.fromtimestamp(self.recent_page["timestamp"]) > fifteen_minutes_ago:
+            await interaction.response.defer(ephemeral=True)
+            button = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page-confirm")
+            async def callback(i: discord.Interaction):
+                followup = await i.channel.send("Sending...")
+                await interaction.delete_original_response()
                 self.recent_page = {
                 "user_id": interaction.user.id,
                 "message": message,
                 "timestamp": round(datetime.datetime.now().timestamp()),
-                "priority": priority,
+                "priority": priority_num,
                 "service": service,
                 "cb_affected": cb_affected
                 }
-                await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority, followup, cb_affected, interaction.user)
+                await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup, cb_affected, interaction.user)
+            button.callback = callback
+            view = ui.View()
+            view.add_item(button)
+            await interaction.followup.send(f"A page was sent <t:{self.recent_page['timestamp']}:R> by <@{self.recent_page['user_id']}>. Service: `{self.recent_page['service']}` | Message: `{self.recent_page['message']}` | Priority: `{self.recent_page['priority']}` | CB affected: `{self.recent_page['cb_affected']}` | ID: `{self.recent_page['id']}`.\nAre you sure you would like to send this one?\n-# Click *confirm* button to confirm, dismiss message to cancel.", ephemeral=True, view=view)
         else:
-            await interaction.response.send_message(content=f"Priority argument must be between 1 and 4.")
-    
-    @page.autocomplete("priority")
-    async def page_autocomplete_priority(self, interaction: discord.Interaction, current: int):
-        return [
-            app_commands.Choice(name="4 | Night", value=4),
-            app_commands.Choice(name="3 | Major issue", value=3),
-            app_commands.Choice(name="2 | Minor issue", value=2),
-            app_commands.Choice(name="1 | Information", value=1)
-        ]
+            await interaction.response.defer()
+            followup = await interaction.followup.send("Sending...", wait=True)
+            self.recent_page = {
+            "user_id": interaction.user.id,
+            "message": message,
+            "timestamp": round(datetime.datetime.now().timestamp()),
+            "priority": priority_num,
+            "service": service,
+            "cb_affected": cb_affected
+            }
+            await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup, cb_affected, interaction.user)
 
     @commands.Cog.listener("on_message")
     async def autopage_on_ratelimit(self, message: discord.Message):
