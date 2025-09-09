@@ -244,6 +244,7 @@ class epi(commands.Cog):
                     try:
                         Message = await status.fetch_message(epi_config["message_id"])
                     except discord.NotFound as e:
+                        await update_epi_message_id(self.pool, 0) # remove the message id from the db
                         try:
                             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
                         except discord.NotFound as e2:
@@ -402,7 +403,7 @@ class epi(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
             if message != None or message_id != None or sticky != None:
-                command_response = "\nSuccessfully updated EPI mode!"
+                command_response = "Successfully updated EPI mode!"
                 new_key = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
                 previous_key = list(self.epi_data.keys())[0]
                 self.epi_data[new_key] = list(self.epi_data.values())[0]
