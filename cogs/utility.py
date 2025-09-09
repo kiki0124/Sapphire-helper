@@ -272,7 +272,7 @@ class utility(commands.Cog):
                 await alerts_thread.edit(archived=False)
             await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}).", allowed_mentions=discord.AllowedMentions.none())
         else:
-            await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>")
+            await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
     @app_commands.command(name="unsolve", description="Cancel the post from being closed")
     @app_commands.check(one_of_mod_expert_op)
@@ -321,7 +321,7 @@ class utility(commands.Cog):
 
     def get_user_id_from_avatar(self, avatar_url: str) -> int | None:
         """Gets the user_id from a users avatar"""
-        
+
         guild_member_avatar_regex = r"^https?:\/\/cdn\.discord(?:app)?\.com\/guilds\/\d+\/users\/\d+\/avatars\/"
         user_avatar_regex = r"^https?:\/\/cdn\.discord(?:app)?\.com\/avatars\/\d+\/"
         if re.match(user_avatar_regex, avatar_url, re.IGNORECASE):
