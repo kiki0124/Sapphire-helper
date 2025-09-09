@@ -321,7 +321,7 @@ class utility(commands.Cog):
 
     def get_user_id_from_avatar(self, avatar_url: str) -> int | None:
         """Gets the user_id from a users avatar"""
-      
+        
         guild_member_avatar_regex = r"^https?:\/\/cdn\.discord(?:app)?\.com\/guilds\/\d+\/users\/\d+\/avatars\/"
         user_avatar_regex = r"^https?:\/\/cdn\.discord(?:app)?\.com\/avatars\/\d+\/"
         if re.match(user_avatar_regex, avatar_url, re.IGNORECASE):

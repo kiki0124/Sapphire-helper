@@ -238,4 +238,3 @@ class remind(commands.Cog):
 
 async def setup(client):
     await client.add_cog(remind(client))
-
