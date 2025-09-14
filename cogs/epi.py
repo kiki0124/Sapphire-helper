@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, update_epi_message_id, update_epi_sticky, update_epi_iso
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
 from typing import Literal, Optional
+from aiocache import cached
 
 load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
@@ -196,6 +197,17 @@ class epi(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none()
         )
 
+    @cached()
+    async def get_solved_id(self):
+        solved_id = 1274997472162349079
+        for command in await self.client.tree.fetch_commands():
+                if command.name == "solved": 
+                    solved_id=command.id
+                    break
+                else:
+                    continue
+        return solved_id
+
     async def handle_sticky_message(self, channel: discord.TextChannel | discord.PartialMessageable, delay: float = 4):
         embed = self.generate_epi_embed()
         await asyncio.sleep(delay)
@@ -314,9 +326,11 @@ class epi(commands.Cog):
                 await i.channel.typing()
                 await i.response.defer(ephemeral=True)
                 await i.delete_original_response()
-                content = "Hey, this issue is fixed now!\n-# Thank you for your patience."
+                general_content = "Hey, this issue is fixed now!\n-# Thank you for your patience."
+                post_content = f"Hey, this issue is fixed now! Can you let us know if you still have any trouble or use </solved:{await self.get_solved_id()}> if everything works now.\n-# Thank you for your patience."
                 if message:
-                    content += f"\n> {message}"
+                    general_content += f"\n> {message}"
+                    post_content += f"\n> {message}"
                 for thread_id, message_id in list(self.epi_data.values())[0].items():
                     thread = self.client.get_channel(thread_id)
                     if thread:
@@ -325,7 +339,7 @@ class epi(commands.Cog):
                             try:
                                 await msg.edit(view=None)
                                 await msg.reply(
-                                    content= content,
+                                    content=post_content,
                                     mention_author=False
                                 )
                             except discord.NotFound:
@@ -335,7 +349,7 @@ class epi(commands.Cog):
                             try:
                                 msg.edit(view=None)
                                 await msg.reply(
-                                    content= content,
+                                    content= post_content,
                                     mention_author=False
                                 )
                                 await thread.edit(archived=True)
@@ -345,7 +359,7 @@ class epi(commands.Cog):
                         continue
                 await clear_epi_messages(self.pool)
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
-                main_message = await general.send(content=content)
+                main_message = await general.send(content=general_content)
                 if epi_users:
                     mentions: list[discord.Member|discord.User] = []
                     for user_id in epi_users:
