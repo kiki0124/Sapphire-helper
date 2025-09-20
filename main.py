@@ -22,7 +22,7 @@ class MyClient(commands.Bot):
 
         self.alert_webhook_url: str | None = None
 
-    async def setup_hook():
+    async def setup_hook(self):
         unittest.main(test_functions, exit=False)
         await main() # function that creates the db tables if they don't already exist
         for filename in os.listdir('./cogs'):
@@ -36,3 +36,4 @@ class MyClient(commands.Bot):
         print(f"Bot is ready. Logged in as {self.user.name}")
 
 client.run(TOKEN)
+
