@@ -179,7 +179,6 @@ class autoadd(commands.Cog):
             for post in await support.guild.active_threads():
                 if post.parent_id == SUPPORT_CHANNEL_ID and not post.locked:
                     if NEED_DEV_REVIEW_TAG_ID not in post._applied_tags:
-                        owner = post.owner
                         owner = post.guild.get_member(await get_post_creator_id(post.id)) or post.owner
                         if not owner: # post owner/creator will be None if they left the server
                             tags = [support.get_tag(SOLVED_TAG_ID)]
@@ -219,4 +218,5 @@ class autoadd(commands.Cog):
 async def setup(client):
 
     await client.add_cog(autoadd(client))
+
 
