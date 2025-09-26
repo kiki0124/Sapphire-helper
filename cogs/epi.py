@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands, ui
 from dotenv import load_dotenv
 from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, update_epi_message_id, update_epi_sticky, update_epi_iso
@@ -155,6 +155,7 @@ class epi(commands.Cog):
     epi_msg: Optional[str] = None
     epi_Message: Optional[discord.Message] = None
     epi_data: dict[str, dict[int, int]] = {} # {str(started_iso_format: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
+    status_page: Optional[bool|None] = None # true if its working, false if its not working
 
     def generate_epi_embed(self) -> discord.Embed:
         embed_data = {
@@ -173,6 +174,8 @@ class epi(commands.Cog):
         if self.epi_Message or self.epi_msg:
             embed_data["description"] += "\n\n"
         embed_data["description"] += "-# You can also always check the [Sapphire status page](https://sapph.xyz/status)"
+        if self.status_page == False:
+            embed_data["description"] += " (currently not working)"
         return discord.Embed().from_dict(embed_data)
 
     async def send_epi_log(self, content: str):
@@ -267,6 +270,7 @@ class epi(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data: # Make sure epi mode is not already enabled
             command_response = "Successfully enabled EPI mode!"
+            self.ping_status_page.start()
             self.epi_data[datetime.datetime.now(tz=datetime.timezone.utc).isoformat()] = {}
             if message:
                 self.epi_msg = message
@@ -311,6 +315,7 @@ class epi(commands.Cog):
                 custom_id="epi-disable-confirm"
             )
             async def on_button_click(i: discord.Interaction):
+                self.ping_status_page.stop()
                 await i.channel.typing()
                 await i.response.defer(ephemeral=True)
                 await i.delete_original_response()
@@ -758,6 +763,13 @@ class epi(commands.Cog):
                 await interaction.followup.send("Are you sure you would like to close all currently open page web sockets?\n**This action can't be undone**", view=view)
         else:
             await interaction.followup.send(f"There aren't any websockets open right now...")
+
+    @tasks.loop(minutes=5)
+    async def ping_status_page(self):
+        async with aiohttp.ClientSession(trust_env=True) as cs:
+            async with cs.get("https:// sapph.xyz/status", timeout=aiohttp.ClientTimeout(total=5)) as req:
+                print(req.status)
+                self.status_page = req.status == 200
 
 async def setup(client):
     await client.add_cog(epi(client=client))
