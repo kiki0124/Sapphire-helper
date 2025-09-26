@@ -27,7 +27,7 @@ class MyClient(commands.Bot):
         await main() # function that creates the db tables if they don't already exist
         for filename in os.listdir('./cogs'):
             if filename.endswith('.py'):
-                await client.load_extension(f"cogs.{filename[:-3]}")
+                await self.load_extension(f"cogs.{filename[:-3]}")
                 print(f"Loaded extension {filename[:-3]}")
             else:
                 print(f"Skipped loading {filename[:-3]}")
@@ -35,5 +35,4 @@ class MyClient(commands.Bot):
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")
 
-client.run(TOKEN)
-
+MyClient().run(TOKEN)
