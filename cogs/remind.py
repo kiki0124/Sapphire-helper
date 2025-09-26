@@ -25,7 +25,7 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 reminder_not_sent_posts: dict[int, int] = {} # dictionary of post ids: the amount of tries
 
-class CloseNow(ui.View):
+class  CloseNow(ui.LayoutView):
     def __init__(self):
         super().__init__(timeout=None)
         
@@ -61,6 +61,20 @@ class remind(commands.Cog):
         self.check_for_pending_posts.start()
         self.close_pending_posts.start()
         self.check_exception_posts.start()
+
+    @commands.command()
+    async def test_btn(self, ctx: commands.Context):
+        view = ui.LayoutView()
+        greeting = random.choice(["Hi", "Hello", "Hey", "Hi there"])
+        container = ui.Container(
+            ui.TextDisplay(
+                f"{greeting} <@{ctx.channel.owner_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved."
+            ),
+            CloseNow(),
+            accent_colour=discord.Colour.purple()
+        )
+        view.add_item(container())
+        await ctx.channel.send(view=CloseNow(ctx.channel.owner_id))
 
     async def reminders_filter(self, thread: discord.Thread):
         """  
@@ -123,7 +137,9 @@ class remind(commands.Cog):
                 if check_time_more_than_day(message.created_at.timestamp()):
                     if post.owner: # make sure the post owner is not None- still in server
                         greetings = ["Hi", "Hello", "Hey", "Hi there"]
-                        await message.channel.send(content=f"{random.choice(greetings)} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
+                        view = ui.LayoutView()
+                        view.add_item(CloseNow())
+                        await message.channel.send(content=f"{random.choice(greetings)} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=view)
                         await add_post_to_pending(post_id=post.id)
                         to_remove.append(post.id)
                         continue
