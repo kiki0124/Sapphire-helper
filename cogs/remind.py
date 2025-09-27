@@ -254,7 +254,4 @@ class remind(commands.Cog):
         await self.client.wait_until_ready()
 
 async def setup(client):
-
     await client.add_cog(remind(client))
-
-
