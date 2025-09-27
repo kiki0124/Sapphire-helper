@@ -769,7 +769,7 @@ class epi(commands.Cog):
         async with aiohttp.ClientSession(trust_env=True) as cs:
             async with cs.get("https:// sapph.xyz/status", timeout=aiohttp.ClientTimeout(total=5)) as req:
                 print(req.status)
-                self.status_page = req.status == 200
+                self.status_page = req.status == 200 # true if the status is 200 - OK, else false
 
 async def setup(client):
     await client.add_cog(epi(client=client))
