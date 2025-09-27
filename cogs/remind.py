@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands, tasks
 from functions import add_post_to_pending, \
@@ -9,6 +11,9 @@ import random
 from discord import ui
 import os
 from dotenv import load_dotenv
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from main import MyClient
 
 load_dotenv()
 
@@ -56,8 +61,8 @@ class CloseNow(ui.View):
             await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
 
 class remind(commands.Cog):
-    def __init__(self, client: commands.Bot):
-        self.client: commands.Bot = client
+    def __init__(self, client: MyClient):
+        self.client = client
         self.check_for_pending_posts.start()
         self.close_pending_posts.start()
         self.check_exception_posts.start()
@@ -80,6 +85,19 @@ class remind(commands.Cog):
             return False
         
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
+        if self.client.alert_webhook_url is not None:
+            webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
+            try:
+                await webhook.send(
+                    content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
+                    username=self.client.user.name,
+                    avatar_url=self.client.user.display_avatar.url,
+                    thread=discord.Object(id=ALERTS_THREAD_ID),
+                    wait=False
+                )
+                return
+            except Exception:
+                pass #pass so that it can try the other methods below
         try:
             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
         except discord.NotFound as e:
@@ -98,6 +116,7 @@ class remind(commands.Cog):
             thread=discord.Object(id=ALERTS_THREAD_ID),
             wait=False
         )
+        self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -115,7 +134,7 @@ class remind(commands.Cog):
             post = self.client.get_channel(post_id)
             if tries < 24:
                 try:
-                    message: discord.Message|None = await post.fetch_message(post.last_message_id)
+                    message: discord.Message|None = post.last_message or await post.fetch_message(post.last_message_id)
                 except discord.NotFound:
                     tries+=1
                     reminder_not_sent_posts[post.id] = tries
@@ -134,7 +153,7 @@ class remind(commands.Cog):
                     continue
             elif tries == 24: 
                 try:
-                    message = await post.fetch_message(post.last_message_id)
+                    message = post.last_message or await post.fetch_message(post.last_message_id)
                 except discord.HTTPException as e:
                     try:
                         alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
@@ -164,7 +183,7 @@ class remind(commands.Cog):
                 if await self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
                     if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
                         try:
-                            message: discord.Message|None = await post.fetch_message(post.last_message_id)
+                            message: discord.Message|None = post.last_message or await post.fetch_message(post.last_message_id)
                         except discord.NotFound: # message id could be for a message that was already deleted
                             reminder_not_sent_posts[post.id] = 1
                             continue
@@ -177,14 +196,12 @@ class remind(commands.Cog):
                                 await alerts.edit(archived=False)
                             await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
                             continue
-                        author_not_owner = message.author != post.owner
-                        if post.id in await get_rtdr_posts():
-                            author_not_owner = message.author.id != await get_post_creator_id(post.id)
+                        post_author_id = await get_post_creator_id(post.id) or post.owner_id
+                        author_not_owner = message.author.id != post_author_id
                         more_than_day = check_time_more_than_day(message.created_at.timestamp())
                         if author_not_owner and more_than_day and message.author != self.client.user:
                             if post.owner: # make sure post owner isn't None- still in server
                                 greetings = ["Hi", "Hello", "Hey", "Hi there"]
-                                post_author_id = await get_post_creator_id(post.id) or post.owner_id
                                 await message.channel.send(content=f"{random.choice(greetings)} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
                                 await add_post_to_pending(post_id=post.id)
             

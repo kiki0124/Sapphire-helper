@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands, tasks
 import re
@@ -7,6 +9,9 @@ from dotenv import load_dotenv
 from functions import get_post_creator_id, get_rtdr_posts, generate_random_id, remove_post_from_rtdr
 from aiocache import cached
 from discord import ui
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from main import MyClient #only import for autocomplete/typechecking
 
 load_dotenv()
 
@@ -61,8 +66,8 @@ class confirm_close(ui.View):
             await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
 
 class autoadd(commands.Cog):
-    def __init__(self, client: commands.Bot):
-        self.client: commands.Bot = client
+    def __init__(self, client: MyClient):
+        self.client = client
         self.close_abandoned_posts.start()
         
     @commands.Cog.listener('on_ready')
@@ -84,6 +89,19 @@ class autoadd(commands.Cog):
         return solved_id
 
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
+        if self.client.alert_webhook_url is not None:
+            webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
+            try:
+                await webhook.send(
+                    content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
+                    username=self.client.user.name,
+                    avatar_url=self.client.user.display_avatar.url,
+                    thread=discord.Object(id=ALERTS_THREAD_ID),
+                    wait=False
+                )
+                return
+            except Exception:
+                pass #pass to try the other methods below
         try:
             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
         except discord.NotFound as e:
@@ -102,6 +120,7 @@ class autoadd(commands.Cog):
             thread=discord.Object(id=ALERTS_THREAD_ID),
             wait=False
         )
+        self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
 
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
@@ -160,9 +179,7 @@ class autoadd(commands.Cog):
             for post in await support.guild.active_threads():
                 if post.parent_id == SUPPORT_CHANNEL_ID and not post.locked:
                     if NEED_DEV_REVIEW_TAG_ID not in post._applied_tags:
-                        owner = post.owner
-                        if post.id in await get_rtdr_posts():
-                            owner = post.guild.get_member(await get_post_creator_id(post.id))
+                        owner = post.guild.get_member(await get_post_creator_id(post.id)) or post.owner
                         if not owner: # post owner/creator will be None if they left the server
                             tags = [support.get_tag(SOLVED_TAG_ID)]
                             cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
