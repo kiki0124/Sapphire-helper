@@ -5,8 +5,7 @@ from discord.ext import commands, tasks
 from functions import add_post_to_pending, \
     remove_post_from_pending, get_pending_posts, \
     check_post_last_message_time, check_time_more_than_day,\
-    get_post_creator_id, remove_post_from_rtdr, generate_random_id, \
-    get_rtdr_posts
+    get_post_creator_id, remove_post_from_rtdr, generate_random_id
 import random
 from discord import ui
 import os

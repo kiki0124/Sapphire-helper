@@ -48,7 +48,7 @@ class confirm_close(ui.View):
             try:
                 alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
             except discord.NotFound as e:
-                 raise e
+                raise e
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Post starter message delete and confirm button clicked- mark post as solved")
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
