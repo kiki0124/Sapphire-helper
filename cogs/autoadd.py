@@ -6,7 +6,7 @@ import re
 import random
 import os
 from dotenv import load_dotenv
-from functions import get_post_creator_id, get_rtdr_posts, generate_random_id, remove_post_from_rtdr
+from functions import get_post_creator_id, generate_random_id, remove_post_from_rtdr
 from aiocache import cached
 from discord import ui
 from typing import TYPE_CHECKING
