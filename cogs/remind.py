@@ -134,7 +134,7 @@ class remind(commands.Cog):
             post = self.client.get_channel(post_id)
             if tries < 24:
                 try:
-                    message: discord.Message|None = await post.fetch_message(post.last_message_id)
+                    message: discord.Message|None = post.last_message or await post.fetch_message(post.last_message_id)
                 except discord.NotFound:
                     tries+=1
                     reminder_not_sent_posts[post.id] = tries
@@ -153,7 +153,7 @@ class remind(commands.Cog):
                     continue
             elif tries == 24: 
                 try:
-                    message = await post.fetch_message(post.last_message_id)
+                    message = post.last_message or await post.fetch_message(post.last_message_id)
                 except discord.HTTPException as e:
                     try:
                         alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
@@ -183,7 +183,7 @@ class remind(commands.Cog):
                 if await self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
                     if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
                         try:
-                            message: discord.Message|None = await post.fetch_message(post.last_message_id)
+                            message: discord.Message|None = post.last_message or await post.fetch_message(post.last_message_id)
                         except discord.NotFound: # message id could be for a message that was already deleted
                             reminder_not_sent_posts[post.id] = 1
                             continue
@@ -256,4 +256,5 @@ class remind(commands.Cog):
 async def setup(client):
 
     await client.add_cog(remind(client))
+
 
