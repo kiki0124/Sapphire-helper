@@ -39,7 +39,7 @@ class bot(commands.Cog):
                     try:
                         options_dict = interaction.data.get("options", [])[0].get("options", []) # This is nested since it is a sub command
                         command_mention = f"</{interaction.command.parent.name} {interaction.command.name}:{command_id}>"
-                    except IndexError:
+                    except (IndexError, AttributeError):
                         options_dict  = interaction.data.get("options", [])
                         command_mention = f"</{interaction.command.name}:{command_id}>"
                 else:
@@ -178,3 +178,4 @@ class bot(commands.Cog):
 async def setup(client: commands.Bot):
 
     await client.add_cog(bot(client))
+
