@@ -277,10 +277,14 @@ class utility(commands.Cog):
             
     @app_commands.command(name="remove", description="Remove the given member from the current post")
     @app_commands.guild_only()
-    @app_commands.describe(user="What user do you want to remove?")
+    @app_commands.describe(user="What user do you want to remove?", reason="The reason for removing the user")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def remove(self, interaction: discord.Interaction, user: discord.Member):
+    async def remove(self, interaction: discord.Interaction, user: discord.Member, reason: str = "No reason provided."):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+            owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+            if owner_id == user.id:
+                await interaction.response.send_message(f"{user.mention} is the owner of this post. Therefore they cannot be removed.", ephemeral=True)
+                return
             await interaction.channel.remove_user(user)
             await interaction.response.send_message(content=f"Successfully removed {user.mention} from this post.", ephemeral=True)
             try:
@@ -289,7 +293,7 @@ class utility(commands.Cog):
                 raise e
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
-            await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}).", allowed_mentions=discord.AllowedMentions.none())
+            await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}.\nReason: {reason}", allowed_mentions=discord.AllowedMentions.none())
         else:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
@@ -502,4 +506,5 @@ class utility(commands.Cog):
         await interaction.delete_original_response()
 
 async def setup(client):
+
     await client.add_cog(utility(client))
