@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands
 import asyncio
 import os
 from dotenv import load_dotenv
 from functions import generate_random_id, get_post_creator_id
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from main import MyClient
 
 load_dotenv()
 SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
@@ -17,7 +23,24 @@ class waiting_for_reply(commands.Cog):
     def __init__(self, client):
         self.client: commands.Bot = client
         
+class waiting_for_reply(commands.Cog):
+    def __init__(self, client: MyClient):
+        self.client = client
+        
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
+        if self.client.alert_webhook_url is not None:
+            webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
+            try:
+                await webhook.send(
+                    content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
+                    username=self.client.user.name,
+                    avatar_url=self.client.user.display_avatar.url,
+                    thread=discord.Object(id=ALERTS_THREAD_ID),
+                    wait=False
+                )
+                return
+            except Exception:
+                pass #pass to try the other methods below
         try:
             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
         except discord.NotFound as e:
@@ -36,6 +59,7 @@ class waiting_for_reply(commands.Cog):
             thread=discord.Object(id=ALERTS_THREAD_ID),
             wait=False
         )
+        self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
         
     posts: dict[int, asyncio.Task] = {}
 

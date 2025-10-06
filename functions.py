@@ -165,19 +165,6 @@ async def remove_post_from_rtdr(post_id: int) -> None:
         async with conn.cursor() as cu:
             await cu.execute(f"DELETE FROM readthedamnrules WHERE post_id=?", (post_id,))
             await conn.commit()
-        
-async def get_rtdr_posts() -> list[int]:
-    """  
-    Returns a list of all post ids in rtdr system
-    """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("SELECT post_id FROM readthedamnrules")
-            result = await cu.fetchall()
-            if result:
-                return [row['post_id'] for row in result]
-            else:
-                return []
 
 # reminders-redone
 
