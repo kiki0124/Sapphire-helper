@@ -23,7 +23,7 @@ class bot(commands.Cog):
     def cog_load(self):
         self.client.tree.on_error = self.tree_on_error
     
-    async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, interaction: discord.Interaction = None) -> None:
+    async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, interaction: discord.Interaction | None = None) -> None:
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
         content = f"<@1105414178937774150>\nUnhandled error: `{error}`"
 
@@ -33,24 +33,16 @@ class bot(commands.Cog):
             interaction_data = interaction.data or {}
             content += f"\n### Interaction Error:\n>>> Interaction created at <t:{round(interaction_created_at)}:T> ({now - interaction_created_at:.3f}s ago)\
                 \nUser: {interaction.user.mention} | Channel: {interaction.channel.mention} | Type: {interaction.type.name}"
-            if interaction.command and interaction.type is discord.InteractionType.application_command and interaction_data:
+            if interaction.command and interaction.command.parent is None:
                 command_id = interaction_data.get('id', 0)
-                if interaction.command.parent:
-                    try:
-                        options_dict = interaction_data.get("options", [])[0].get("options", []) # This is nested since it is a sub command
-                        command_mention = f"</{interaction.command.qualified_name}:{command_id}>"
-                    except (IndexError, AttributeError):
-                        options_dict  = interaction_data.get("options", [])
-                        command_mention = f"</{interaction.command.name}:{command_id}>"
-                else:
-                    options_dict  = interaction_data.get("options", [])
-                    command_mention = f"</{interaction.command.name}:{command_id}>"
+                options_dict  = interaction_data.get("options", [])
+                command_mention = f"</{interaction.command.qualified_name}:{command_id}>"
                 content += f"\nCommand: {command_mention}, inputted values:"
 
                 options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict])
                 content += f"\n```{options_formatted}```"
             else:
-                content += f"\n```json\n{interaction_data}```"
+                content += f"\n```json\n{interaction.data}```"
             await alerts_thread.send(content, allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150)])) #1105414178937774150 is Kiki's user ID
         else:
             await alerts_thread.send(content=content)
@@ -178,5 +170,6 @@ class bot(commands.Cog):
 async def setup(client: commands.Bot):
 
     await client.add_cog(bot(client))
+
 
 
