@@ -454,7 +454,7 @@ class utility(commands.Cog):
                     await self.send_action_log(action_id, ctx.channel.mention, tags, "/incomplete-post used")
                 await ctx.channel.send(content=content, embed=embed)
             else:
-                await ctx.reply("You cannot use this command as this post has the *Solved* tag.", ephemeral=True)
+                await ctx.reply("You cannot use this command as this post has the *Solved* or *Needs dev review* tag.", ephemeral=True)
         else:
             await ctx.reply(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
 
@@ -502,4 +502,5 @@ class utility(commands.Cog):
         await interaction.delete_original_response()
 
 async def setup(client):
+
     await client.add_cog(utility(client))
