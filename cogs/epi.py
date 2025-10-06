@@ -174,7 +174,7 @@ class epi(commands.Cog):
         if self.epi_Message or self.epi_msg:
             embed_data["description"] += "\n\n"
         embed_data["description"] += "-# You can also always check the [Sapphire status page](https://sapph.xyz/status)"
-        if self.status_page == False:
+        if self.status_page == False: # a GET to https://sapph.xyz/status returned a status code that is != 200
             embed_data["description"] += " (currently not working)"
         return discord.Embed().from_dict(embed_data)
 
