@@ -168,8 +168,4 @@ class bot(commands.Cog):
         await ctx.reply(embed=embed, mention_author=False)
 
 async def setup(client: commands.Bot):
-
     await client.add_cog(bot(client))
-
-
-
