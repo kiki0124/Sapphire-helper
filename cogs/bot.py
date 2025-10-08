@@ -29,9 +29,8 @@ class bot(commands.Cog):
 
         if interaction:
             interaction_created_at = interaction.created_at.timestamp()
-            now = datetime.datetime.now().timestamp()
             interaction_data = interaction.data or {}
-            content += f"\n### Interaction Error:\n>>> Interaction created at <t:{round(interaction_created_at)}:T> ({now - interaction_created_at:.3f}s ago)\
+            content += f"\n### Interaction Error:\n>>> Interaction created at <t:{round(interaction_created_at)}:T> (<t:{round(interaction_created_at)}:R>)\
                 \nUser: {interaction.user.mention} | Channel: {interaction.channel.mention} | Type: {interaction.type.name}"
             if interaction.command and interaction.command.parent is None:
                 command_id = interaction_data.get('id', 0)
