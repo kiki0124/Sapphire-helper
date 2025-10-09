@@ -31,14 +31,14 @@ class bot(commands.Cog):
             interaction_created_at = interaction.created_at.timestamp()
             interaction_data = interaction.data or {}
             content += f"\n### Interaction Error:\n>>> Interaction created at <t:{round(interaction_created_at)}:T> (<t:{round(interaction_created_at)}:R>)\
-                \nUser: {interaction.user.mention} | Channel: {interaction.channel.mention} | Type: {interaction.type.name}"
-            if interaction.command and interaction.command.parent is None:
+                \nUser: {interaction.user.mention} | Channel: {getattr(interaction.channel, "mention", f"DM channel ({interaction.channel_id})")} | Type: {interaction.type.name}"
+            if interaction.command and isinstance(interaction.command, app_commands.Command) and interaction.command.parent is None:
                 command_id = interaction_data.get('id', 0)
                 options_dict  = interaction_data.get("options", [])
                 command_mention = f"</{interaction.command.qualified_name}:{command_id}>"
                 content += f"\nCommand: {command_mention}, inputted values:"
 
-                options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict])
+                options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict]) or "There are no inputted values."
                 content += f"\n```{options_formatted}```"
             else:
                 content += f"\n```json\n{interaction.data}```"
@@ -167,4 +167,6 @@ class bot(commands.Cog):
         await ctx.reply(embed=embed, mention_author=False)
 
 async def setup(client: commands.Bot):
+
     await client.add_cog(bot(client))
+

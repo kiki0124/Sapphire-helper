@@ -485,6 +485,7 @@ class utility(commands.Cog):
             description='Inform the post creator that their question/issue is not Sapphire/appeal.gg related.'
     )
     @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
+    @app_commands.guild_only()
     async def wrong_server(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
