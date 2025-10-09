@@ -38,7 +38,7 @@ class bot(commands.Cog):
                 command_mention = f"</{interaction.command.qualified_name}:{command_id}>"
                 content += f"\nCommand: {command_mention}, inputted values:"
 
-                options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict])
+                options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict]) or "There are no inputted values."
                 content += f"\n```{options_formatted}```"
             else:
                 content += f"\n```json\n{interaction.data}```"
@@ -169,3 +169,4 @@ class bot(commands.Cog):
 async def setup(client: commands.Bot):
 
     await client.add_cog(bot(client))
+
