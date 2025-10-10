@@ -267,10 +267,11 @@ async def update_tag(name: str, content: str):
         await conn.commit()
         return True
 
-async def add_tag_uses(name: str, uses: int = 1):
+async def add_tag_uses(data: list[tuple[str, int]]):
     async with sql.connect(DB_PATH) as conn:
-        await conn.execute("UPDATE tags SET uses=uses+? WHERE name=?", (uses, name,))
-        await conn.commit()
+        async with conn.transaction():
+            await conn.executemany("UPDATE tags SET uses=uses+? WHERE name=?", data)
+            await conn.commit()
 
 async def get_used_tags() -> list[str]:
     """  
