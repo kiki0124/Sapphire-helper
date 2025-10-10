@@ -18,23 +18,26 @@ class create_tag(ui.Modal):
             timeout=None
             )
 
-    name = ui.TextInput(
-        label="Name", 
-        placeholder="cv2", 
-        max_length=20
+    name = ui.Label(
+        text="Name:",
+        component=ui.TextInput(
+            max_length=20,
+            placeholder="cv2"
         )
-    
-    content = ui.TextInput(
-        label="Content",
-        style=discord.TextStyle.paragraph,
-        placeholder="Components Version 2 (aka cv2) is a relatively new discord update...",
-        max_length=1_000
-        )
+    )
+
+    content = ui.Label(
+        text="Content:",
+        component=ui.TextInput(
+            style=discord.TextStyle.paragraph,
+            placeholder="Components Version 2 (aka cv2) is a relatively new discord update...",
+            max_length=1_000
+        ))
 
     async def on_submit(self, interaction: discord.Interaction):
-        if not await check_tag_exists(self.name.value):
-            await save_tag(name=self.name.value, content=self.content.value, creator_id=interaction.user.id)
-            await interaction.response.send_message(f"Tag `{self.name.value}` saved successfully!\nYou can now access it with /tag use", ephemeral=True)
+        if not await check_tag_exists(self.name.component.value):
+            await save_tag(name=self.name.component.value, content=self.content.component.value, creator_id=interaction.user.id)
+            await interaction.response.send_message(f"Tag `{self.name.component.value}` saved successfully!\nYou can now access it with /tag use", ephemeral=True)
         else:
             await interaction.response.send_message("A tag with this name already exists...\n-# Use /tag delete to delete it", ephemeral=True)
 
@@ -94,7 +97,8 @@ class quick_replies(commands.Cog):
             content = "Tag not found, try again later..."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f"Similar tags:\n {'\n'.join(suggestions)}"
+                content += f"Similar tags:\n"
+                content += "\n".join(suggestions)
             await interaction.followup.send(content, ephemeral=True)
 
     @tag_group.command(name="info", description="Get info about a specific tag")
@@ -112,7 +116,8 @@ class quick_replies(commands.Cog):
             content = f"There's no tag with the name `{tag}`, try again later..."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f"Similar tags: {'\n'.join(suggestions)}"
+                content += f"Similar tags:\n"
+                content += '\n'.join(suggestions)
             await interaction.followup.send(content, ephemeral=True)
 
     @tasks.loop(minutes=1)
@@ -150,19 +155,21 @@ class quick_replies(commands.Cog):
             content = f"Couldn't delete tag `{tag}` because it doesn't exist or has already been deleted..."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f"Similar tags:\n{'\n'.join(suggestions)}"
+                content += f"Similar tags:\n"
+                content += '\n'.join(suggestions)
             await interaction.followup.send(content, ephemeral=True)
 
-    @tag_group.command(name="update", description="Update the content for an existing tag")
-    @app_commands.describe(tag="The name of the tag that should be updated")
+    @tag_group.command(name="edit", description="edit the content for an existing tag")
+    @app_commands.describe(tag="The name of the tag that should be editted")
     async def update(self, interaction: discord.Interaction, tag: str):
         if await check_tag_exists(tag):
             await interaction.response.send_modal(update_tag_modal(tag))
         else:
-            content = f"Couldn't update tag `{tag}` because it doesn't exist.."
+            content = f"Couldn't edit tag `{tag}` because it doesn't exist.."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f"Similar tags:\n{'\n'.join(suggestions)}"
+                content += f"Similar tags:\n"
+                content += '\n'.join(suggestions)
             await interaction.response.send_message(content, ephemeral=True)
 
 async def setup(client: commands.Bot):
