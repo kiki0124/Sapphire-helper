@@ -37,6 +37,18 @@ class create_tag(ui.Modal):
         else:
             await interaction.response.send_message("A tag with this name already exists...", ephemeral=True)
 
+class update_tag_modal(ui.Modal):
+    def __init__(self, tag: str):
+        super().__init__(title="Update tag", custom_id="update tag modal")
+        self.tag = tag
+
+    label = ui.Label(text="New content:", component=ui.TextInput(style=discord.TextStyle.paragraph, placeholder="The new content that this tag should have"))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        new_content = self.label.component.value
+        await update_tag(self.tag, new_content)
+        await interaction.followup.send(f"Successfully updated `{self.tag}`'s content!")
+
 class quick_replies(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
@@ -55,14 +67,29 @@ class quick_replies(commands.Cog):
     @app_commands.describe(tag="The name of the tag that you want to use")
     @app_commands.checks.cooldown(1, 60, key=lambda i: (i.channel.id, i.user.id))
     async def use(self, interaction: discord.Interaction, tag: str):
+        await interaction.response.defer(ephemeral=True)
         if await check_tag_exists(tag):
-            if tag in self.used_tags.keys():
-                self.used_tags[tag] +=1
-            else:
-                self.used_tags[tag] = 1
-            await interaction.response.send_message(f"{await get_tag_content(tag)}\n-# Recommended by @{interaction.user.name}", allowed_mentions=discord.AllowedMentions.none())
+            content = await get_tag_content(tag)
+            confirm = ui.Button(
+                label="Confirm",
+                custom_id="tag-send-confirm",
+                style=discord.ButtonStyle.danger
+            )
+            async def confirm_click(i: discord.Interaction):
+                if tag in self.used_tags.keys():
+                    self.used_tags[tag] +=1
+                else:
+                    self.used_tags[tag] = 1
+                await interaction.channel.send(f"{content}\n-# Recommended by @{i.user.name}", allowed_mentions=discord.AllowedMentions.none())
+            view = ui.View()
+            confirm.callback = confirm_click
+            view.add_item(confirm)
+            await interaction.followup.send(
+                f"Are you sure you would like to send this tag?\n```\n{content}\n```\n-# Click *Confirm* to confirm, dismiss message to cancel",
+                view=view
+            )
         else:
-            await interaction.response.send_message("Tag not found, try again later...", ephemeral=True)
+            await interaction.followup.send("Tag not found, try again later...", ephemeral=True)
 
     @tag_group.command(name="info", description="Get info about a specific tag")
     @app_commands.describe(tag="The name of the tag")
@@ -80,8 +107,7 @@ class quick_replies(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def refresh_use_count(self):
-        for tag, uses in self.used_tags.items():
-            await add_tag_uses(tag, uses)
+        await add_tag_uses(self.used_tags.items())
         self.used_tags.clear()
         self.recommended_tags = await get_used_tags()
 
@@ -98,10 +124,29 @@ class quick_replies(commands.Cog):
     async def delete(self, interaction: discord.Interaction, tag: str):
         await interaction.response.defer(ephemeral=True)
         if await check_tag_exists(tag):
-            await delete_tag(tag)
-            await interaction.followup.send(f"Successfully deleted tag `{tag}`!", ephemeral=True)
+            confirm = ui.Button(
+                label="Confirm",
+                style=discord.ButtonStyle.danger,
+                custom_id="tag-delete-confirm"
+            )
+            async def on_confirm_click(i: discord.Interaction):
+                await delete_tag(tag)
+                await i.followup.send(f"Successfully deleted tag `{tag}`!", ephemeral=True)
+            confirm.callback = on_confirm_click
+            view = ui.View()
+            view.add_item(confirm)
+            await interaction.followup.send(f"Are you sure you would like to delete the tag `{tag}`?\n-# Click *Confirm* to confirm, dismiss message to cancel", view=view)
         else:
             await interaction.followup.send(f"Couldn't delete tag `{tag}` because it doesn't exist or has already been deleted...")
+
+    @tag_group.command(name="update", description="Update the content for an existing tag")
+    @app_commands.describe(tag="The name of the tag that should be updated")
+    async def update(self, interaction: discord.Interaction, tag: str):
+        await interaction.response.defer(ephemeral=True)
+        if await check_tag_exists(tag):
+            await interaction.response.send_modal(update_tag_modal(tag))
+        else:
+            await interaction.followup.send(f"Couldn't update tag `{tag}` because it doesn't exist..")
 
 async def setup(client: commands.Bot):
     await client.add_cog(quick_replies(client))
