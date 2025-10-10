@@ -62,10 +62,10 @@ class quick_replies(commands.Cog):
         self.client = client
         self.used_tags: dict[str, int] = {} # saved and sent to DB every 15 minutes
         self.recommended_tags: list[str] = [] # max 25 with highest uses from DB extracted every 15 minutes
-        self.refresh_use_count.start()
 
     async def cog_load(self):
         self.pool = await sql.create_pool("database/data.db")
+        self.refresh_use_count.start()
 
     tag_group = app_commands.Group(name="tag", description="Commands related to the tag system")
 
