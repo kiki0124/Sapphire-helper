@@ -18,7 +18,7 @@ async def main():
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS quick_replies(id STRING UNIQUE NOT NULL, title STRING NOT NULL, description STRING NULL, emoji STRING NULL, reply_content STRING NULL, embed_data STRING NULL)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS tags(name STRING UNIQUE NOT NULL, content STRING NULL, creator_id INTEGER NOT NULL, created_ts INTEGER)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -228,6 +228,52 @@ async def delete_channel_permissions(channel_id: int) -> None:
 
 # quick replies
 
-async def save_quick_reply(title: str, description: str = None, emoji: str = None, content: str = None, embed_data: dict = None):
-    # INSERT INTO quick_replies (id, title, description, emoji, reply_content, embed_data) VALUES (?, ?, ?, ?, ?) (title, description, emoji, content, str(embed_data),)
-    pass
+async def get_tags() -> list[str]:
+    async with sql.connect(DB_PATH) as conn:
+        query = await conn.fetchall("SELECT name FROM tags")
+        return [tag_name["name"] for tag_name in query]
+
+async def check_tag_exists(name: str) -> bool:
+    return name in await get_tags()
+
+async def save_tag(name: str, content: str, creator_id: int):
+    # INSERT INTO tags (name, content, creator_id) VALUES (?, ?, ?) (name, content, creator_id,)
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("INSERT INTO tags (name, content, creator_id, created_ts) VALUES (?, ?, ?, ?)", (name, content, creator_id, round(datetime.datetime.now().timestamp())))
+            await conn.commit()
+
+async def get_tag_content(name: str) -> str|None:
+    async with sql.connect(DB_PATH) as conn:
+        result = await conn.fetchone("SELECT content FROM tags WHERE name=?", (name,))
+        if result:
+            return result[0]
+        else:
+            return None
+
+async def get_tag_data(name: str) -> dict:
+    async with sql.connect(DB_PATH) as conn:
+        result = await conn.fetchone("SELECT * FROM tags WHERE name=?", (name, ))
+        if result:
+            return {
+                "name": result["name"],
+                "content": result["content"],
+                "creator_id": result["creator_id"],
+                "created_ts": result["created_ts"]
+            }
+        else:
+            return {}
+
+async def update_tag(name: str, content: str) -> bool:
+    """  
+    Return True if the tag was updated successfully
+    False if a tag with the name doesn't exist
+    """
+    if await check_tag_exists(name):
+        async with sql.connect(DB_PATH) as conn:
+            async with conn.cursor() as cu:
+                await cu.execute("UPDATE tags SET content=? WHERE name=?", (content, name,))
+                await conn.commit()
+                return True
+    else:
+        return False
