@@ -37,7 +37,7 @@ class create_tag(ui.Modal):
         ))
 
     async def on_submit(self, interaction: discord.Interaction):
-        if not await check_tag_exists(self.pool ,self.name.component.value):
+        if not await check_tag_exists(self.pool, self.name.component.value):
             await save_tag(self.pool ,name=self.name.component.value, content=self.content.component.value, creator_id=interaction.user.id)
             await interaction.response.send_message(f"Tag `{self.name.component.value}` saved successfully!\nYou can now access it with /tag use", ephemeral=True)
         else:
