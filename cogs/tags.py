@@ -159,7 +159,7 @@ class quick_replies(commands.Cog):
         if await check_tag_exists(tag):
             await interaction.response.send_modal(update_tag_modal(tag))
         else:
-            content = f"Couldn't update tag `{tag}` because it doesn't exist..", ephemeral=True
+            content = f"Couldn't update tag `{tag}` because it doesn't exist.."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
                 content += f"Similar tags:\n{'\n'.join(suggestions)}"
