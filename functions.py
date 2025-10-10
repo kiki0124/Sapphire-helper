@@ -228,27 +228,26 @@ async def delete_channel_permissions(channel_id: int) -> None:
 
 # quick replies
 
-async def check_tag_exists(name: str) -> bool:
-    async with sql.connect(DB_PATH) as conn:
+async def check_tag_exists(pool: sql.Pool ,name: str) -> bool:
+    async with pool.acquire() as conn:
         result = await conn.fetchone("SELECT content FROM tags WHERE name=?", (name,))
         return bool(result)
 
-async def save_tag(name: str, content: str, creator_id: int):
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("INSERT INTO tags (name, content, creator_id, created_ts) VALUES (?, ?, ?, ?)", (name, content, creator_id, round(datetime.datetime.now().timestamp())))
-            await conn.commit()
+async def save_tag(pool: sql.Pool, name: str, content: str, creator_id: int):
+    async with pool.acquire() as conn:
+        await conn.execute("INSERT INTO tags (name, content, creator_id, created_ts) VALUES (?, ?, ?, ?)", (name, content, creator_id, round(datetime.datetime.now().timestamp())))
+        await conn.commit()
 
-async def get_tag_content(name: str) -> str|None:
-    async with sql.connect(DB_PATH) as conn:
+async def get_tag_content(pool: sql.Pool, name: str) -> str|None:
+    async with pool.acquire() as conn:
         result = await conn.fetchone("SELECT content FROM tags WHERE name=?", (name,))
         if result:
             return result[0]
         else:
             return None
 
-async def get_tag_data(name: str) -> dict:
-    async with sql.connect(DB_PATH) as conn:
+async def get_tag_data(pool: sql.Pool, name: str) -> dict:
+    async with pool.acquire() as conn:
         result = await conn.fetchone("SELECT * FROM tags WHERE name=?", (name, ))
         if result:
             return {
@@ -261,27 +260,27 @@ async def get_tag_data(name: str) -> dict:
         else:
             return {}
 
-async def update_tag(name: str, content: str):
-    async with sql.connect(DB_PATH) as conn:
+async def update_tag(pool: sql.Pool, name: str, content: str):
+    async with pool.acquire() as conn:
         await conn.execute("UPDATE tags SET content=? WHERE name=?", (content, name,))
         await conn.commit()
         return True
 
-async def add_tag_uses(data: list[tuple[str, int]]):
-    async with sql.connect(DB_PATH) as conn:
+async def add_tag_uses(pool: sql.Pool, data: list[tuple[str, int]]):
+    async with pool.acquire() as conn:
         async with conn.transaction():
             await conn.executemany("UPDATE tags SET uses=uses+? WHERE name=?", data)
             await conn.commit()
 
-async def get_used_tags() -> list[str]:
+async def get_used_tags(pool: sql.Pool) -> list[str]:
     """  
     Returns a list of the names of most used tags, max 25
     """
-    async with sql.connect(DB_PATH) as conn:
+    async with pool.acquire() as conn:
         result = await conn.fetchall("SELECT name FROM tags ORDER BY uses LIMIT 25")
         return [tag[0] for tag in result]
 
-async def delete_tag(name: str):
-    async with sql.connect(DB_PATH) as conn:
+async def delete_tag(pool: sql.Pool, name: str):
+    async with pool.acquire() as conn:
         await conn.execute("DELETE FROM tags WHERE name=?", (name,))
         await conn.commit()
