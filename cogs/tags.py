@@ -67,6 +67,10 @@ class quick_replies(commands.Cog):
         self.pool = await sql.create_pool("database/data.db")
         self.refresh_use_count.start()
 
+    async def cog_unload(self):
+        await self.pool.close()
+        self.refresh_use_count.stop()
+
     tag_group = app_commands.Group(name="tag", description="Commands related to the tag system")
 
     @tag_group.command(name="create", description="Add a new tag with the given content")
@@ -74,9 +78,15 @@ class quick_replies(commands.Cog):
     async def add(self, interaction: discord.Interaction):
         await interaction.response.send_modal(create_tag(self.pool))
 
+    @staticmethod
+    async def tag_use_dynamic_cooldown(interaction: discord.Interaction):
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
+            return None
+        return app_commands.Cooldown(1, 60)
+
     @tag_group.command(name="use", description="Use a tag to display its content")
     @app_commands.describe(tag="The name of the tag that you want to use")
-    @app_commands.checks.cooldown(1, 60, key=lambda i: (i.channel.id, i.user.id))
+    @app_commands.checks.dynamic_cooldown(tag_use_dynamic_cooldown, key= lambda i: (i.channel.id, i.user.id))
     async def use(self, interaction: discord.Interaction, tag: str):
         await interaction.response.defer(ephemeral=True)
         if await check_tag_exists(self.pool, tag):
