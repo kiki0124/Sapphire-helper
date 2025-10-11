@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 from difflib import get_close_matches
 import asqlite as sql
+from asyncio import Lock
 
 load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
@@ -62,6 +63,7 @@ class quick_replies(commands.Cog):
         self.client = client
         self.used_tags: dict[str, int] = {} # saved and sent to DB every 15 minutes
         self.recommended_tags: list[str] = [] # max 25 with highest uses from DB extracted every 15 minutes
+        self.used_tags_lock = Lock()
 
     async def cog_load(self):
         self.pool = await sql.create_pool("database/data.db")
@@ -97,10 +99,11 @@ class quick_replies(commands.Cog):
                 style=discord.ButtonStyle.danger
             )
             async def confirm_click(i: discord.Interaction):
-                if tag in self.used_tags.keys():
-                    self.used_tags[tag] +=1
-                else:
-                    self.used_tags[tag] = 1
+                async with self.used_tags_lock:
+                    if tag in self.used_tags.keys():
+                        self.used_tags[tag] +=1
+                    else:
+                        self.used_tags[tag] = 1
                 await interaction.channel.send(f"{content}\n-# Recommended by @{i.user.name}", allowed_mentions=discord.AllowedMentions.none())
             view = ui.View()
             confirm.callback = confirm_click
@@ -138,14 +141,15 @@ class quick_replies(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def refresh_use_count(self):
-        await add_tag_uses(self.pool, self.used_tags.items())
-        self.used_tags.clear()
-        self.recommended_tags = await get_used_tags(self.pool)
+        async with self.used_tags_lock:
+            await add_tag_uses(self.pool, self.used_tags.items())
+            self.used_tags.clear()
+            self.recommended_tags = await get_used_tags(self.pool)
 
     @use.autocomplete("tag")
     async def tag_autocomplete(self, interaction: discord.Interaction, current: str):
         if self.recommended_tags:
-            return [app_commands.Choice(name=str(tag), value=str(tag)) for tag in self.recommended_tags]
+            return [app_commands.Choice(name=str(tag), value=str(tag)) for tag in self.recommended_tags[0:25]]
         else:
             return []
 
