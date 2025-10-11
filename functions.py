@@ -269,7 +269,7 @@ async def update_tag(pool: sql.Pool, name: str, content: str):
 async def add_tag_uses(pool: sql.Pool, data: list[tuple[str, int]]):
     async with pool.acquire() as conn:
         async with conn.transaction():
-            await conn.executemany("UPDATE tags SET uses=uses+? WHERE name=?", data)
+            await conn.executemany("UPDATE tags SET uses=uses+? WHERE name=?", ((uses, name) for name, uses in data))
             await conn.commit()
 
 async def get_used_tags(pool: sql.Pool) -> list[str]:
