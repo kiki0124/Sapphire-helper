@@ -114,7 +114,7 @@ class quick_replies(commands.Cog):
             confirm.callback = confirm_click
             view.add_item(confirm)
             await interaction.followup.send(
-                f"Are you sure you would like to send this tag?\n```\n{content}\n```\n-# Click *Confirm* to confirm, dismiss message to cancel",
+                f"Are you sure you would like to send this tag?\n{content}\n-# Click *Confirm* to confirm, dismiss message to cancel",
                 view=view
             )
         else:
@@ -170,7 +170,17 @@ class quick_replies(commands.Cog):
                 custom_id="tag-delete-confirm"
             )
             async def on_confirm_click(i: discord.Interaction):
+                await i.response.defer(ephemeral=True)
                 await delete_tag(self.pool, tag)
+                async with self.used_tags_lock:
+                    if tag in self.recommended_tags:
+                        del self.recommended_tags[tag]
+                    if tag in self.used_tags:
+                        del self.used_tags[tag]
+                try:
+                    await interaction.delete_original_response()
+                except discord.HTTPException:
+                    pass
                 await i.followup.send(f"Successfully deleted tag `{tag}`!", ephemeral=True)
             confirm.callback = on_confirm_click
             view = ui.View()
