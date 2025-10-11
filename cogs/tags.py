@@ -99,11 +99,16 @@ class quick_replies(commands.Cog):
                 style=discord.ButtonStyle.danger
             )
             async def confirm_click(i: discord.Interaction):
+                await i.response.defer(ephemeral=True)
                 async with self.used_tags_lock:
                     if tag in self.used_tags.keys():
                         self.used_tags[tag] +=1
                     else:
                         self.used_tags[tag] = 1
+                try:
+                    await i.delete_original_response()
+                except discord.HTTPException:
+                    pass # message was most likely already dismissed by the user
                 await interaction.channel.send(f"{content}\n-# Recommended by @{i.user.name}", allowed_mentions=discord.AllowedMentions.none())
             view = ui.View()
             confirm.callback = confirm_click
@@ -113,10 +118,10 @@ class quick_replies(commands.Cog):
                 view=view
             )
         else:
-            content = "Tag not found, try again later..."
+            content = "Tag not found."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f"Similar tags:\n"
+                content += f" Similar tags:\n"
                 content += "\n".join(suggestions)
             await interaction.followup.send(content, ephemeral=True)
 
@@ -132,10 +137,10 @@ class quick_replies(commands.Cog):
             uses = tag_data["uses"]
             await interaction.followup.send(f"Name: `{tag}`\nCreated by: <@{creator_id}>\nCreated on: <t:{created_ts}:f>\nUses: `{uses}`\nContent: ```\n{content}\n```", ephemeral=True)
         else:
-            content = f"There's no tag with the name `{tag}`, try again later..."
+            content = f"There's no tag with the name `{tag}`."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f"Similar tags:\n"
+                content += f" Similar tags:\n"
                 content += '\n'.join(suggestions)
             await interaction.followup.send(content, ephemeral=True)
 
@@ -172,10 +177,10 @@ class quick_replies(commands.Cog):
             view.add_item(confirm)
             await interaction.followup.send(f"Are you sure you would like to delete the tag `{tag}`?\n-# Click *Confirm* to confirm, dismiss message to cancel", view=view)
         else:
-            content = f"Couldn't delete tag `{tag}` because it doesn't exist or has already been deleted..."
+            content = f"Couldn't delete tag `{tag}` because it doesn't exist or has already been deleted."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f"Similar tags:\n"
+                content += f" Similar tags:\n"
                 content += '\n'.join(suggestions)
             await interaction.followup.send(content, ephemeral=True)
 
@@ -185,10 +190,10 @@ class quick_replies(commands.Cog):
         if await check_tag_exists(self.pool, tag):
             await interaction.response.send_modal(update_tag_modal(self.pool, tag))
         else:
-            content = f"Couldn't edit tag `{tag}` because it doesn't exist.."
+            content = f"Couldn't edit tag `{tag}` because it doesn't exist."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f"Similar tags:\n"
+                content += f" Similar tags:\n"
                 content += '\n'.join(suggestions)
             await interaction.response.send_message(content, ephemeral=True)
 
