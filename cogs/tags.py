@@ -143,7 +143,6 @@ class quick_replies(commands.Cog):
     async def use(self, interaction: discord.Interaction, tag: str):
         await interaction.response.defer(ephemeral=True)
         if await check_tag_exists(self.pool, tag):
-            content = await get_tag_content(self.pool, tag)
             confirm = ui.Button(
                 label="Confirm",
                 custom_id="tag-send-confirm",
@@ -151,6 +150,7 @@ class quick_replies(commands.Cog):
             )
             async def confirm_click(i: discord.Interaction):
                 await i.response.defer(ephemeral=True)
+                content = await get_tag_content(self.pool, tag)
                 async with self.used_tags_lock:
                     if tag in self.used_tags.keys():
                         self.used_tags[tag] +=1
