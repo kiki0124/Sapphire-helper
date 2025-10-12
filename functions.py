@@ -2,6 +2,7 @@ import datetime
 import asqlite as sql
 from string import ascii_letters, digits
 import random
+from traceback import print_exception
 
 DB_PATH = "database\data.db"
 
@@ -267,10 +268,16 @@ async def update_tag(pool: sql.Pool, name: str, content: str):
         return True
 
 async def add_tag_uses(pool: sql.Pool, data: list[tuple[str, int]]):
-    async with pool.acquire() as conn:
-        async with conn.transaction():
-            await conn.executemany("UPDATE tags SET uses=uses+? WHERE name=?", ((uses, name) for name, uses in data))
-            await conn.commit()
+    try:
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.executemany("UPDATE tags SET uses=uses+? WHERE name=?", ((uses, name) for name, uses in data))
+                await conn.commit()
+    except Exception as e:
+        print_exception(e)
+        async with sql.connect(DB_PATH) as conn:
+            async with conn.transaction():
+                await conn.executemany("UPDATE tags SET uses=uses+? WHERE name=?", ((uses, name) for name, uses in data))
 
 async def get_used_tags(pool: sql.Pool) -> list[str]:
     """  
