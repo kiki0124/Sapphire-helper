@@ -57,7 +57,7 @@ def sql_to_dict(sql_results: list[tuple]) -> dict[str, Any]:
     """Formats a sql.Row into dict"""
 
     possible_queries = ('post_id', 'timestamp', 'user_id', 'channel_id', 'allow', 'deny', 'started_iso', 'message', 'message_id', 'sticky', 'sticky_message_id',
-                        'thread_id') #All the possible queries in all the tables
+                        'thread_id', 'name', 'content', 'uses', 'creator_id', 'created_ts') #All the possible queries in all the tables
     data = {}
     for row in sql_results: # fetchall() returns a list of tuples, so we loop through the list
         for query in possible_queries: 
