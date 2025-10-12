@@ -120,7 +120,7 @@ class bot(commands.Cog):
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
     async def stats(self, ctx: commands.Context):
         embed = discord.Embed(
-            title="Sapphire Helper | Version 4.0",
+            title="Sapphire Helper | Version 5.0",
             colour=discord.Colour.purple()
         )
         embed.add_field(name="CPU Count:", value=os.cpu_count(), inline=False)
