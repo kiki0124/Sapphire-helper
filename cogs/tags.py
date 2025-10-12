@@ -35,7 +35,7 @@ class create_tag(ui.Modal):
         component=ui.TextInput(
             style=discord.TextStyle.paragraph,
             placeholder="Components Version 2 (aka cv2) is a relatively new discord update...",
-            max_length=1_000
+            max_length=950
         ))
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -67,7 +67,14 @@ class update_tag_modal(ui.Modal):
         self.tag = tag
         self.pool = pool
 
-    label = ui.Label(text="New content:", component=ui.TextInput(style=discord.TextStyle.paragraph, placeholder="The new content that this tag should have", max_length=1_000))
+    label = ui.Label(
+        text="New content:", 
+        component=ui.TextInput(
+            style=discord.TextStyle.paragraph, 
+            placeholder="The new content that this tag should have", 
+            max_length=950
+            )
+            )
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
