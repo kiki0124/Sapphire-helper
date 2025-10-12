@@ -158,7 +158,7 @@ class bot(commands.Cog):
     async def stats(self, ctx: commands.Context):
         embed = discord.Embed(
             title="Sapphire Helper | Version 5.0",
-            colour=discord.Colour.purple()
+            colour=discord.Colour.purple(),
             url="https://github.com/kiki0124/sapphire-helper"
         )
         embed.add_field(name="CPU Count:", value=os.cpu_count(), inline=False)
