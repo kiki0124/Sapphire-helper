@@ -67,7 +67,7 @@ class update_tag_modal(ui.Modal):
         self.tag = tag
         self.pool = pool
 
-    label = ui.Label(text="New content:", component=ui.TextInput(style=discord.TextStyle.paragraph, placeholder="The new content that this tag should have"))
+    label = ui.Label(text="New content:", component=ui.TextInput(style=discord.TextStyle.paragraph, placeholder="The new content that this tag should have", max_length=1_000))
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
