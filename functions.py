@@ -279,7 +279,7 @@ async def get_tag_data(pool: sql.Pool, name: str) -> dict:
                 "creator_id": result["creator_id"],
                 "created_ts": result["created_ts"],
                 "uses": result["uses"]
-
+            }
 
 async def update_tag(pool: sql.Pool, name: str, content: str):
     async with pool.acquire() as conn:
