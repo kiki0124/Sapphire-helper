@@ -129,7 +129,7 @@ class quick_replies(commands.Cog):
 
     async def cog_unload(self):
         await self.pool.close()
-        self.refresh_use_count.stop()
+        self.refresh_use_count.cancel()
 
     tag_group = app_commands.Group(name="tag", description="Commands related to the tag system")
 
