@@ -12,6 +12,7 @@ load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
+TAG_LOGGING_THREAD_ID = int(os.getenv("TAG_LOGGING_THREAD_ID"))
 
 class create_tag(ui.Modal):
     def __init__(self, pool: sql.Pool):
@@ -40,6 +41,22 @@ class create_tag(ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         if not await check_tag_exists(self.pool, self.name.component.value):
             await save_tag(self.pool ,name=self.name.component.value, content=self.content.component.value, creator_id=interaction.user.id)
+            tag_thread = interaction.guild.get_thread(TAG_LOGGING_THREAD_ID)
+            if tag_thread.archived:
+                await tag_thread.edit(archived=False)
+            webhooks = await tag_thread.parent.webhooks()
+            try:
+                webhook = webhooks[0] 
+            except IndexError:
+                webhook = await tag_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+            await webhook.send(
+                content=f"Tag `{self.name.component.value}` created by {interaction.user.mention}.\nContent: ```\n{self.content.component.value}\n```",
+                username=interaction.client.user.name,
+                avatar_url=interaction.client.user.avatar.url,
+                thread=discord.Object(id=TAG_LOGGING_THREAD_ID),
+                wait=False,
+                allowed_mentions=discord.AllowedMentions.none()
+            )
             await interaction.response.send_message(f"Tag `{self.name.component.value}` saved successfully!\nYou can now access it with /tag use", ephemeral=True)
         else:
             await interaction.response.send_message("A tag with this name already exists...\n-# Use /tag delete to delete it", ephemeral=True)
@@ -56,6 +73,22 @@ class update_tag_modal(ui.Modal):
         await interaction.response.defer(ephemeral=True)
         new_content = self.label.component.value
         await update_tag(self.pool, self.tag, new_content)
+        tag_thread = interaction.guild.get_thread(TAG_LOGGING_THREAD_ID)
+        if tag_thread.archived:
+            await tag_thread.edit(archived=False)
+        webhooks = await tag_thread.parent.webhooks()
+        try:
+            webhook = webhooks[0] 
+        except IndexError:
+            webhook = await tag_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+        await webhook.send(
+            content=f"Tag `{self.tag}` editted by {interaction.user.mention}. New content: ```\n{new_content}\n```",
+            username=interaction.client.user.name,
+            avatar_url=interaction.client.user.avatar.url,
+            thread=discord.Object(id=TAG_LOGGING_THREAD_ID),
+            wait=False,
+            allowed_mentions=discord.AllowedMentions.none()
+        )
         await interaction.followup.send(f"Successfully updated `{self.tag}`'s content!")
 
 class quick_replies(commands.Cog):
@@ -64,6 +97,24 @@ class quick_replies(commands.Cog):
         self.used_tags: dict[str, int] = {} # saved and sent to DB every 15 minutes
         self.recommended_tags: list[str] = [] # max 25 with highest uses from DB extracted every 15 minutes
         self.used_tags_lock = Lock()
+
+    async def send_tag_log(self, content: str):
+        tag_thread = self.client.get_channel(TAG_LOGGING_THREAD_ID)
+        if tag_thread.archived:
+            await tag_thread.edit(archived=False)
+        webhooks = await tag_thread.parent.webhooks()
+        try:
+            webhook = webhooks[0] 
+        except IndexError:
+            webhook = await tag_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+        await webhook.send(
+            content=content,
+            username=self.client.user.name,
+            avatar_url=self.client.user.avatar.url,
+            thread=discord.Object(id=TAG_LOGGING_THREAD_ID),
+            wait=False,
+            allowed_mentions=discord.AllowedMentions.none()
+        )
 
     async def cog_load(self):
         self.pool = await sql.create_pool("database/data.db")
@@ -172,14 +223,15 @@ class quick_replies(commands.Cog):
             async def on_confirm_click(i: discord.Interaction):
                 await i.response.defer(ephemeral=True)
                 await delete_tag(self.pool, tag)
+                await self.send_tag_log(f"Tag `{tag}` deleted by {i.user.mention}")
                 async with self.used_tags_lock:
                     if tag in self.recommended_tags:
-                        del self.recommended_tags[tag]
+                        self.recommended_tags.remove(tag)
                     if tag in self.used_tags:
                         del self.used_tags[tag]
                 try:
                     await interaction.delete_original_response()
-                except discord.HTTPException:
+                except discord.HTTPException: # message was most likely already dismissed by the user
                     pass
                 await i.followup.send(f"Successfully deleted tag `{tag}`!", ephemeral=True)
             confirm.callback = on_confirm_click
