@@ -20,6 +20,7 @@ async def main():
             await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS tags(name STRING UNIQUE NOT NULL, content STRING NULL, creator_id INTEGER NOT NULL, created_ts INTEGER, uses INTEGER NOT NULL DEFAULT 0)")
             await cu.execute("CREATE TABLE IF NOT EXISTS epi_config(started_iso STRING NOT NULL, message STRING NOT NULL, message_id INTEGER NOT NULL, sticky BOOL NOT NULL, sticky_message_id INTEGER NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS epi_users(user_id INTEGER UNIQUE NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS epi_messages(thread_id INTEGER UNIQUE NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
@@ -248,6 +249,62 @@ async def delete_channel_permissions(channel_id: int) -> None:
             await cu.execute("DELETE FROM locked_channels_permissions WHERE channel_id=?", (channel_id,))
             await conn.commit()
 
+# quick replies
+
+async def check_tag_exists(pool: sql.Pool ,name: str) -> bool:
+    async with pool.acquire() as conn:
+        result = await conn.fetchone("SELECT content FROM tags WHERE name=?", (name,))
+        return bool(result)
+
+async def save_tag(pool: sql.Pool, name: str, content: str, creator_id: int):
+    async with pool.acquire() as conn:
+        await conn.execute("INSERT INTO tags (name, content, creator_id, created_ts) VALUES (?, ?, ?, ?)", (name, content, creator_id, round(datetime.datetime.now().timestamp())))
+        await conn.commit()
+
+async def get_tag_content(pool: sql.Pool, name: str) -> str|None:
+    async with pool.acquire() as conn:
+        result = await conn.fetchone("SELECT content FROM tags WHERE name=?", (name,))
+        if result:
+            return result[0]
+        else:
+            return None
+
+async def get_tag_data(pool: sql.Pool, name: str) -> dict:
+    async with pool.acquire() as conn:
+        result = await conn.fetchone("SELECT * FROM tags WHERE name=?", (name, ))
+        if result:
+            return {
+                "name": result["name"],
+                "content": result["content"],
+                "creator_id": result["creator_id"],
+                "created_ts": result["created_ts"],
+                "uses": result["uses"]
+
+
+async def update_tag(pool: sql.Pool, name: str, content: str):
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE tags SET content=? WHERE name=?", (content, name,))
+        await conn.commit()
+        return True
+
+async def add_tag_uses(pool: sql.Pool, data: list[tuple[str, int]]):
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.executemany("UPDATE tags SET uses=uses+? WHERE name=?", ((uses, name) for name, uses in data))
+            await conn.commit()
+
+async def get_used_tags(pool: sql.Pool) -> list[str]:
+    """  
+    Returns a list of the names of most used tags, max 25
+    """
+    async with pool.acquire() as conn:
+        result = await conn.fetchall("SELECT name FROM tags ORDER BY uses LIMIT 25")
+        return [tag[0] for tag in result]
+
+async def delete_tag(pool: sql.Pool, name: str):
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM tags WHERE name=?", (name,))
+        await conn.commit()
 
 # EPI
 
@@ -298,7 +355,7 @@ async def get_epi_config(pool: sql.Pool) -> Optional[dict[str, int, str, str, st
             }
         else:
             return {}
-
+							
 async def add_epi_message(pool: sql.Pool, message_id: int, thread_id: int) -> None:
     async with pool.acquire() as conn:
         await conn.execute("INSERT INTO epi_messages (thread_id, message_id) VALUES (?, ?)", (thread_id, message_id,))

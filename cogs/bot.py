@@ -92,6 +92,8 @@ class bot(commands.Cog):
     async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingAnyRole):
             await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
+        elif isinstance(error, app_commands.CommandOnCooldown):
+            await interaction.response.send_message(content=f"Command on cooldown for another **{round(error.retry_after)}** seconds!", ephemeral=True)
         elif isinstance(error, app_commands.NoPrivateMessage):
             await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
         elif isinstance(error, app_commands.CommandOnCooldown):
@@ -155,8 +157,8 @@ class bot(commands.Cog):
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def stats(self, ctx: commands.Context):
         embed = discord.Embed(
-            title="Sapphire Helper | Version 4.4",
-            colour=discord.Colour.purple(),
+            title="Sapphire Helper | Version 5.0",
+            colour=discord.Colour.purple()
             url="https://github.com/kiki0124/sapphire-helper"
         )
         embed.add_field(name="CPU Count:", value=os.cpu_count(), inline=False)
