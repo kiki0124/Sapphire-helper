@@ -11,6 +11,7 @@ EXPERTS_ROLE_ID = int(os.getenv('EXPERTS_ROLE_ID'))
 MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
 SUPPORT_CHANNEL_ID = int(os.getenv("SUPPORT_CHANNEL_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
+DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class readthedamnrules(commands.Cog):
     def __init__(self, client) -> None:
@@ -89,8 +90,8 @@ class readthedamnrules(commands.Cog):
     async def redirect_to_support(self, message: discord.Message):
         if not message.author.bot and message.reference and message.content.startswith(self.client.user.mention) and message.guild:
             everyone = message.guild.default_role
-            if message.channel.permissions_for(everyone).view_channel and message.channel.permissions_for(everyone).send_messages:
-                if message.author.get_role(EXPERTS_ROLE_ID) or message.author.get_role(MODERATORS_ROLE_ID):
+            if message.channel.permissions_for(everyone).view_channel and message.channel.permissions_for(everyone).send_messages or message.channel.permissions_for(everyone).send_messages_in_threads:
+                if message.author.get_role(EXPERTS_ROLE_ID) or message.author.get_role(MODERATORS_ROLE_ID) or message.author.get_role(DEVELOPERS_ROLE_ID):
                     replied_message = message.reference.cached_message or await message.channel.fetch_message(message.reference.message_id)
                     if not replied_message.author == message.author:
                         await self.handle_request(reference_message=replied_message, user=message.author, message=message)
@@ -103,7 +104,7 @@ class readthedamnrules(commands.Cog):
             if reaction.message.channel.permissions_for(everyone).view_channel and reaction.message.channel.permissions_for(everyone).send_messages:
                 reactions = ("❓", "❔") # allowed reactions, all other reactions will be ignored in this context
                 if reaction.emoji in reactions:
-                    if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID):
+                    if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
                         await self.handle_request(reaction.message, user=user)
 
 async def setup(client):

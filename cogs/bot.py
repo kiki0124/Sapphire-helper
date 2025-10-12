@@ -7,12 +7,14 @@ from dotenv import load_dotenv
 from traceback import print_exception
 import functions
 import psutil
+from functions import humanize_duration
 
 load_dotenv()
 
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
+DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class bot(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -21,15 +23,31 @@ class bot(commands.Cog):
     def cog_load(self):
         self.client.tree.on_error = self.tree_on_error
     
-    async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, interaction: discord.Interaction = None) -> None:
+    async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, interaction: discord.Interaction | None = None) -> None:
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-        content=f"Unhandled error: `{error}`\n<@1105414178937774150>"
-        await alerts_thread.send(content=content)
+        content = f"<@1105414178937774150>\nUnhandled error: `{error}`"
+
         if interaction:
-            await alerts_thread.send(content=f"Interaction created at `{interaction.created_at.timestamp()}` <t:{round(interaction.created_at.timestamp())}:T>. Now `{datetime.datetime.now().timestamp()}` <t:{round(datetime.datetime.now().timestamp())}:T>\nCommand: `{interaction.command.name}`")
+            interaction_created_at = interaction.created_at.timestamp()
+            interaction_data = interaction.data or {}
+            content += f"\n### Interaction Error:\n>>> Interaction created at <t:{round(interaction_created_at)}:T> (<t:{round(interaction_created_at)}:R>)\
+                \nUser: {interaction.user.mention} | Channel: {interaction.channel.mention} | Type: {interaction.type.name}"
+            if interaction.command and interaction.command.parent is None:
+                command_id = interaction_data.get('id', 0)
+                options_dict  = interaction_data.get("options", [])
+                command_mention = f"</{interaction.command.qualified_name}:{command_id}>"
+                content += f"\nCommand: {command_mention}, inputted values:"
+
+                options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict])
+                content += f"\n```{options_formatted}```"
+            else:
+                content += f"\n```json\n{interaction.data}```"
+            await alerts_thread.send(content, allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150)])) #1105414178937774150 is Kiki's user ID
+        else:
+            await alerts_thread.send(content=content)
 
     @commands.command(name="ping")
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def ping(self, ctx: commands.Context):
         now = datetime.datetime.now()
         message = await ctx.reply(content=f"Pong!\nClient latency: {str(self.client.latency)[:4]}s", mention_author=False)
@@ -37,7 +55,7 @@ class bot(commands.Cog):
         await message.edit(content=f"{message.content}\nDiscord latency: {str(latency.total_seconds())[:4]}s")
 
     @commands.command(name="restart")
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def restart(self, ctx: commands.Context):
         extensions = os.listdir("./cogs")
         await ctx.reply(content=f"Reloading {len(extensions)} extension(s)", mention_author=False)
@@ -48,7 +66,7 @@ class bot(commands.Cog):
                 continue
 
     @commands.command()
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def sync(self, ctx: commands.Context):
         try:
             synced = await self.client.tree.sync()
@@ -73,39 +91,47 @@ class bot(commands.Cog):
 
     async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingAnyRole):
-            await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.CommandOnCooldown):
             await interaction.response.send_message(content=f"Command on cooldown for another **{round(error.retry_after)}** seconds!", ephemeral=True)
         elif isinstance(error, app_commands.NoPrivateMessage):
             await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
+        elif isinstance(error, app_commands.CommandOnCooldown):
+            await interaction.response.send_message(f"This command is on cooldown. You can run it again **{humanize_duration(error.retry_after)}**", ephemeral=True)
         elif isinstance(error, app_commands.CheckFailure): # raised when a user tries to use a command that only mods/experts/op can use, eg /solved
-            await interaction.response.send_message(content=f"Only <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command and only in #support!", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command and only in #support!", ephemeral=True)
         else:
             await self.send_unhandled_error(error=error, interaction=interaction)
             print_exception(error)
 
     @app_commands.command(name="debug", description="Debug for various systems")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    @app_commands.describe(debug = "Options: last message id | in db | timestamp | more than 24 hours | eval sql ... | check post", post = "The post to debug")
     async def debug(self, interaction: discord.Interaction, debug: str, post: discord.Thread = None):
-        if debug == "last message id":
+        if debug in ("last_message_id", "in_db", "timestamp", "more_than_24_hours", "check_post") and post is None:
+            await interaction.response.send_message(f"To use the `{debug}` debug, a post must be provided.", ephemeral=True)
+        elif debug == "last_message_id":
             await interaction.response.send_message(content=post.last_message_id)
-        elif debug == "in db":
+        elif debug == "in_db":
             await interaction.response.send_message(content=post.id in await functions.get_pending_posts())
         elif debug == "timestamp":
-            await interaction.response.send_message(content=await functions.get_post_timestamp(post.id))
-        elif debug == "more than 24 hours":
+            await interaction.response.send_message(content=await functions.get_post_timestamp(post.id) or 'Unknown')
+        elif debug == "more_than_24_hours":
             await interaction.response.send_message(content=await functions.check_post_last_message_time(post.id))
         elif debug.startswith("eval sql"):
-            command = debug.removeprefix('eval sql ')
-            await interaction.response.send_message(content=f"Executed SQL. Results: `{await functions.execute_sql(command)}`")
-        elif debug == "check post":
+            command = debug.removeprefix('eval sql ').strip("<>")
+            await interaction.response.send_message(content=f"Executed SQL. Results: ```json\n{await functions.execute_sql(command)}```")
+        elif debug == "check_post":
             applied_tags = post._applied_tags
             ndr = int(os.getenv("NEED_DEV_REVIEW_TAG_ID")) not in applied_tags
             solved = int(os.getenv("SOLVED_TAG_ID")) not in applied_tags
             archived = not post.archived
             locked = not post.locked
             is_pending = post.id not in await functions.get_pending_posts()
-            last_message = post.last_message or await post.fetch_message(post.last_message_id) or None
+            try:
+                last_message = post.last_message or await post.fetch_message(post.last_message_id)
+            except discord.NotFound:
+                last_message = None
             message_time = False
             author_is_owner = False
             owner_id = await functions.get_post_creator_id(post.id) or post.owner_id
@@ -116,12 +142,24 @@ class bot(commands.Cog):
         else:
             await interaction.response.send_message(content="Debug not found...", ephemeral=True)
 
+    @debug.autocomplete('debug')
+    async def debug_autocomplete(self, interaction: discord.Interaction, current: str):
+        return [
+            app_commands.Choice(name='last message id', value='last_message_id'),
+            app_commands.Choice(name='in db', value= 'in_db'),
+            app_commands.Choice(name='timestamp', value='timestamp'),
+            app_commands.Choice(name='more than 24 hours', value='more_than_24_hours'),
+            app_commands.Choice(name='eval sql <command>', value='eval sql'),
+            app_commands.Choice(name='check post', value='check_post')
+        ]
+
     @commands.command()
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def stats(self, ctx: commands.Context):
         embed = discord.Embed(
             title="Sapphire Helper | Version 5.0",
             colour=discord.Colour.purple()
+            url="https://github.com/kiki0124/sapphire-helper"
         )
         embed.add_field(name="CPU Count:", value=os.cpu_count(), inline=False)
         embed.add_field(name="CPU Load:", value=f"{psutil.cpu_percent()}%", inline=False)

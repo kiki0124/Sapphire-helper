@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
@@ -8,8 +10,11 @@ from dotenv import load_dotenv
 from functions import remove_post_from_rtdr, get_post_creator_id, \
                     generate_random_id, remove_post_from_pending
 from aiocache import cached
-from typing import Union, Literal, Optional
+from typing import Union, Literal, Optional, TYPE_CHECKING
 import re
+if TYPE_CHECKING:
+    from main import MyClient
+
 
 load_dotenv()
 
@@ -24,6 +29,9 @@ NDR_CHANNEL_ID = int(os.getenv('NDR_CHANNEL_ID'))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 QR_LOG_THREAD_ID = int(os.getenv("QR_LOG_THREAD_ID"))
 APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
+WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
+UNANSWERED_TAG_ID = int(os.getenv("UNANSWERED_TAG_ID"))
+DEVELOPERS_ROLE_ID = int(os.getenv('DEVELOPERS_ROLE_ID'))
 
 class need_dev_review_buttons(ui.View):
     def __init__(self):
@@ -32,7 +40,7 @@ class need_dev_review_buttons(ui.View):
     @ui.button(label="Show an example of the questions answered", style=discord.ButtonStyle.grey, custom_id="need-dev-review-example")
     async def on_show_example_click(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_message(
-            content="## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\n3. Join Roles are not being assigned. Steps:\\- Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n\\- Worked fine for two months.\n\\- Suddenly stopped.\n4. Yes, in one server as well but not in another.\n5. IDs:\n\\- 678279978244374528 (my main server)\n\\- 181730794815881216 (does not work as well)\n\\- 288847386002980875 (works there)\n6. I did:\\- Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much", 
+            content="## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\n3. Join Roles are not being assigned. Steps:\\- Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n\\- Worked fine for two months.\n\\- Suddenly stopped.\n4. Yes, in one server as well but not in another.\n5. IDs:\n\\- 678279978244374528 (my main server)\n\\- 181730794815881216 (does not work as well)\n\\- 288847386002980875 (works there)\n6. I did:\n\\- Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much", 
             ephemeral=True
             )
     @ui.button(label="How to get a server's ID?", style=discord.ButtonStyle.grey, custom_id="how-to-get-server-id")
@@ -59,7 +67,10 @@ class ndr_options_buttons(ui.View):
         if appeal in post.applied_tags:
             tags.append(appeal)
         action_id = generate_random_id()
-        alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID)
+        try:
+            alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
@@ -88,14 +99,30 @@ class ndr_options_buttons(ui.View):
         await self.Interaction.delete_original_response()
 
 class utility(commands.Cog):
-    def __init__(self, client: commands.Bot):
-        self.client: commands.Bot = client
+    def __init__(self, client: MyClient):
+        self.client = client
         
     async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
-        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+        if self.client.alert_webhook_url is not None:
+            webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
+            try:
+                await webhook.send(
+                    content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
+                    username=self.client.user.name,
+                    avatar_url=self.client.user.display_avatar.url,
+                    thread=discord.Object(id=ALERTS_THREAD_ID),
+                    wait=False
+                )
+                return
+            except Exception:
+                pass #pass to try the other methods below
+        try:
+            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
-        webhooks = await alerts_thread.parent.webhooks()
+        webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0] 
         except IndexError:
@@ -103,10 +130,11 @@ class utility(commands.Cog):
         await webhook.send(
             content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
             username=self.client.user.name,
-            avatar_url=self.client.user.avatar.url,
+            avatar_url=self.client.user.display_avatar.url,
             thread=discord.Object(id=ALERTS_THREAD_ID),
             wait=False
         )
+        self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
 
     @cached()
     async def get_unsolve_id(self) -> int:
@@ -176,8 +204,7 @@ class utility(commands.Cog):
         action_id = generate_random_id()
         await post.edit(locked=True, applied_tags=solved, reason=f'ID: {action_id}. Post locked as it was not sapphire related')
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=solved, context="/unrelated used")
-        task = asyncio.create_task(self.close_post(post=post, close_delay=600))
-        self.close_tasks[post] = task
+        asyncio.create_task(self.close_post(post=post, close_delay=600))
 
     async def unsolve_post(self, post: discord.Thread) -> None:
         """  
@@ -206,9 +233,16 @@ class utility(commands.Cog):
         """
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
-            return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID)) or interaction.user.id == owner_id
+            return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)) or interaction.user.id == owner_id
         else:
             return False
+        
+    @staticmethod
+    async def is_mod_or_expert(interaction: discord.Interaction):
+        """  
+        Checks if the interaction user is a Moderator or Community Expert
+        """
+        return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID))
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -243,18 +277,25 @@ class utility(commands.Cog):
             
     @app_commands.command(name="remove", description="Remove the given member from the current post")
     @app_commands.guild_only()
-    @app_commands.describe(user="What user do you want to remove?")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    async def remove(self, interaction: discord.Interaction, user: discord.Member):
+    @app_commands.describe(user="What user do you want to remove?", reason="The reason for removing the user")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    async def remove(self, interaction: discord.Interaction, user: discord.Member, reason: str = "No reason provided."):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+            owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+            if owner_id == user.id:
+                await interaction.response.send_message(f"{user.mention} is the owner of this post. Therefore they cannot be removed.", ephemeral=True)
+                return
             await interaction.channel.remove_user(user)
             await interaction.response.send_message(content=f"Successfully removed {user.mention} from this post.", ephemeral=True)
-            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
+            try:
+                alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+            except discord.NotFound as e:
+                raise e
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
-            await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}).", allowed_mentions=discord.AllowedMentions.none())
+            await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}.\nReason: {reason}", allowed_mentions=discord.AllowedMentions.none())
         else:
-            await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>")
+            await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
     @app_commands.command(name="unsolve", description="Cancel the post from being closed")
     @app_commands.check(one_of_mod_expert_op)
@@ -263,7 +304,7 @@ class utility(commands.Cog):
         if interaction.channel in self.close_tasks or SOLVED_TAG_ID in interaction.channel._applied_tags:
             await self.unsolve_post(interaction.channel)
             content = f"Post successfully unsolved!\nPlease send a message here explaining what you still need help with.\n-# If the post is solved you may use </solved:{await self.get_solved_id()}> to mark it as solved."
-            if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID):
+            if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
                 content = "Post successfully unsolved!"
             await interaction.response.send_message(content=content)
         else:
@@ -271,7 +312,7 @@ class utility(commands.Cog):
 
     @app_commands.command(name="needs-dev-review", description="This post needs to be reviewed by the developer")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def need_dev_review(self, interaction: discord.Interaction):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags:
@@ -282,8 +323,11 @@ class utility(commands.Cog):
             await interaction.response.send_message(f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
     async def send_qr_log(self, message: discord.Message, user: discord.Member):
-        qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID)
-        webhooks = await qr_logs_thread.parent.webhooks()
+        try:
+            qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID) or await self.client.fetch_channel(QR_LOG_THREAD_ID)
+        except discord.NotFound as e:
+            raise e
+        webhooks = [webhook for webhook in await qr_logs_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]
         except IndexError:
@@ -293,19 +337,33 @@ class utility(commands.Cog):
         await webhook.send(
             content=f"Message deleted by {user.mention} in {message.channel.mention}\nMessage id: `{message.id}`",
             username=self.client.user.name,
-            avatar_url=self.client.user.avatar.url,
+            avatar_url=self.client.user.display_avatar.url,
             thread=discord.Object(id=QR_LOG_THREAD_ID),
             allowed_mentions=discord.AllowedMentions.none()
         )
+
+    def get_user_id_from_avatar(self, avatar_url: str) -> int | None:
+        """Gets the user_id from a users avatar"""
+
+        guild_member_avatar_regex = r"^https?:\/\/cdn\.discord(?:app)?\.com\/guilds\/\d+\/users\/\d+\/avatars\/"
+        user_avatar_regex = r"^https?:\/\/cdn\.discord(?:app)?\.com\/avatars\/\d+\/"
+        if re.match(user_avatar_regex, avatar_url, re.IGNORECASE):
+            user_id = int(avatar_url.split("/")[4]) #https://cdn.discordapp.com/avatars/user_id/user_avatar.png -> ['https:', '', 'cdn.discordapp.com', 'avatars', 'user_id', 'user_avatar.png']
+        elif re.match(guild_member_avatar_regex, avatar_url, re.IGNORECASE):
+            user_id = int(avatar_url.split("/")[6]) #https://cdn.discordapp.com/guilds/guild_id/users/user_id/avatars/member_avatar.png -> ['https:', '', 'cdn.discordapp.com', 'guilds', 'guild_id', 'users', 'user_id', 'avatars', 'member_avatar.png']
+        else:
+            user_id = None
+        return user_id
 
     @commands.Cog.listener('on_reaction_add')
     async def delete_accidental_qr(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         in_support = isinstance(reaction.message.channel, discord.Thread) \
             and reaction.message.channel.parent_id == SUPPORT_CHANNEL_ID
-        from_sapphire = reaction.message.author.id == 678344927997853742 # Sapphire's user id
+        from_sapphire_or_helper = reaction.message.author.id == 678344927997853742 or \
+                                reaction.message.author.id == self.client.user.id
         reaction_allowed = reaction.emoji in ["🗑️", "❌"]
-        if in_support and from_sapphire and reaction_allowed:
-            if user.get_role(EXPERTS_ROLE_ID):
+        if in_support and from_sapphire_or_helper and reaction_allowed:
+            if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
                 await reaction.message.delete()
                 await self.send_qr_log(reaction.message, user)
                 return
@@ -316,12 +374,20 @@ class utility(commands.Cog):
                     return
             elif reaction.message.embeds:
                 if reaction.message.embeds[len(reaction.message.embeds)-1].footer:
+                    footer = reaction.message.embeds[len(reaction.message.embeds)-1].footer
+
                     regex = f'(Recommended|Sent) by @{user.name}'
-                    footer_text = reaction.message.embeds[len(reaction.message.embeds)-1].footer.text
-                    if re.match(regex, footer_text, re.IGNORECASE):
+                    if footer.text and re.match(regex, footer.text, re.IGNORECASE):
                         await reaction.message.delete()
                         await self.send_qr_log(message=reaction.message, user=user)
                         return
+
+                    if footer.icon_url:
+                        user_id = self.get_user_id_from_avatar(footer.icon_url)
+                        if user_id is not None and user_id == user.id:
+                            await reaction.message.delete()
+                            await self.send_qr_log(message=reaction.message, user=user)
+                            return
             if reaction.message.reference and reaction.message.reference.cached_message:
                 if user == reaction.message.reference.cached_message.author:
                     await reaction.message.delete()
@@ -330,7 +396,7 @@ class utility(commands.Cog):
 
     @app_commands.command(name="atbl", description="Mark the current post as 'Added to bug list'")
     @app_commands.describe(priority="The priority of this issue")
-    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID)
+    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def atbl(self, interaction: discord.Interaction, priority: Literal["Very Low", "Low", "Medium", "High", "Special Issue"]):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             priority_texts = {
@@ -369,57 +435,75 @@ class utility(commands.Cog):
             if SOLVED_TAG_ID not in ctx.channel._applied_tags and NEED_DEV_REVIEW_TAG_ID not in ctx.channel._applied_tags:
                 user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
                 content = None
-                if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID):
+                if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
                     content = f"<@{user_id}>"
                 embed = discord.Embed(
                     title="Incomplete support post",
                     description="Hey, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible",
                     colour=0xFFA800
                 )
-                embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.avatar.url)
+                embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.display_avatar.url)
                 if not ctx.interaction:
                     await ctx.message.delete()
                 elif ctx.interaction:
                     await ctx.interaction.delete_original_response()
-                tags = [ctx.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-                if CUSTOM_BRANDING_TAG_ID in ctx.channel._applied_tags:
-                    tags.append(ctx.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                if APPEAL_GG_TAG_ID in ctx.channel._applied_tags:
-                    tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
+                if WAITING_FOR_REPLY_TAG_ID in ctx.channel._applied_tags or UNANSWERED_TAG_ID in ctx.channel._applied_tags:
+                    tags = [ctx.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+                    if CUSTOM_BRANDING_TAG_ID in ctx.channel._applied_tags:
+                        tags.append(ctx.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+                    if APPEAL_GG_TAG_ID in ctx.channel._applied_tags:
+                        tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
+                    action_id = generate_random_id()
+                    await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
+                    await self.send_action_log(action_id, ctx.channel.mention, tags, "/incomplete-post used")
                 await ctx.channel.send(content=content, embed=embed)
-                action_id = generate_random_id()
-                await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
-                await self.send_action_log(action_id, ctx.channel.mention, tags, "/incomplete-post used")
             else:
-                await ctx.reply("You cannot use this command as this post has the *Solved* tag.", ephemeral=True)
+                await ctx.reply("You cannot use this command as this post has the *Solved* or *Needs dev review* tag.", ephemeral=True)
         else:
             await ctx.reply(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
 
-    @commands.hybrid_command(
+
+    async def non_expert_mod_cooldown(interaction: discord.Interaction):
+        """
+        Returns a cooldown of 1 use per 5 minutes if the command author is not expert or mod
+        """
+        if interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
+            return None
+        
+        return commands.Cooldown(1,  5.0 * 60.0)
+
+    # def unrelated_cooldown_key(interaction: discord.Interaction):
+    #     """
+    #     The key used to define the cooldown by
+    #     """
+    #     return interaction.channel_id
+    # this is only here because it may be useful someday idk
+
+
+    @app_commands.command(
             name='unrelated',
             description='Inform the post creator that their question/issue is not Sapphire/appeal.gg related.'
     )
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID)
-    async def wrong_server(self, ctx: commands.Context):
-        await ctx.defer(ephemeral=True)
-        if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
-            user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
-            if ctx.interaction:
-                await ctx.interaction.delete_original_response()
-            elif not ctx.interaction:
-                await ctx.message.delete()
+    @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
+    async def wrong_server(self, interaction: discord.Interaction):
+        await interaction.response.defer()
 
-            embed = discord.Embed(
-                title='Unrelated question/issue',
-                description='Hey, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query.',
-                colour=discord.Colour.purple()
-            )
-            embed.set_footer(text=f'Recommended by @{ctx.author.name}', icon_url=ctx.author.avatar.url)
+        embed = discord.Embed(
+            title="Unrelated question/issue",
+            description="Hey, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query.",
+            colour=discord.Colour.purple()
+        )
+        embed.set_footer(text=f"Recommended by @{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
 
-            await self.lock_unrelated_post(ctx.channel)
-            await ctx.channel.send(embed=embed, content=f'<@{user_id}>')
-        else:
-            await ctx.reply(content=f'This command can only be used in <#{SUPPORT_CHANNEL_ID}>!', ephemeral=True)
+        content = ""
+        if isinstance(interaction.channel, discord.Thread) and await self.is_mod_or_expert(interaction=interaction):
+            if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+                user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+                content = f"<@{user_id}>"
+                await self.lock_unrelated_post(interaction.channel)
+
+        await interaction.channel.send(content=content, embed=embed)
+        await interaction.delete_original_response()
 
 async def setup(client):
     await client.add_cog(utility(client))
