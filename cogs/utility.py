@@ -393,15 +393,10 @@ class utility(commands.Cog):
                     await reaction.message.delete()
                     await self.send_qr_log(reaction.message, user)
                     return
-            else:
-                lines = reaction.message.content.split("\n")
-                if lines: # Check that lines is not an empty list
-                    last_line = lines[len(lines)-1] # -1 as python starts counting from 0
-                    regex = f'-# (Recommended|Sent) by @{user.name}'
-                    if last_line and re.match(regex, last_line, re.IGNORECASE):
-                        await reaction.message.delete()
-                        await self.send_qr_log(message=reaction.message, user=user)
-                        return
+            if reaction.message.content and reaction.message.content.endswith(user.mention):
+                await reaction.message.delete()
+                await self.send_qr_log(reaction.message, user)
+                return    
 
     @app_commands.command(name="atbl", description="Mark the current post as 'Added to bug list'")
     @app_commands.describe(priority="The priority of this issue")
