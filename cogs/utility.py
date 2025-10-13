@@ -393,6 +393,10 @@ class utility(commands.Cog):
                     await reaction.message.delete()
                     await self.send_qr_log(reaction.message, user)
                     return
+            if reaction.message.content and reaction.message.content.endswith(f"Recommended by {user.mention}"):
+                await reaction.message.delete()
+                await self.send_qr_log(reaction.message, user)
+                return    
 
     @app_commands.command(name="atbl", description="Mark the current post as 'Added to bug list'")
     @app_commands.describe(priority="The priority of this issue")
@@ -507,3 +511,4 @@ class utility(commands.Cog):
 
 async def setup(client):
     await client.add_cog(utility(client))
+

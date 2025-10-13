@@ -167,7 +167,7 @@ class quick_replies(commands.Cog):
                     await i.delete_original_response()
                 except discord.HTTPException:
                     pass # message was most likely already dismissed by the user
-                await interaction.channel.send(f"{content}\n-# Recommended by @{i.user.name}", allowed_mentions=discord.AllowedMentions.none())
+                await interaction.channel.send(f"{content}\n-# Recommended by {i.user.mention}", allowed_mentions=discord.AllowedMentions.none())
             view = ui.View()
             confirm.callback = confirm_click
             view.add_item(confirm)
