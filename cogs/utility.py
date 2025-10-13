@@ -515,5 +515,5 @@ class utility(commands.Cog):
         await interaction.delete_original_response()
 
 async def setup(client):
-
     await client.add_cog(utility(client))
+
