@@ -750,7 +750,7 @@ class epi(commands.Cog):
                             closed.append(key) if close else not_closed.append(key)
                             continue
                         closed_str = ", ".join(closed) if closed else None
-                        not_closed_str = ",".join(not_closed) if not_closed else None
+                        not_closed_str = ", ".join(not_closed) if not_closed else None
                         await i.followup.send(
                             content=f"{'Successfully closed: ' + closed_str if closed_str else ''}.\n{'Not closed: ' + not_closed_str if not_closed_str else ''}",
                             ephemeral=True
