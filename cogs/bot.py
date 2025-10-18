@@ -90,19 +90,19 @@ class bot(commands.Cog):
             raise error
 
     async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        send_message = interaction.response.send_message if not interaction.response.is_done() else interaction.followup.send
         if isinstance(error, app_commands.MissingAnyRole):
-            await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
-        elif isinstance(error, app_commands.CommandOnCooldown):
-            await interaction.response.send_message(content=f"Command on cooldown for another **{round(error.retry_after)}** seconds!", ephemeral=True)
+            await send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.NoPrivateMessage):
-            await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
+            await send_message(content="You may not use this command in DMs!", ephemeral=True)
         elif isinstance(error, app_commands.CommandOnCooldown):
-            await interaction.response.send_message(f"This command is on cooldown. You can run it again **{humanize_duration(error.retry_after)}**", ephemeral=True)
+            await send_message(f"This command is on cooldown. You can run it again **{humanize_duration(error.retry_after)}**", ephemeral=True)
         elif isinstance(error, app_commands.CheckFailure): # raised when a user tries to use a command that only mods/experts/op can use, eg /solved
-            await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command and only in #support!", ephemeral=True)
+            await send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command and only in #support!", ephemeral=True)
         else:
             await self.send_unhandled_error(error=error, interaction=interaction)
             print_exception(error)
+            await send_message("An unexpected error occurred, the developer of Sapphire Helper has been notified.", ephemeral=True)
 
     @app_commands.command(name="debug", description="Debug for various systems")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
@@ -170,3 +170,4 @@ class bot(commands.Cog):
 
 async def setup(client: commands.Bot):
     await client.add_cog(bot(client))
+
