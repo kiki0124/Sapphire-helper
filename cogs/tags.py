@@ -44,7 +44,7 @@ class create_tag(ui.Modal):
             tag_thread = interaction.guild.get_thread(TAG_LOGGING_THREAD_ID)
             if tag_thread.archived:
                 await tag_thread.edit(archived=False)
-            webhooks = await tag_thread.parent.webhooks()
+            webhooks = [webhook for webhook in await tag_thread.parent.webhooks() if webhook.token]
             try:
                 webhook = webhooks[0] 
             except IndexError:
