@@ -18,10 +18,6 @@ SUPPORT_CHANNEL_ID = int(os.getenv('SUPPORT_CHANNEL_ID'))
 WAITING_FOR_REPLY_TAG_ID = int(os.getenv('WAITING_FOR_REPLY_TAG_ID'))
 UNANSWERED_TAG_ID = int(os.getenv("UNANSWERED_TAG_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
-
-class waiting_for_reply(commands.Cog):
-    def __init__(self, client):
-        self.client: commands.Bot = client
         
 class waiting_for_reply(commands.Cog):
     def __init__(self, client: MyClient):
