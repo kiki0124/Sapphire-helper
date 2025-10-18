@@ -39,6 +39,7 @@ class create_tag(ui.Modal):
         ))
 
     async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         if not await check_tag_exists(self.pool, self.name.component.value):
             await save_tag(self.pool ,name=self.name.component.value, content=self.content.component.value, creator_id=interaction.user.id)
             tag_thread = interaction.guild.get_thread(TAG_LOGGING_THREAD_ID)
@@ -57,9 +58,10 @@ class create_tag(ui.Modal):
                 wait=False,
                 allowed_mentions=discord.AllowedMentions.none()
             )
-            await interaction.response.send_message(f"Tag `{self.name.component.value}` saved successfully!\nYou can now access it with /tag use", ephemeral=True)
+            await interaction.followup.send(f"Tag `{self.name.component.value}` saved successfully!\nYou can now access it with /tag use", ephemeral=True)
         else:
-            await interaction.response.send_message("A tag with this name already exists...\n-# Use /tag delete to delete it", ephemeral=True)
+            await interaction.followup.send("A tag with this name already exists...\n-# Use /tag delete to delete it", ephemeral=True)
+
 
 class update_tag_modal(ui.Modal):
     def __init__(self, pool: sql.Pool, tag: str):
