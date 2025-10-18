@@ -170,4 +170,3 @@ class bot(commands.Cog):
 
 async def setup(client: commands.Bot):
     await client.add_cog(bot(client))
-
