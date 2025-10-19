@@ -31,14 +31,14 @@ class bot(commands.Cog):
             interaction_created_at = interaction.created_at.timestamp()
             interaction_data = interaction.data or {}
             content += f"\n### Interaction Error:\n>>> Interaction created at <t:{round(interaction_created_at)}:T> (<t:{round(interaction_created_at)}:R>)\
-                \nUser: {interaction.user.mention} | Channel: {interaction.channel.mention} | Type: {interaction.type.name}"
-            if interaction.command and interaction.command.parent is None:
+                \nUser: {interaction.user.mention} | Channel: {getattr(interaction.channel, "mention", f"DM channel ({interaction.channel_id})")} | Type: {interaction.type.name}"
+            if interaction.command and isinstance(interaction.command, app_commands.Command) and interaction.command.parent is None:
                 command_id = interaction_data.get('id', 0)
                 options_dict  = interaction_data.get("options", [])
                 command_mention = f"</{interaction.command.qualified_name}:{command_id}>"
                 content += f"\nCommand: {command_mention}, inputted values:"
 
-                options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict])
+                options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict]) or "There are no inputted values."
                 content += f"\n```{options_formatted}```"
             else:
                 content += f"\n```json\n{interaction.data}```"
@@ -90,19 +90,19 @@ class bot(commands.Cog):
             raise error
 
     async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        send_message = interaction.response.send_message if not interaction.response.is_done() else interaction.followup.send
         if isinstance(error, app_commands.MissingAnyRole):
-            await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
-        elif isinstance(error, app_commands.CommandOnCooldown):
-            await interaction.response.send_message(content=f"Command on cooldown for another **{round(error.retry_after)}** seconds!", ephemeral=True)
+            await send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
         elif isinstance(error, app_commands.NoPrivateMessage):
-            await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
+            await send_message(content="You may not use this command in DMs!", ephemeral=True)
         elif isinstance(error, app_commands.CommandOnCooldown):
-            await interaction.response.send_message(f"This command is on cooldown. You can run it again **{humanize_duration(error.retry_after)}**", ephemeral=True)
+            await send_message(f"This command is on cooldown. You can run it again **{humanize_duration(error.retry_after)}**", ephemeral=True)
         elif isinstance(error, app_commands.CheckFailure): # raised when a user tries to use a command that only mods/experts/op can use, eg /solved
-            await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command and only in #support!", ephemeral=True)
+            await send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command and only in #support!", ephemeral=True)
         else:
             await self.send_unhandled_error(error=error, interaction=interaction)
             print_exception(error)
+            await send_message("An unexpected error occurred, the developer of Sapphire Helper has been notified.", ephemeral=True)
 
     @app_commands.command(name="debug", description="Debug for various systems")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
