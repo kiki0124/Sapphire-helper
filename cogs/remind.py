@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 from discord.utils import snowflake_time
 if TYPE_CHECKING:
     from main import MyClient
-from time import perf_counter
 load_dotenv()
 
 SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
