@@ -5,15 +5,16 @@ from discord.ext import commands, tasks
 from functions import add_post_to_pending, \
     remove_post_from_pending, get_pending_posts, \
     check_post_last_message_time, check_time_more_than_day,\
-    get_post_creator_id, remove_post_from_rtdr, generate_random_id
+    get_post_creator_id, remove_post_from_rtdr, generate_random_id, in_pending_posts
 import random
 from discord import ui
 import os
 from dotenv import load_dotenv
 from typing import TYPE_CHECKING
+from discord.utils import snowflake_time
 if TYPE_CHECKING:
     from main import MyClient
-
+from time import perf_counter
 load_dotenv()
 
 SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
@@ -35,8 +36,8 @@ class CloseNow(ui.View):
         
     @ui.button(label="Issue already solved? Close post now", custom_id="remind-close-now", style=discord.ButtonStyle.grey)
     async def on_close_now_click(self, interaction: discord.Interaction, button: ui.Button):
-        owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
-        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or interaction.user.id == owner_id:
+        is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner:
             await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
             tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
             cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
@@ -145,8 +146,6 @@ class remind(commands.Cog):
                         await add_post_to_pending(post_id=post.id)
                         to_remove.append(post.id)
                         continue
-                    else:
-                        continue
                 else:
                     to_remove.append(post.id)
                     continue
@@ -178,9 +177,12 @@ class remind(commands.Cog):
     async def check_for_pending_posts(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         if support:
-            for post in await support.guild.active_threads():
+            for post in await support.guild.active_threads():   
+                more_than_day = check_time_more_than_day(snowflake_time(post.last_message_id).timestamp()) # Check time before making any further API/DB calls
+                if not more_than_day:
+                    continue
                 if await self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
-                    if post.id not in await get_pending_posts() and post.id not in reminder_not_sent_posts:
+                    if post.id not in reminder_not_sent_posts and not await in_pending_posts(post.id):
                         try:
                             message: discord.Message|None = post.last_message or await post.fetch_message(post.last_message_id)
                         except discord.NotFound: # message id could be for a message that was already deleted
@@ -197,8 +199,7 @@ class remind(commands.Cog):
                             continue
                         post_author_id = await get_post_creator_id(post.id) or post.owner_id
                         author_not_owner = message.author.id != post_author_id
-                        more_than_day = check_time_more_than_day(message.created_at.timestamp())
-                        if author_not_owner and more_than_day and message.author != self.client.user:
+                        if author_not_owner and message.author != self.client.user:
                             if post.owner: # make sure post owner isn't None- still in server
                                 greetings = ["Hi", "Hello", "Hey", "Hi there"]
                                 await message.channel.send(content=f"{random.choice(greetings)} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
@@ -211,7 +212,7 @@ class remind(commands.Cog):
                 others_filter = not message.channel.locked and NEED_DEV_REVIEW_TAG_ID not in message.channel._applied_tags
                 owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
                 message_author = message.author.id == owner_id
-                in_pending_post = message.channel.id in await get_pending_posts()
+                in_pending_post = await in_pending_posts(message.channel.id)
                 if message_author and in_pending_post and others_filter:
                     await remove_post_from_pending(message.channel.id)
 
@@ -237,8 +238,8 @@ class remind(commands.Cog):
                     await remove_post_from_pending(post.id)
                     await remove_post_from_rtdr(post.id)
             else:
-                    await remove_post_from_pending(post_id)
-                    continue
+                await remove_post_from_pending(post_id)
+
 
     @check_for_pending_posts.before_loop
     async def cfpp_before_loop(self):
