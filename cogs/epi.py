@@ -35,7 +35,7 @@ class get_notified(ui.View):
             await interaction.response.send_message(content="You will no longer be notified for this issue!", ephemeral=True)
 
 class select_channels(ui.ChannelSelect):
-    def __init__(self, action: str, reason: str,i: discord.Interaction ,slowmode: int | None = None):
+    def __init__(self, action: str, reason: str, i: discord.Interaction, slowmode: int | None = None):
         super().__init__(
             channel_types=[discord.ChannelType.text, discord.ChannelType.forum],
             placeholder=f"Select channels to",
@@ -139,9 +139,10 @@ class select_channels(ui.ChannelSelect):
                         successful.append(channel.id)
             else:
                 await interaction.followup.send(f"You can only {self.action} channels you can send messages in and `@everyone` can view!\n-# {channel.mention}", ephemeral=True)
-        action_str = self.action + "ed" if self.slowmode is None else f"set slowmode to {self.slowmode}" if self.slowmode > 0 else "disabled slowmode"
-        await self.send_log(f"{interaction.user.mention} {action_str} in {', '.join([f'<#{c}>' for c in successful])}. Reason: {self.reason}")
-        await self.i.edit_original_response(view=None)
+        if successful: # Check that channels were successfully edited
+            action_str = self.action + "ed" if self.slowmode is None else f"set slowmode to {self.slowmode}" if self.slowmode > 0 else "disabled slowmode"
+            await self.send_log(f"{interaction.user.mention} {action_str} in {', '.join([f'<#{c}>' for c in successful])}. Reason: {self.reason}")
+            await self.i.edit_original_response(view=None)
 
 class epi(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -199,7 +200,7 @@ class epi(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none()
         )
 
-    async def handle_sticky_message(self, channel: discord.TextChannel | discord.PartialMessageable, delay: float = 4):
+    async def handle_sticky_message(self, channel: discord.TextChannel | discord.PartialMessageable, delay: float = 4.0):
         embed = self.generate_epi_embed()
         await asyncio.sleep(delay)
         self.is_being_executed = True
@@ -407,7 +408,7 @@ class epi(commands.Cog):
     async def edit(self, interaction: discord.Interaction, message: str = None, message_id: str = None, sticky: bool = None):
         await interaction.response.defer(ephemeral=True)
         if self.epi_data:
-            if message != None or message_id != None or sticky != None:
+            if message is not None or message_id is not None or sticky is not None:
                 command_response = "Successfully updated EPI mode!"
                 new_key = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
                 previous_key = list(self.epi_data.keys())[0]
