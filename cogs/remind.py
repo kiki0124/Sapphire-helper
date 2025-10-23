@@ -8,10 +8,11 @@ from functions import add_post_to_pending, \
     get_post_creator_id, remove_post_from_rtdr, generate_random_id, in_pending_posts
 import random
 from discord import ui
+from datetime import datetime, timezone
 import os
 from dotenv import load_dotenv
 from typing import TYPE_CHECKING
-from discord.utils import snowflake_time
+from discord.utils import snowflake_time, time_snowflake
 if TYPE_CHECKING:
     from main import MyClient
 load_dotenv()
@@ -165,10 +166,8 @@ class remind(commands.Cog):
                     continue
                 if check_time_more_than_day(message.created_at.timestamp()):
                     await add_post_to_pending(post.id)
-                    continue
                 else:
                     to_remove.append(post.id)
-                    continue
         for post_id in to_remove:
             reminder_not_sent_posts.pop(post_id)
 
@@ -176,12 +175,14 @@ class remind(commands.Cog):
     async def check_for_pending_posts(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         if support:
-            for post in await support.guild.active_threads():   
-                more_than_day = check_time_more_than_day(snowflake_time(post.last_message_id).timestamp()) # Check time before making any further API/DB calls
+            pending_posts: list[int] = await get_pending_posts() # Cache the list to avoid DB calls every iteration of the loop
+            for post in await support.guild.active_threads():
+                now_dt = time_snowflake(datetime.now(timezone.utc))
+                more_than_day = check_time_more_than_day(snowflake_time(post.last_message_id or now_dt).timestamp()) # Check time before making any further API/DB calls
                 if not more_than_day:
                     continue
                 if await self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
-                    if post.id not in reminder_not_sent_posts and not await in_pending_posts(post.id):
+                    if post.id not in reminder_not_sent_posts and post.id not in pending_posts:
                         try:
                             message: discord.Message|None = post.last_message or await post.fetch_message(post.last_message_id)
                         except discord.NotFound: # message id could be for a message that was already deleted
