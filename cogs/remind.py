@@ -212,8 +212,7 @@ class remind(commands.Cog):
                 others_filter = not message.channel.locked and NEED_DEV_REVIEW_TAG_ID not in message.channel._applied_tags
                 owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
                 message_author = message.author.id == owner_id
-                in_pending_post = await in_pending_posts(message.channel.id)
-                if message_author and in_pending_post and others_filter:
+                if message_author and others_filter and await in_pending_posts(message.channel.id):
                     await remove_post_from_pending(message.channel.id)
 
     @tasks.loop(hours=1)
