@@ -40,7 +40,10 @@ class need_dev_review_buttons(ui.View):
     @ui.button(label="Show an example of the questions answered", style=discord.ButtonStyle.grey, custom_id="need-dev-review-example")
     async def on_show_example_click(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_message(
-            content="## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\n3. Join Roles are not being assigned. Steps:\\- Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n\\- Worked fine for two months.\n\\- Suddenly stopped.\n4. Yes, in one server as well but not in another.\n5. IDs:\n\\- 678279978244374528 (my main server)\n\\- 181730794815881216 (does not work as well)\n\\- 288847386002980875 (works there)\n6. I did:\n\\- Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much", 
+            content="## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\
+            \n3. Join Roles are not being assigned. Steps:\n  - Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n  - Worked fine for two months.\n  - Suddenly stopped.\
+            \n4. Yes, in one server as well but not in another.\n5. IDs:\n  - 678279978244374528 (my main server)\n  - 181730794815881216 (does not work as well)\n  - 288847386002980875 (works there)\
+            \n6. I did:\n  - Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much", 
             ephemeral=True
             )
     @ui.button(label="How to get a server's ID?", style=discord.ButtonStyle.grey, custom_id="how-to-get-server-id")
@@ -71,7 +74,7 @@ class ndr_options_buttons(ui.View):
             alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
         except discord.NotFound as e:
             raise e
-        await post.edit(applied_tags=tags, reason=f"ID: {action_id}.Post marked as needs-dev-review with /needs-dev-review")
+        await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as needs-dev-review with /needs-dev-review")
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
         await alerts_thread.send(content=f"ID: {action_id}\nPost: {post.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: /needs-dev-review command used")
@@ -162,9 +165,9 @@ class utility(commands.Cog):
                     continue
         return solved_id
 
-    close_tasks: dict[discord.Thread, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
+    close_tasks: dict[int, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
 
-    async def close_post(self, post: discord.Thread, close_delay: Optional[float] = 3600) -> None:
+    async def close_post(self, post: discord.Thread, close_delay: float = 3600) -> None:
         """  
         Used with asyncio.create_task to close the given post after the given delay in seconds.
         """
@@ -173,7 +176,7 @@ class utility(commands.Cog):
             archived=True,
             reason=f"Auto archive {'solved' if close_delay == 3600 else 'unrelated'} post after {close_delay} seconds"
         )
-        self.close_tasks.pop(post)
+        self.close_tasks.pop(post.id)
         await remove_post_from_rtdr(post.id)
         await remove_post_from_pending(post.id)
 
@@ -194,7 +197,7 @@ class utility(commands.Cog):
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as solved with /solved")
         await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
         task = asyncio.create_task(self.close_post(post=post))
-        self.close_tasks[post] = task
+        self.close_tasks[post.id] = task
 
     async def lock_unrelated_post(self, post: discord.Thread) -> None:
         """
@@ -210,9 +213,9 @@ class utility(commands.Cog):
         """  
         Cancel marking the given post as solved, used in /unsolve command
         """
-        if post in self.close_tasks: 
-            self.close_tasks[post].cancel()
-            del self.close_tasks[post]
+        if post.id in self.close_tasks: 
+            self.close_tasks[post.id].cancel()
+            del self.close_tasks[post.id]
         not_solved = post.parent.get_tag(NOT_SOLVED_TAG_ID)
         cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
         appeal = post.parent.get_tag(APPEAL_GG_TAG_ID)
@@ -281,8 +284,8 @@ class utility(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def remove(self, interaction: discord.Interaction, user: discord.Member, reason: str = "No reason provided."):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
-            if owner_id == user.id:
+            is_owner = user.id == interaction.channel.owner_id or user.id == await get_post_creator_id(interaction.channel_id)
+            if is_owner:
                 await interaction.response.send_message(f"{user.mention} is the owner of this post. Therefore they cannot be removed.", ephemeral=True)
                 return
             await interaction.channel.remove_user(user)
@@ -488,6 +491,7 @@ class utility(commands.Cog):
             name='unrelated',
             description='Inform the post creator that their question/issue is not Sapphire/appeal.gg related.'
     )
+    @app_commands.guild_only()
     @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
     async def wrong_server(self, interaction: discord.Interaction):
         await interaction.response.defer()

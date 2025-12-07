@@ -58,7 +58,7 @@ def sql_to_dict(sql_results: list[tuple]) -> dict[str, Any]:
 
     possible_queries = ('post_id', 'timestamp', 'user_id', 'channel_id', 'allow', 'deny', 'started_iso', 'message', 'message_id', 'sticky', 'sticky_message_id',
                         'thread_id', 'name', 'content', 'uses', 'creator_id', 'created_ts') #All the possible queries in all the tables
-    data = {}
+    data: dict[str, Any] = {}
     for row in sql_results: # fetchall() returns a list of tuples, so we loop through the list
         for query in possible_queries: 
             try:
@@ -74,7 +74,7 @@ def sql_to_dict(sql_results: list[tuple]) -> dict[str, Any]:
                 
     return data
 
-async def execute_sql(cmd: str) -> dict[str, Any]:
+async def execute_sql(cmd: str) -> dict[str, Any] | Exception:
     """  
     Execute the given sql command and return the result or None if there is no result, if an error was raised when executing the sql command it will be returned
     """
@@ -97,6 +97,16 @@ async def add_post_to_pending(post_id: int) -> None:
             timestamp = int(datetime.datetime.now().timestamp())
             await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, timestamp,))
             await conn.commit()
+
+async def in_pending_posts(post_id: int) -> bool:
+    """
+    Check if a post is in pending posts table.
+    """
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT NULL FROM pending_posts WHERE post_id=?", (post_id)) # Returns a Sqlite.Row object if inside else None
+            result = await cu.fetchone()
+            return bool(result)
 
 async def get_pending_posts():
     """
@@ -206,7 +216,7 @@ async def remove_post_from_waiting(post_id: int) -> None:
             await cu.execute("DELETE FROM reminder_waiting WHERE post_id=?", (post_id,))
             await conn.commit()
 
-async def add_post_to_waiting(post_id: int, timestamp: int = None) -> None:
+async def add_post_to_waiting(post_id: int, timestamp: int | None = None) -> None:
     if timestamp is None: timestamp = int(datetime.datetime.now().timestamp())
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
@@ -265,11 +275,11 @@ async def get_tag_content(pool: sql.Pool, name: str) -> str|None:
     async with pool.acquire() as conn:
         result = await conn.fetchone("SELECT content FROM tags WHERE name=?", (name,))
         if result:
-            return result[0]
+            return result['content']
         else:
             return None
 
-async def get_tag_data(pool: sql.Pool, name: str) -> dict:
+async def get_tag_data(pool: sql.Pool, name: str) -> dict[str, Any] | None:
     async with pool.acquire() as conn:
         result = await conn.fetchone("SELECT * FROM tags WHERE name=?", (name, ))
         if result:
@@ -285,7 +295,6 @@ async def update_tag(pool: sql.Pool, name: str, content: str):
     async with pool.acquire() as conn:
         await conn.execute("UPDATE tags SET content=? WHERE name=?", (content, name,))
         await conn.commit()
-        return True
 
 async def add_tag_uses(pool: sql.Pool, data: list[tuple[str, int]]):
     async with pool.acquire() as conn:
@@ -299,7 +308,7 @@ async def get_used_tags(pool: sql.Pool) -> list[str]:
     """
     async with pool.acquire() as conn:
         result = await conn.fetchall("SELECT name FROM tags ORDER BY uses LIMIT 25")
-        return [tag[0] for tag in result]
+        return [tag['name'] for tag in result]
 
 async def delete_tag(pool: sql.Pool, name: str):
     async with pool.acquire() as conn:
@@ -332,7 +341,7 @@ async def get_epi_users(pool: sql.Pool) -> list[Optional[int]]:
         else: 
             return []
 
-async def get_epi_config(pool: sql.Pool) -> Optional[dict[str, int, str, str, str, int, str, bool]]: # {"started_ts": 123, "message": "low taper fade is still massive", "message_id": 123, sticky: True}
+async def get_epi_config(pool: sql.Pool) -> dict[str, Any]: # {"started_ts": 123, "message": "low taper fade is still massive", "message_id": 123, sticky: True}
     """  
     Returns a dict of the saved config in this format
     {

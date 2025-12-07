@@ -12,6 +12,7 @@ MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
 SUPPORT_CHANNEL_ID = int(os.getenv("SUPPORT_CHANNEL_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
+FEEDBACK_CHANNEL_ID = int(os.getenv("FEEDBACK_CHANNEL_ID"))
 
 class readthedamnrules(commands.Cog):
     def __init__(self, client) -> None:
@@ -22,7 +23,7 @@ class readthedamnrules(commands.Cog):
         Get a list[Message] for all messages that should be used in the new post
         """
         messages_to_move: list[discord.Message] = [reference_message]
-        async for msg in reference_message.channel.history(limit=100, after=reference_message.created_at):
+        async for msg in reference_message.channel.history(limit=40, after=reference_message.created_at):
             if msg.author == reference_message.author:
                 messages_to_move.append(msg)
             else:
@@ -50,7 +51,7 @@ class readthedamnrules(commands.Cog):
         or "No message content found" if all messages don't have content (only have attachments)
         """
         content = 'No message content found'
-        messages_content: list[discord.Message] = []
+        messages_content: list[str] = []
         for message in messages:
             if message.content:
                 messages_content.append(message.clean_content)
@@ -59,10 +60,9 @@ class readthedamnrules(commands.Cog):
         return content
 
     def get_extra_content(self, reference_msg: discord.Message) -> str:
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         if isinstance(reference_msg.channel, discord.Thread) and reference_msg.channel.parent_id == SUPPORT_CHANNEL_ID:
             return f"{reference_msg.author.mention} in the future please always create your own post instead of using other users' posts!" # asking for help in another user's support post
-        elif isinstance(reference_msg.channel, discord.Thread) and reference_msg.channel.id != SUPPORT_CHANNEL_ID and reference_msg.channel.category_id == support.category_id:
+        elif isinstance(reference_msg.channel, discord.Thread) and reference_msg.channel.parent_id == FEEDBACK_CHANNEL_ID:
             return f"{reference_msg.author.mention} the feature you suggested is already possible with Sapphire!" # requesting a feature which already exists
         else:
             return f"{reference_msg.author.mention} please provide any additional information here so we can give you the best help." # default message - if none of the special ones above are used
@@ -90,7 +90,7 @@ class readthedamnrules(commands.Cog):
     async def redirect_to_support(self, message: discord.Message):
         if not message.author.bot and message.reference and message.content.startswith(self.client.user.mention) and message.guild:
             everyone = message.guild.default_role
-            if message.channel.permissions_for(everyone).view_channel and message.channel.permissions_for(everyone).send_messages or message.channel.permissions_for(everyone).send_messages_in_threads:
+            if message.channel.permissions_for(everyone).view_channel and (message.channel.permissions_for(everyone).send_messages or isinstance(message.channel, discord.Thread) and message.channel.parent_id == FEEDBACK_CHANNEL_ID):
                 if message.author.get_role(EXPERTS_ROLE_ID) or message.author.get_role(MODERATORS_ROLE_ID) or message.author.get_role(DEVELOPERS_ROLE_ID):
                     replied_message = message.reference.cached_message or await message.channel.fetch_message(message.reference.message_id)
                     if not replied_message.author == message.author:
@@ -101,7 +101,7 @@ class readthedamnrules(commands.Cog):
     async def reaction_redirect_to_support(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
         if reaction.message.guild and reaction.message.author != user and not reaction.message.author.bot:
             everyone = reaction.message.guild.default_role
-            if reaction.message.channel.permissions_for(everyone).view_channel and reaction.message.channel.permissions_for(everyone).send_messages:
+            if reaction.message.channel.permissions_for(everyone).view_channel and (reaction.message.channel.permissions_for(everyone).send_messages or isinstance(reaction.message.channel, discord.Thread) and reaction.message.channel.parent_id == FEEDBACK_CHANNEL_ID):
                 reactions = ("❓", "❔") # allowed reactions, all other reactions will be ignored in this context
                 if reaction.emoji in reactions:
                     if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
