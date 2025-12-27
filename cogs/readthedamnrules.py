@@ -3,7 +3,10 @@ from discord.ext import commands
 from dotenv import load_dotenv
 import os
 from functions import add_post_to_rtdr
-from typing import Union
+from typing import Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from main import MyClient
 
 load_dotenv()
 GENERAL_CHANNEL_ID = int(os.getenv('GENERAL_CHANNEL_ID'))
@@ -15,7 +18,7 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class readthedamnrules(commands.Cog):
     def __init__(self, client) -> None:
-        self.client: commands.Bot = client
+        self.client: MyClient = client
 
     async def get_messages_to_move(self, reference_message: discord.Message) -> list[discord.Message]:
         """  

@@ -21,7 +21,7 @@ ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 
 class waiting_for_reply(commands.Cog):
     def __init__(self, client):
-        self.client: commands.Bot = client
+        self.client: MyClient = client
         
 class waiting_for_reply(commands.Cog):
     def __init__(self, client: MyClient):
