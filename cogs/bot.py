@@ -24,7 +24,8 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class bot(commands.Cog):
     def __init__(self, client: MyClient):
-        self.client: MyClient = client
+        self.client = client
+
 
     def cog_load(self):
         self.client.tree.on_error = self.tree_on_error
