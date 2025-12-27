@@ -26,6 +26,7 @@ class bot(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
 
+
     def cog_load(self):
         self.client.tree.on_error = self.tree_on_error
     
