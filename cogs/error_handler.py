@@ -63,7 +63,7 @@ class ErrorHandler(commands.Cog):
 			await self.handle_text_command_check_failure(ctx, e)
 		elif isinstance(e, commands.CommandOnCooldown):
 			error_message = f"This command is on cooldown for another **{e.retry_after:.2f} seconds**!"
-			await ctx.reply(content=error_message, mention_author=False, allowed_mentions=discord.AllowedMentions(roles=False))
+			await ctx.reply(content=error_message, mention_author=False)
 		else:
 			await self.send_unhandled_error(error=e) # send error to #sapphire-helper-alerts thread under sapphire-experts channel
 			raise e
@@ -95,7 +95,7 @@ class ErrorHandler(commands.Cog):
 			missing_roles = [f"<@&{role_id}>" for role_id in e.missing_roles]
 			error_message = f"Only {format_list(missing_roles)} can use this command!"
 
-		await ctx.reply(content=error_message, mention_author=False, allowed_mentions=discord.AllowedMentions(roles=False))
+		await ctx.reply(content=error_message, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
 
 
 	@staticmethod
