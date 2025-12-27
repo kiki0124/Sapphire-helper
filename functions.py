@@ -42,7 +42,7 @@ def check_time_more_than_day(timestamp: float) -> bool:
     one_day_ago = datetime.datetime.now(tz=tz_info) - datetime.timedelta(days=1)
     return not one_day_ago < time 
 
-def format_list(items: list[any], conjunction = "or"):
+def format_list(items: list[str], conjunction: str = "or") -> str:
     return ", ".join(items[:-1]) + f" {conjunction} " + items[-1]
 
 # reminder system related functions
