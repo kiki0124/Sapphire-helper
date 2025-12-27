@@ -252,5 +252,5 @@ class remind(commands.Cog):
     async def cep_before_loop(self):
         await self.client.wait_until_ready()
 
-async def setup(client):
+async def setup(client: MyClient):
     await client.add_cog(remind(client))

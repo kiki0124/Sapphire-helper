@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands
 import datetime
@@ -8,6 +10,10 @@ from traceback import print_exception
 import functions
 import psutil
 from functions import humanize_duration
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from main import MyClient
 
 load_dotenv()
 
@@ -17,8 +23,9 @@ ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class bot(commands.Cog):
-    def __init__(self, client: commands.Bot):
-        self.client: commands.Bot = client
+    def __init__(self, client: MyClient):
+        self.client = client
+
 
     def cog_load(self):
         self.client.tree.on_error = self.tree_on_error
@@ -168,5 +175,5 @@ class bot(commands.Cog):
         embed.set_footer(text=f"Discord.py version {discord.__version__}")
         await ctx.reply(embed=embed, mention_author=False)
 
-async def setup(client: commands.Bot):
+async def setup(client: MyClient):
     await client.add_cog(bot(client))

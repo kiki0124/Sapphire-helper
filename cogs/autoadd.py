@@ -215,6 +215,5 @@ class autoadd(commands.Cog):
     async def wait_until_ready(self):
         await self.client.wait_until_ready()
 
-async def setup(client):
-
+async def setup(client: MyClient):
     await client.add_cog(autoadd(client))
