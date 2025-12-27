@@ -776,5 +776,5 @@ class epi(commands.Cog):
                 print(req.status)
                 self.status_page = req.status == 200 # true if the status is 200 - OK, else false
 
-async def setup(client):
-    await client.add_cog(epi(client=client))
+async def setup(client: MyClient):
+    await client.add_cog(epi(client))

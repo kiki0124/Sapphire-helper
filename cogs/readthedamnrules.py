@@ -19,8 +19,8 @@ ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class readthedamnrules(commands.Cog):
-    def __init__(self, client) -> None:
-        self.client: MyClient = client
+    def __init__(self, client: MyClient) -> None:
+        self.client = client
 
     async def get_messages_to_move(self, reference_message: discord.Message) -> list[discord.Message]:
         """  
@@ -112,5 +112,5 @@ class readthedamnrules(commands.Cog):
                     if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
                         await self.handle_request(reaction.message, user=user)
 
-async def setup(client):
+async def setup(client: MyClient):
     await client.add_cog(readthedamnrules(client))
