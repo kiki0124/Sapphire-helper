@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands, ui
