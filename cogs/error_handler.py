@@ -10,6 +10,10 @@ import os
 
 load_dotenv()
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
+EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
+MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
+DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
+SUPPORT_CHANNEL_ID = int(os.getenv("SUPPORT_CHANNEL_ID"))
 
 from typing import TYPE_CHECKING
 
@@ -118,6 +122,8 @@ class ErrorHandler(commands.Cog):
 			error_message = f"I need the following permissions to be able to execute this command: `{missing_bot_perms}`!"
 		elif isinstance(e, app_commands.CommandOnCooldown):
 			error_message = f"This command is on cooldown for another **{e.retry_after:.2f} seconds**!"
+		else:
+			error_message = f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command in <#{SUPPORT_CHANNEL_ID}>"
 		
 		await interaction.response.send_message(error_message, ephemeral=True)
 
