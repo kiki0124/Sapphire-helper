@@ -156,18 +156,6 @@ class bot(commands.Cog):
     @commands.command()
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def stats(self, ctx: commands.Context):
-        # embed = discord.Embed(
-        #     title="Sapphire Helper | Version 5.0",
-        #     colour=discord.Colour.purple(),
-        #     url="https://github.com/kiki0124/sapphire-helper"
-        # )
-        # embed.add_field(name="CPU Count:", value=os.cpu_count(), inline=False)
-        # embed.add_field(name="CPU Load:", value=f"{psutil.cpu_percent()}%", inline=False)
-        # embed.add_field(name="Available Memory:", value=f"{str(round(psutil.virtual_memory()[0]/1000000000))}GB", inline=False)
-        # embed.add_field(name="Memory Usage:", value=f"{psutil.virtual_memory()[2]}%", inline=False)
-        # embed.set_footer(text=f"Discord.py version {discord.__version__}")
-        # await ctx.reply(embed=embed, mention_author=False)
-
         view = ui.LayoutView()
         container = ui.Container(accent_color=discord.Color.purple())
 

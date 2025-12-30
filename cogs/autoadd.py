@@ -77,8 +77,8 @@ class ConfirmCloseButtons(ui.ActionRow):
 
 
 class ConfirmCloseView(ui.LayoutView):
-    def __init__(self, *, post_author: int = 0):
-        super().__init__(timeout=None)
+    def __init__(self, post_author: int = 0):
+        super().__init__(timeout=120)
 
         self.greetings = ["Hi", "Hey", "Hello", "Hi there"]
         self.textdisplay = ui.TextDisplay(f"{random.choice(self.greetings)} <@{post_author}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.")
@@ -89,16 +89,21 @@ class ConfirmCloseView(ui.LayoutView):
         self.container.add_item(self.confirm_close_buttons)
         self.add_item(self.container)
 
+    def attach_message(self, message: discord.Message):
+        self.message = message
+
+    async def on_timeout(self):
+        for child in self.walk_children():
+            if hasattr(child, "disabled"):
+                child.disabled = True
+        
+        await self.message.edit(view=self)
+
 
 class autoadd(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
         self.close_abandoned_posts.start()
-        
-    # TODO work out how to make a LayoutView with a variable argument persistent (or switch to ui.DynamicItem?)
-    # @commands.Cog.listener('on_ready')
-    # async def add_persistent_view(self):
-    #     self.client.add_view(confirm_close())
 
     def cog_unload(self):
         self.close_abandoned_posts.cancel()
@@ -244,8 +249,9 @@ class autoadd(commands.Cog):
             if tag_filters and other_filters:
                 owner_id = await get_post_creator_id(payload.channel_id) or message_channel.owner_id
                 view = ConfirmCloseView(post_author=owner_id)
-                await message_channel.send(view=view)
-                
+                message = await message_channel.send(view=view)
+                view.attach_message(message)
+
     @close_abandoned_posts.before_loop
     async def wait_until_ready(self):
         await self.client.wait_until_ready()

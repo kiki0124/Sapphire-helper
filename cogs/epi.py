@@ -33,8 +33,10 @@ class GetNotified(ui.ActionRow):
 
 
 class GetNotifiedView(ui.LayoutView):
-    def __init__(self, *, description: str = ""):
-        super().__init__(timeout=None)
+    message: discord.Message
+
+    def __init__(self, *, timeout: float = 300, description: str = ""):
+        super().__init__(timeout=timeout)
         self.description = description
 
         title = "## Some services are currently experiencing issues"
@@ -50,6 +52,17 @@ class GetNotifiedView(ui.LayoutView):
         container.add_item(get_notified_button)
 
         self.add_item(container)
+    
+    # ideally the buttons should be removed but trying to get that to work caused an hour of getting nowhere so we have this instead
+    def attach_message(self, message: discord.Message):
+        self.message = message
+
+    async def on_timeout(self):
+        for child in self.walk_children():
+            if hasattr(child, "disabled"):
+                child.disabled = True
+        
+        await self.message.edit(view=self)
 
 
 class select_channels(ui.ChannelSelect):
@@ -175,7 +188,7 @@ class epi(commands.Cog):
     epi_data: dict[str, dict[int, int]] = {} # {str(started_iso_format: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
     status_page: Optional[bool|None] = None # true if its working, false if its not working
 
-    def generate_epi_layout_view(self) -> ui.LayoutView:
+    def generate_epi_layout_view(self, *, view_timeout: float|None = None) -> GetNotifiedView:
         description: str = ""
         if self.epi_msg:
             description += self.epi_msg
@@ -187,7 +200,7 @@ class epi(commands.Cog):
         if self.status_page == False: # a GET request to https://sapph.xyz/status page returned a code != 200
             description += "(currently unavailable)"
 
-        return GetNotifiedView(description=description)
+        return GetNotifiedView(description=description, timeout=view_timeout)
 
 
     async def send_epi_log(self, content: str):
@@ -221,6 +234,7 @@ class epi(commands.Cog):
             except discord.NotFound:
                 pass
         self.sticky_message = await channel.send(view=view)
+        view.attach_message(self.sticky_message)
         await update_sticky_message_id(self.pool, self.sticky_message.id)
         self.sticky_task = None
         self.is_being_executed = False
@@ -234,11 +248,6 @@ class epi(commands.Cog):
             pass # message was not found, probably already deleted - do nothing
         self.sticky_message = None
         self.sticky_task = None
-
-    # TODO work out how to make a LayoutView with a variable argument persistent (or switch to ui.DynamicItem?)
-    # @commands.Cog.listener()
-    # async def on_ready(self):
-    #     self.client.add_view(GetNotified())
 
     async def cog_unload(self):
         await self.pool.close()
@@ -340,7 +349,9 @@ class epi(commands.Cog):
                     if thread:
                         msg = await thread.fetch_message(message_id)
                         new_view = ui.LayoutView.from_message(msg)
-                        # TODO figure out a way to remove the button from the message (maybe using ids?)
+                        for child in new_view.walk_children():
+                            if hasattr(child, "disabled"):
+                                child.disabled = True
                         if not thread.archived:
                             try:
                                 await msg.edit(view=new_view)
@@ -487,6 +498,7 @@ class epi(commands.Cog):
             await asyncio.sleep(3) # make sure that epi messages will be sent last (after more info message)
             view = self.generate_epi_layout_view()
             message = await thread.send(view=view)
+            view.attach_message(message)
             await add_epi_message(self.pool, message.id, thread.id)
             index = list(self.epi_data.keys())[0]
             self.epi_data[index][thread.id] = message.id
