@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 import datetime
-from discord import app_commands
+from discord import app_commands, ui
 import os
 from dotenv import load_dotenv
 from traceback import print_exception
@@ -156,17 +156,35 @@ class bot(commands.Cog):
     @commands.command()
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def stats(self, ctx: commands.Context):
-        embed = discord.Embed(
-            title="Sapphire Helper | Version 5.0",
-            colour=discord.Colour.purple(),
-            url="https://github.com/kiki0124/sapphire-helper"
-        )
-        embed.add_field(name="CPU Count:", value=os.cpu_count(), inline=False)
-        embed.add_field(name="CPU Load:", value=f"{psutil.cpu_percent()}%", inline=False)
-        embed.add_field(name="Available Memory:", value=f"{str(round(psutil.virtual_memory()[0]/1000000000))}GB", inline=False)
-        embed.add_field(name="Memory Usage:", value=f"{psutil.virtual_memory()[2]}%", inline=False)
-        embed.set_footer(text=f"Discord.py version {discord.__version__}")
-        await ctx.reply(embed=embed, mention_author=False)
+        # embed = discord.Embed(
+        #     title="Sapphire Helper | Version 5.0",
+        #     colour=discord.Colour.purple(),
+        #     url="https://github.com/kiki0124/sapphire-helper"
+        # )
+        # embed.add_field(name="CPU Count:", value=os.cpu_count(), inline=False)
+        # embed.add_field(name="CPU Load:", value=f"{psutil.cpu_percent()}%", inline=False)
+        # embed.add_field(name="Available Memory:", value=f"{str(round(psutil.virtual_memory()[0]/1000000000))}GB", inline=False)
+        # embed.add_field(name="Memory Usage:", value=f"{psutil.virtual_memory()[2]}%", inline=False)
+        # embed.set_footer(text=f"Discord.py version {discord.__version__}")
+        # await ctx.reply(embed=embed, mention_author=False)
+
+        view = ui.LayoutView()
+        container = ui.Container(accent_color=discord.Color.purple())
+
+        title = ui.TextDisplay("## [Sapphire helper | Version 5.0](https://github.com/kiki0124/sapphire-helper)")
+
+        info_text = (f"**CPU Count:** {os.cpu_count()}\n"
+                     f"**CPU Load:** {psutil.cpu_percent()}%\n"
+                     f"**Available memory:** {str(round(psutil.virtual_memory()[0]/1000000000))}GB\n"
+                     f"**Memory Usage:** {psutil.virtual_memory()[2]}%\n"
+                     f"-# discord.py vesion {discord.__version__}")
+        
+        container.add_item(title)
+        container.add_item(ui.Separator(spacing=discord.SeparatorSpacing.large))
+        container.add_item(ui.TextDisplay(info_text))
+        view.add_item(container)
+        await ctx.reply(view=view, mention_author=False)
+
 
 async def setup(client: commands.Bot):
     await client.add_cog(bot(client))

@@ -1,4 +1,5 @@
 import discord
+from discord import ui
 from discord.ext import commands
 from dotenv import load_dotenv
 import os
@@ -29,15 +30,22 @@ class readthedamnrules(commands.Cog):
                 break
         return messages_to_move
 
-    async def get_files(self, messages: list[discord.Message]) -> list[discord.File]:
+    async def get_media_gallery_items(self, messages: list[discord.Message]) -> list[discord.MediaGalleryItem]:
         """  
-        Returns list[File] for all attachments (files) that should be used in the new post 
+        Returns list[MediaGalleryItem] for all attachments (files) that should be used in the new post 
         """
-        files = []
+        # cv2 for rtdr is tempting, but because the messages get deleted and a media gallery needs a valid url to display images
+        # the images will eventually show up as invalid
+        # unless we do some sapphire images tomfoolery we'll have to compromise
+        gallery_items: ui.MediaGallery = []
         for msg in messages:
             for attachment in msg.attachments:
-                files.append(await attachment.to_file())
-        return files
+                item = discord.MediaGalleryItem(
+                    attachment.proxy_url,
+                    description=attachment.description
+                )
+                gallery_items.append(item)
+        return gallery_items
 
     async def get_content(self, messages: list[discord.Message]) -> str:
         """  
@@ -50,7 +58,7 @@ class readthedamnrules(commands.Cog):
         or "No message content found" if all messages don't have content (only have attachments)
         """
         content = 'No message content found'
-        messages_content: list[discord.Message] = []
+        messages_content: list[str] = []
         for message in messages:
             if message.content:
                 messages_content.append(message.clean_content)
@@ -70,16 +78,28 @@ class readthedamnrules(commands.Cog):
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
         await reference_message.channel.typing()
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
-        files = await self.get_files(messages=messages_to_move)
+        gallery_items = await self.get_media_gallery_items(messages_to_move)
         content = await self.get_content(messages_to_move)
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         title = f"Support for {reference_message.author.name}"
         if message and message.content.removeprefix(self.client.user.mention): # make sure the message has a content beyond @sapphire helper
             title = message.content.removeprefix(self.client.user.mention) 
+
+        view = ui.LayoutView()
+
+        user_message = ui.TextDisplay(f"## Original message:\n{content}")
+        footer = ui.TextDisplay(f"{self.get_extra_content(reference_message)}\n-# Created by {user.mention} | In the future please always create a post in <#{SUPPORT_CHANNEL_ID}> for all Sapphire and appeal.gg related questions.")
+
+        container = ui.Container(user_message)
+        if len(gallery_items) > 0:
+            container.add_item(ui.MediaGallery(*gallery_items))
+        container.add_item(ui.Separator(spacing=discord.SeparatorSpacing.large))
+        container.add_item(footer)
+        view.add_item(container)
+
         post = await support.create_thread(
             name=title,
-            files=files,
-            content=f"**Original message:**\n```\n{content}```\n\n{self.get_extra_content(reference_message)}\n-# Created by {user.mention} | In the future please always create a post in <#{SUPPORT_CHANNEL_ID}> for all Sapphire and appeal.gg related questions."
+            view=view
         )
         await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
         await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire or appeal.gg. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire or appeal.gg related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300, allowed_mentions=discord.AllowedMentions.none())
