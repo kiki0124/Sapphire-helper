@@ -67,7 +67,7 @@ class NeedDevReviewView(ui.LayoutView):
     def __init__(self):
         super().__init__(timeout=None)
 
-        # removed the "by <user>" part in the questions since its not relevant neccesarily relevant to the user
+        # removed the "by <user>" part in the questions since its not relevant neccesarily relevant to the user, and to preserve non expiry
         # and when an expert+ marks a post as dev review they almost always send something thereafter
         # if need be internal logging can be added to show who marked as dev review
         container = ui.Container()

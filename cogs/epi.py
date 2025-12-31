@@ -33,7 +33,7 @@ class GetNotified(ui.ActionRow):
 
 
 class GetNotifiedView(ui.LayoutView):
-    message: discord.Message
+    message: discord.Message | None = None
 
     def __init__(self, *, timeout: float = 300, description: str = ""):
         super().__init__(timeout=timeout)
@@ -55,14 +55,20 @@ class GetNotifiedView(ui.LayoutView):
     
     # ideally the buttons should be removed but trying to get that to work caused an hour of getting nowhere so we have this instead
     def attach_message(self, message: discord.Message):
+        """
+        This method must be called if the on_timeout call is to edit the message and disable the buttons
+
+        Not attaching the method will leave the buttons perpetually enabled even after the timeout, causing interaction failed errors
+        """
         self.message = message
 
     async def on_timeout(self):
-        for child in self.walk_children():
-            if hasattr(child, "disabled"):
-                child.disabled = True
-        
-        await self.message.edit(view=self)
+        if self.message is not None:
+            for child in self.walk_children():
+                if hasattr(child, "disabled"):
+                    child.disabled = True
+
+            await self.message.edit(view=self)
 
 
 class select_channels(ui.ChannelSelect):
