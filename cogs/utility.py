@@ -410,6 +410,14 @@ class utility(commands.Cog):
                             await reaction.message.delete()
                             await self.send_qr_log(message=reaction.message, user=user)
                             return
+            elif reaction.message.flags.components_v2:
+                regex = f'-# (Recommended|Sent) by {user.mention}'
+                view = ui.LayoutView.from_message(reaction.message)
+                for child in view.walk_children():
+                    if isinstance(child, ui.TextDisplay) and re.match(regex, child.content, re.IGNORECASE):
+                        await reaction.message.delete()
+                        await self.send_qr_log(reaction.message, user)
+
             if reaction.message.reference and reaction.message.reference.cached_message:
                 if user == reaction.message.reference.cached_message.author:
                     await reaction.message.delete()
