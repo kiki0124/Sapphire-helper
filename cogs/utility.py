@@ -64,15 +64,13 @@ class NeedDevReviewButtons(ui.ActionRow):
 
 
 class NeedDevReviewView(ui.LayoutView):
-    def __init__(self):
+    def __init__(self, *, executor_id: int = 0):
+        self.executor_id = executor_id
         super().__init__(timeout=None)
 
-        # removed the "by <user>" part in the questions since its not relevant neccesarily relevant to the user, and to preserve non expiry
-        # and when an expert+ marks a post as dev review they almost always send something thereafter
-        # if need be internal logging can be added to show who marked as dev review
         container = ui.Container()
         self.need_dev_review_buttons = NeedDevReviewButtons()
-        self.questions = f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review**\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _"
+        self.questions = f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by <@{self.executor_id}>\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _"
         self.footer = "-# Thank you for helping Sapphire to continuously improve."
         container.add_item(ui.TextDisplay(self.questions + "\n" + self.footer))
         container.add_item(ui.Separator())
@@ -85,7 +83,7 @@ class ndr_options_buttons(ui.View):
     def __init__(self, Interaction: discord.Interaction):
         super().__init__(timeout=None)
         self.Interaction = Interaction
-    
+
     async def mark_post_as_ndr(self, post: discord.Thread):
         ndr = post.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
         tags = [ndr]
@@ -119,7 +117,7 @@ class ndr_options_buttons(ui.View):
     async def on_send_questions_click(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer()
         await self.mark_post_as_ndr(interaction.channel)
-        await interaction.channel.send(view=NeedDevReviewView())
+        await interaction.channel.send(view=NeedDevReviewView(executor_id=interaction.user.id))
         await self.Interaction.delete_original_response()
 
 class utility(commands.Cog):
@@ -268,8 +266,8 @@ class utility(commands.Cog):
         """
         return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID))
 
-    @commands.Cog.listener()
-    async def on_ready(self):
+    @commands.Cog.listener("on_ready")
+    async def add_persistent_view(self):
         self.client.add_view(NeedDevReviewView())
 
     @app_commands.command(name="solved", description="Mark the current post as solved")

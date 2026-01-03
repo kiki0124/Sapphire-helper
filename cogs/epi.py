@@ -35,8 +35,8 @@ class GetNotified(ui.ActionRow):
 class GetNotifiedView(ui.LayoutView):
     message: discord.Message | None = None
 
-    def __init__(self, *, timeout: float = 300, description: str = ""):
-        super().__init__(timeout=timeout)
+    def __init__(self, *, description: str = ""):
+        super().__init__(timeout=None)
         self.description = description
 
         title = "## Some services are currently experiencing issues"
@@ -194,7 +194,11 @@ class epi(commands.Cog):
     epi_data: dict[str, dict[int, int]] = {} # {str(started_iso_format: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
     status_page: Optional[bool|None] = None # true if its working, false if its not working
 
-    def generate_epi_layout_view(self, *, view_timeout: float|None = None) -> GetNotifiedView:
+    @commands.Cog.listener("on_ready")
+    async def add_persistent_view(self):
+        self.client.add_view(GetNotifiedView())
+
+    def generate_epi_layout_view(self) -> GetNotifiedView:
         description: str = ""
         if self.epi_msg:
             description += self.epi_msg
@@ -206,7 +210,7 @@ class epi(commands.Cog):
         if self.status_page == False: # a GET request to https://sapph.xyz/status page returned a code != 200
             description += "(currently unavailable)"
 
-        return GetNotifiedView(description=description, timeout=view_timeout)
+        return GetNotifiedView(description=description)
 
 
     async def send_epi_log(self, content: str):

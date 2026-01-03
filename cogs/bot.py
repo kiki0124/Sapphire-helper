@@ -157,7 +157,7 @@ class bot(commands.Cog):
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def stats(self, ctx: commands.Context):
         view = ui.LayoutView()
-        container = ui.Container(accent_color=discord.Color.purple())
+        container = ui.Container(accent_colour=0xA06BE6)
 
         title = ui.TextDisplay("## [Sapphire helper | Version 5.0](https://github.com/kiki0124/sapphire-helper)")
 

@@ -80,7 +80,7 @@ class ConfirmCloseView(ui.LayoutView):
     message: discord.Message | None = None
 
     def __init__(self, post_author: int = 0):
-        super().__init__(timeout=120)
+        super().__init__(timeout=None)
 
         self.greetings = ["Hi", "Hey", "Hello", "Hi there"]
         self.textdisplay = ui.TextDisplay(f"{random.choice(self.greetings)} <@{post_author}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.")
@@ -112,6 +112,10 @@ class autoadd(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
         self.close_abandoned_posts.start()
+
+    @commands.Cog.listener("on_ready")
+    async def add_persistent_view(self):
+        self.client.add_view(ConfirmCloseView())
 
     def cog_unload(self):
         self.close_abandoned_posts.cancel()

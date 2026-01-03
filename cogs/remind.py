@@ -117,8 +117,8 @@ class remind(commands.Cog):
         )
         self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
 
-    @commands.Cog.listener()
-    async def on_ready(self):
+    @commands.Cog.listener("on_ready")
+    async def add_persistent_view(self):
         self.client.add_view(CloseNow())
 
     async def cog_unload(self):
