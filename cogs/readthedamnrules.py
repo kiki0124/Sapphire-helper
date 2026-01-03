@@ -30,22 +30,22 @@ class readthedamnrules(commands.Cog):
                 break
         return messages_to_move
 
-    async def get_media_gallery_items(self, messages: list[discord.Message]) -> list[discord.MediaGalleryItem]:
+    async def get_media_gallery_items(self, messages: list[discord.Message]) -> tuple[list[discord.MediaGalleryItem], list[discord.File]]:
         """  
-        Returns list[MediaGalleryItem] for all attachments (files) that should be used in the new post 
+        Returns two lists of the `MediaGalleryItem`'s and the `File`'s that should be used in the post starter message
         """
-        # cv2 for rtdr is tempting, but because the messages get deleted and a media gallery needs a valid url to display images
-        # the images will eventually show up as invalid
-        # unless we do some sapphire images tomfoolery we'll have to compromise
-        gallery_items: ui.MediaGallery = []
+        gallery_items: list[discord.MediaGalleryItem] = []
+        files: list[discord.File] = []
         for msg in messages:
             for attachment in msg.attachments:
+                file = await attachment.to_file()
                 item = discord.MediaGalleryItem(
-                    attachment.proxy_url,
+                    media=file,
                     description=attachment.description
                 )
+                files.append(file)
                 gallery_items.append(item)
-        return gallery_items
+        return gallery_items, files
 
     async def get_content(self, messages: list[discord.Message]) -> str:
         """  
@@ -78,7 +78,7 @@ class readthedamnrules(commands.Cog):
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
         await reference_message.channel.typing()
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
-        gallery_items = await self.get_media_gallery_items(messages_to_move)
+        gallery_items, files = await self.get_media_gallery_items(messages_to_move)
         content = await self.get_content(messages_to_move)
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         title = f"Support for {reference_message.author.name}"
@@ -99,7 +99,8 @@ class readthedamnrules(commands.Cog):
 
         post = await support.create_thread(
             name=title,
-            view=view
+            view=view,
+            files=files
         )
         await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
         await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire or appeal.gg. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire or appeal.gg related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300, allowed_mentions=discord.AllowedMentions.none())
