@@ -464,13 +464,13 @@ class utility(commands.Cog):
         if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
             if SOLVED_TAG_ID not in ctx.channel._applied_tags and NEED_DEV_REVIEW_TAG_ID not in ctx.channel._applied_tags:
                 user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
-                user_mention = None
+                text_prefix = "## Incomplete support post\nHey"
                 if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
-                    user_mention = f"<@{user_id}>"
+                    text_prefix = f"## Incomplete support post\nHey <@{user_id}>"
 
                 view = ui.LayoutView()
                 container = ui.Container(
-                    ui.TextDisplay(f"## Incomplete support post\nHey {user_mention}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible\n-# Reccomended by {ctx.author.mention}"),
+                    ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible\n-# Reccomended by {ctx.author.mention}"),
                     accent_colour=0xFFA800
                 )
                 view.add_item(container)
@@ -488,7 +488,10 @@ class utility(commands.Cog):
                     action_id = generate_random_id()
                     await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
                     await self.send_action_log(action_id, ctx.channel.mention, tags, "/incomplete-post used")
-                await ctx.channel.send(view=view, allowed_mentions=discord.AllowedMentions(users=[user_id]))
+                await ctx.channel.send(
+                    view=view,
+                    allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
+                )
             else:
                 await ctx.reply("You cannot use this command as this post has the *Solved* or *Needs dev review* tag.", ephemeral=True)
         else:
@@ -512,26 +515,30 @@ class utility(commands.Cog):
     @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
     async def wrong_server(self, interaction: discord.Interaction):
         await interaction.response.defer()
+        user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
 
         view = ui.LayoutView()
         container = ui.Container(accent_colour=0xFFA800)
         view.add_item(container)
 
-        user_id = 0
+        text_prefix = "Hey"
         if isinstance(interaction.channel, discord.Thread) and await self.is_mod_or_expert(interaction=interaction):
             if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-                user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+                text_prefix = f"Hey <@{user_id}>"
                 await self.lock_unrelated_post(interaction.channel)
 
         title = "## Unrelated question/issue"
-        description = f"Hey <@{user_id}>, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
+        description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
         footer = f"-# Recommended by {interaction.user.mention}"
 
         container.add_item(
             ui.TextDisplay(f"{title}\n{description}\n{footer}")
         )
 
-        await interaction.channel.send(view=view, allowed_mentions=discord.AllowedMentions(users=[user_id]))
+        await interaction.channel.send(
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
+        )
         await interaction.delete_original_response()
 
 async def setup(client):
