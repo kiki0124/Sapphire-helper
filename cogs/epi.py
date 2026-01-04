@@ -19,7 +19,7 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 epi_users: list[int] = []
 
-class GetNotified(ui.ActionRow):
+class GetNotifiedButton(ui.ActionRow):
     @ui.button(label="Notify me when this issue is resolved", custom_id="epi-get-notified", style=discord.ButtonStyle.grey)
     async def on_get_notified_click(self, interaction: discord.Interaction, button: ui.Button):
         if interaction.user.id not in epi_users:
@@ -42,7 +42,7 @@ class GetNotifiedView(ui.LayoutView):
         title = "## Some services are currently experiencing issues"
         accent_colour = 16749824
         footer = "We're sorry for the inconvenience caused and thank you for your patience!"
-        get_notified_button = GetNotified()
+        get_notified_button = GetNotifiedButton()
 
         container = ui.Container(accent_colour=accent_colour)
         full_text = f"{title}\n{description.strip()}"
@@ -335,6 +335,13 @@ class epi(commands.Cog):
         else:
             await interaction.followup.send(content=f"EPI Mode is already enabled!", ephemeral=True)
     
+    def find_message(self, message_id: int) -> Optional[discord.Message]:
+        if self.client.cached_messages:
+            for message in reversed(self.client.cached_messages):
+                if message.id == message_id:
+                    return message
+        return None
+
     @group.command(name="disable", description="Disable EPI mode- mark the issue as solved & ping all users that asked to be pinged")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(message="[Optional] A custom message to be displayed with the \"Hey, this is fixed now!\" message")
@@ -357,7 +364,7 @@ class epi(commands.Cog):
                 for thread_id, message_id in list(self.epi_data.values())[0].items():
                     thread = self.client.get_channel(thread_id)
                     if thread:
-                        msg = await thread.fetch_message(message_id)
+                        msg = self.find_message(message_id) or await thread.fetch_message(message_id)
                         new_view = ui.LayoutView.from_message(msg)
                         for child in new_view.walk_children():
                             if hasattr(child, "disabled"):
