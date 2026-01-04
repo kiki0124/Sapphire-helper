@@ -364,7 +364,10 @@ class epi(commands.Cog):
                 for thread_id, message_id in list(self.epi_data.values())[0].items():
                     thread = self.client.get_channel(thread_id)
                     if thread:
-                        msg = self.find_message(message_id) or await thread.fetch_message(message_id)
+                        try:
+                            msg = self.find_message(message_id) or await thread.fetch_message(message_id)
+                        except (discord.HTTPException, discord.NotFound):
+                            continue
                         new_view = ui.LayoutView.from_message(msg)
                         for child in new_view.walk_children():
                             if hasattr(child, "disabled"):
