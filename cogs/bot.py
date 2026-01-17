@@ -6,10 +6,8 @@ import datetime
 from discord import app_commands
 import os
 from dotenv import load_dotenv
-from traceback import print_exception
 import functions
 import psutil
-from functions import humanize_duration
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -26,32 +24,6 @@ class bot(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
 
-
-    def cog_load(self):
-        self.client.tree.on_error = self.tree_on_error
-    
-    async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, interaction: discord.Interaction | None = None) -> None:
-        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
-        content = f"<@1105414178937774150>\nUnhandled error: `{error}`"
-
-        if interaction:
-            interaction_created_at = interaction.created_at.timestamp()
-            interaction_data = interaction.data or {}
-            content += f"\n### Interaction Error:\n>>> Interaction created at <t:{round(interaction_created_at)}:T> (<t:{round(interaction_created_at)}:R>)\
-                \nUser: {interaction.user.mention} | Channel: {interaction.channel.mention} | Type: {interaction.type.name}"
-            if interaction.command and interaction.command.parent is None:
-                command_id = interaction_data.get('id', 0)
-                options_dict  = interaction_data.get("options", [])
-                command_mention = f"</{interaction.command.qualified_name}:{command_id}>"
-                content += f"\nCommand: {command_mention}, inputted values:"
-
-                options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict])
-                content += f"\n```{options_formatted}```"
-            else:
-                content += f"\n```json\n{interaction.data}```"
-            await alerts_thread.send(content, allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150)])) #1105414178937774150 is Kiki's user ID
-        else:
-            await alerts_thread.send(content=content)
 
     @commands.command(name="ping")
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
@@ -81,35 +53,6 @@ class bot(commands.Cog):
             await ctx.reply(content=f"Command Sync Failure.\n`{error.text}`", mention_author=False)
             return
         await ctx.reply(content=f"Successfully synced {len(synced)} slash command(s)", mention_author=False)
-
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        if isinstance(error, commands.CommandNotFound):
-            return
-        elif isinstance(error, commands.NoPrivateMessage):
-            await ctx.reply(content="This command cannot be executed in DM channels.", mention_author=False)
-        elif isinstance(error, commands.errors.MissingAnyRole):
-            await ctx.reply(content="Insufficient permissions- you are not allowed to execute this command.", mention_author=False)
-        elif isinstance(error, commands.CommandOnCooldown):
-            await ctx.reply(content="Command currently on cooldown, try again later...", mention_author=False)
-        else:
-            await self.send_unhandled_error(error=error) # send error to #sapphire-helper-alerts thread under sapphire-experts channel
-            raise error
-
-    async def tree_on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.MissingAnyRole):
-            await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}> and <@&{EXPERTS_ROLE_ID}> can use this command!", ephemeral=True)
-        elif isinstance(error, app_commands.CommandOnCooldown):
-            await interaction.response.send_message(content=f"Command on cooldown for another **{round(error.retry_after)}** seconds!", ephemeral=True)
-        elif isinstance(error, app_commands.NoPrivateMessage):
-            await interaction.response.send_message(content="You may not use this command in DMs!", ephemeral=True)
-        elif isinstance(error, app_commands.CommandOnCooldown):
-            await interaction.response.send_message(f"This command is on cooldown. You can run it again **{humanize_duration(error.retry_after)}**", ephemeral=True)
-        elif isinstance(error, app_commands.CheckFailure): # raised when a user tries to use a command that only mods/experts/op can use, eg /solved
-            await interaction.response.send_message(content=f"Only <@&{DEVELOPERS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{EXPERTS_ROLE_ID}> and the OP can use this command and only in #support!", ephemeral=True)
-        else:
-            await self.send_unhandled_error(error=error, interaction=interaction)
-            print_exception(error)
 
     @app_commands.command(name="debug", description="Debug for various systems")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
