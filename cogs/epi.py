@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands, ui
 from dotenv import load_dotenv
 from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, update_epi_message_id, update_epi_sticky, update_epi_iso
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
-from typing import Literal, Optional
+from typing import Literal, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from main import MyClient
 
 load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
@@ -145,7 +150,7 @@ class select_channels(ui.ChannelSelect):
             await self.i.edit_original_response(view=None)
 
 class epi(commands.Cog):
-    def __init__(self, client: commands.Bot):
+    def __init__(self, client: MyClient):
         self.client = client
 
     group = app_commands.Group(name="epi", description="Commands related to Emergency Post Information system")
@@ -772,5 +777,5 @@ class epi(commands.Cog):
                 print(req.status)
                 self.status_page = req.status == 200 # true if the status is 200 - OK, else false
 
-async def setup(client):
-    await client.add_cog(epi(client=client))
+async def setup(client: MyClient):
+    await client.add_cog(epi(client))

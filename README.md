@@ -2,52 +2,22 @@
   ## THIS IS NOT SAPPHIRE SUPPORT. If you require support for Sapphire or appeal.gg **always** use https://discord.gg/RrHJYrh4Mm 
   * Hi there, I've made this repository public on 9.9.25 (9.9.25 for the Americans between us) for the purpose of continuosly improving Sapphire Helper with both better features & performance, and for allowing people to learn from it.
   * If you've found an issue/bug - please create an issue on this github repository with as many details as possible including: reproduction steps, expected result, actual result and any other info that may be relevant.
-  * If you'd like to suggest a new feature or an improvement to an existing feature - create a pull request with as many details as possible and if applicable relevant code (written by you) to be used.
+  * If you'd like to suggest a new feature or an improvement to an existing feature - create a discussion or PR in this repository with as many details as possible.
 
 ### NOTICE:
-  The information below is very outdated. Even though some of it is still relevant like [setup](#setup) it is still recommended to have some basic Python knowledge and for you to go over the files before you attempt to run the bot yourself.
+  As mentioned in [License](/LICENSE), this software is provided "as is" without warranties or conditions for use.
 
 ## Setup
 
-### 1. Rename `_.env` to `.env` and replace each variable with its actual value.
+### 1. Rename `_.env` to `.env` and replace each variable with its respective value.
 
-### 2. Install the libraries listed in requirements.txt
+### 2. Install the libraries listed in requirements.txt -
 ```
 pip install -r requirements.txt
 ```
-### 3. Run the main file- python main.py
+### 3. Choose whether you want to use Docker for this. If you do, read [docker-readme](/docker-readme.md), else run `python main.py` to start the bot.
 
-### 4. Use the sync command to sync all slash commands, and restart your discord client.
+### 4. Use the sync command - sh!sync - to sync all slash commands. Then, restart your discord client.
 
-## Files' explanations:
-
-  ## main.py- run the bot (create the session with discord), load cogs (aka extensions- commands and event listeners from other files)
-  ## /cogs/utility.py- utility related commands, includes:
-  - /solved - only usable in #support by Moderators, Experts or the post's creator. Takes the following actions when used:
-    - Reply with a message saying that the post was solved and will be closed in 1 hour.
-    - Removes not solved and unanswered tags,
-    - Adds solved tag.
-    - After 1 hour, the post will also be archived.
-  - /unsolved - only usable in #support by Moderators, Experts or the post's creator. Takes the following actions when used:
-    - Reply with a message saying that the post was unsolved.
-    - Removes solved tag,
-    - Adds unsolved tag.
-  - /need-dev-review - Only usable by Moderators and Experts. Responds with the normal need-dev-review template (including buttons), adds the need-dev-review tag, and sends a notification to 1145088659545141421
-  ## /cogs/remind.py- Remind users of unsolved posts where they have been inactive, and close posts if their owners left.
-  ## /cogs/bot.py- bot control related commands (only sync for now) and error handlers.
-  ## /cogs/autoadd.py- Ask user to more information if their post's starter message length < 15, suggest to use /solved based on a specific regex and more.
-  - On thread create:
-    - Auto-add unanswered tag,
-    - Auto-remove solved tag (if applied),
-       Send a message asking the user to provide more information if starter message length < 15
-  - On message:
-    - If message matches the regex `(solved|^ty|\sty|thanks|work|fixed)` suggest to use /solved, and add the post to a list of ignored posts for this regex (list cleared on bot restart)
-    - If the post has unanswered tag, and the message of the author isn't the creator of the post- replace it with not solved.
-  ## /cogs/readthedamnrules.py- create a post for a user with the details they provided if they ask for help in #general
-  ## cogs/waiting_for_reply.py- autoadd waiting for reply tag after 10 minutes from op if no message from a user that isn't op was sent, and remove that tag on any message from not op.
-  ## functions.py- Functions to add/remove/view data from/to the database- Doesn't directly communicate with discord, these functions are used in the files that do communicate with discord though.
-
-### Function tests:
-
-  To run the tests (only tests functions.check_time_more_than_day) run test_functions.py
-
+## Files:
+  Coming soon

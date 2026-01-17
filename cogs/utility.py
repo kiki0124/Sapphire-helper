@@ -513,6 +513,6 @@ class utility(commands.Cog):
         await interaction.channel.send(content=content, embed=embed)
         await interaction.delete_original_response()
 
-async def setup(client):
+async def setup(client: MyClient):
     await client.add_cog(utility(client))
 

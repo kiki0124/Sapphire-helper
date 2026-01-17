@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands, ui
@@ -7,6 +9,11 @@ from dotenv import load_dotenv
 from difflib import get_close_matches
 import asqlite as sql
 from asyncio import Lock
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from main import MyClient
+
 
 load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
@@ -100,7 +107,7 @@ class update_tag_modal(ui.Modal):
         await interaction.followup.send(f"Successfully updated `{self.tag}`'s content!")
 
 class quick_replies(commands.Cog):
-    def __init__(self, client: commands.Bot):
+    def __init__(self, client: MyClient):
         self.client = client
         self.used_tags: dict[str, int] = {} # saved and sent to DB every 15 minutes
         self.recommended_tags: list[str] = [] # max 25 with highest uses from DB extracted every 15 minutes
@@ -267,5 +274,5 @@ class quick_replies(commands.Cog):
                 content += '\n'.join(suggestions)
             await interaction.response.send_message(content, ephemeral=True)
 
-async def setup(client: commands.Bot):
+async def setup(client: MyClient):
     await client.add_cog(quick_replies(client))
