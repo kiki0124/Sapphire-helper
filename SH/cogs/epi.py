@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands, ui
 from dotenv import load_dotenv
-from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, update_epi_message_id, update_epi_sticky, update_epi_iso
+from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, update_epi_message_id, update_epi_sticky, update_epi_iso, DB_PATH
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
 from typing import Literal, Optional, TYPE_CHECKING
 
@@ -237,7 +237,7 @@ class epi(commands.Cog):
         await self.pool.close()
 
     async def cog_load(self):
-        self.pool = await sql.create_pool("database\data.db")
+        self.pool = await sql.create_pool(DB_PATH)
         epi_config = await get_epi_config(self.pool)
         if epi_config:
             raw_messages = await get_epi_messages(self.pool)
