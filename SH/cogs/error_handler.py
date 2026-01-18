@@ -30,8 +30,28 @@ class ErrorHandler(commands.Cog):
 
 
 	async def send_unhandled_error(self, error: commands.CommandError|app_commands.AppCommandError, interaction: discord.Interaction | None = None) -> None:
-		alerts_thread = self.client.get_channel(ALERTS_THREAD_ID)
 		content = f"<@1105414178937774150>\nUnhandled error: `{error}`"
+		if self.client.alert_webhook_url is None:
+			try:
+					alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+			except discord.NotFound as e:
+				raise e
+			if alerts_thread.archived:
+				await alerts_thread.edit(archived=False)
+			webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
+			try:
+				webhook = webhooks[0]
+			except IndexError:
+				webhook = await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+			self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
+		webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
+		await webhook.send(
+            content=content,
+            username=self.client.user.name,
+            avatar_url=self.client.user.display_avatar.url,
+            thread=discord.Object(id=ALERTS_THREAD_ID),
+            wait=False
+        )
 
 		if interaction:
 			interaction_created_at = interaction.created_at.timestamp()

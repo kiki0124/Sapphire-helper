@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands, ui
-from functions import check_tag_exists, save_tag, get_tag_content, get_tag_data, add_tag_uses, delete_tag, update_tag, get_used_tags
+from functions import check_tag_exists, save_tag, get_tag_content, get_tag_data, add_tag_uses, delete_tag, update_tag, get_used_tags, DB_PATH
 import os
 from dotenv import load_dotenv
 from difflib import get_close_matches
@@ -49,7 +49,7 @@ class create_tag(ui.Modal):
         await interaction.response.defer(ephemeral=True)
         if not await check_tag_exists(self.pool, self.name.component.value):
             await save_tag(self.pool, name=self.name.component.value, content=self.content.component.value, creator_id=interaction.user.id)
-            tag_thread = interaction.guild.get_thread(TAG_LOGGING_THREAD_ID)
+            tag_thread = interaction.guild.get_thread(TAG_LOGGING_THREAD_ID) or await interaction.guild.fetch_channel(TAG_LOGGING_THREAD_ID)
             if tag_thread.archived:
                 await tag_thread.edit(archived=False)
             webhooks = [webhook for webhook in await tag_thread.parent.webhooks() if webhook.token]
@@ -88,7 +88,7 @@ class update_tag_modal(ui.Modal):
         await interaction.response.defer(ephemeral=True)
         new_content = self.label.component.value
         await update_tag(self.pool, self.tag, new_content)
-        tag_thread = interaction.guild.get_thread(TAG_LOGGING_THREAD_ID)
+        tag_thread = interaction.guild.get_thread(TAG_LOGGING_THREAD_ID) or await interaction.guild.fetch_channel(TAG_LOGGING_THREAD_ID)
         if tag_thread.archived:
             await tag_thread.edit(archived=False)
         webhooks = [webhook for webhook in await tag_thread.parent.webhooks() if webhook.token]
@@ -114,7 +114,7 @@ class quick_replies(commands.Cog):
         self.used_tags_lock = Lock()
 
     async def send_tag_log(self, content: str):
-        tag_thread = self.client.get_channel(TAG_LOGGING_THREAD_ID)
+        tag_thread = self.client.get_channel(TAG_LOGGING_THREAD_ID) or await self.client.fetch_channel(TAG_LOGGING_THREAD_ID)
         if tag_thread.archived:
             await tag_thread.edit(archived=False)
         webhooks = [webhook for webhook in await tag_thread.parent.webhooks() if webhook.token]
@@ -132,7 +132,7 @@ class quick_replies(commands.Cog):
         )
 
     async def cog_load(self):
-        self.pool = await sql.create_pool("database/data.db")
+        self.pool = await sql.create_pool(DB_PATH)
         self.refresh_use_count.start()
 
     async def cog_unload(self):
