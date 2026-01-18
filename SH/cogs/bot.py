@@ -8,6 +8,7 @@ import os
 from dotenv import load_dotenv
 import functions
 import psutil
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -35,13 +36,13 @@ class bot(commands.Cog):
     @commands.command(name="restart")
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def restart(self, ctx: commands.Context):
-        extensions = os.listdir("./cogs")
-        await ctx.reply(content=f"Reloading {len(extensions)} extension(s)", mention_author=False)
+        cogs_dir = Path(__file__).parent
+        extensions = os.listdir(cogs_dir)
         for filename in extensions:
             if filename.endswith(".py"):
                 await self.client.reload_extension(f"cogs.{filename[:-3]}")
-            else:
-                continue
+
+        await ctx.reply(content=f"Reloaded {len(extensions)} extension(s)", mention_author=False)
 
     @commands.command()
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
