@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands, ui
-from functions import check_tag_exists, save_tag, get_tag_content, get_tag_data, add_tag_uses, delete_tag, update_tag, get_used_tags
+from functions import check_tag_exists, save_tag, get_tag_content, get_tag_data, add_tag_uses, delete_tag, update_tag, get_used_tags, DB_PATH
 import os
 from dotenv import load_dotenv
 from difflib import get_close_matches
@@ -132,7 +132,7 @@ class quick_replies(commands.Cog):
         )
 
     async def cog_load(self):
-        self.pool = await sql.create_pool("database/data.db")
+        self.pool = await sql.create_pool(DB_PATH)
         self.refresh_use_count.start()
 
     async def cog_unload(self):
