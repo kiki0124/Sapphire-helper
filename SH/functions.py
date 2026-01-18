@@ -4,11 +4,12 @@ import asqlite as sql
 from string import ascii_letters, digits
 import random
 from typing import Optional, Any, TYPE_CHECKING
+from pathlib import Path
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-DB_PATH = "database\data.db"
+DB_PATH = str(Path(__file__).parent / 'database' / 'data.db')
 
 # other functions
 
