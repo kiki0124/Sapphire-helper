@@ -19,10 +19,10 @@ pip install -r requirements.txt
 - Using docker: [docker-readme](/docker-readme.md)
 
 - If you are not using docker,  run these commands in the root folder:
-```
-cd SH
-python main.py
-```
+  ```
+  cd SH
+  python main.py
+  ```
  
 run `python main.py` to start the bot.
 
@@ -30,4 +30,5 @@ run `python main.py` to start the bot.
 
 ## Files:
   Coming soon
+
 
