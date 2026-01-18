@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from functions import main
 import unittest, test_functions
+from pathlib import Path
 
 load_dotenv()
 
@@ -25,7 +26,8 @@ class MyClient(commands.Bot):
     async def setup_hook(self):
         unittest.main(test_functions, exit=False)
         await main() # function that creates the db tables if they don't already exist
-        for filename in os.listdir('./cogs'):
+        cog_dir = Path(__file__).parent / 'cogs'
+        for filename in os.listdir(cog_dir):
             if filename.endswith('.py'):
                 await self.load_extension(f"cogs.{filename[:-3]}")
                 print(f"Loaded extension {filename[:-3]}")
