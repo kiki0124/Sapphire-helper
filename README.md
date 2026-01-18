@@ -18,17 +18,16 @@ pip install -r requirements.txt
 ### 3. Running the bot 
 - Using docker: [docker-readme](/docker-readme.md)
 
-- If you are not using docker,  run these commands in the root folder:
+- If you are not using docker, run these commands in the root folder:
   ```
   cd SH
   python main.py
   ```
- 
-run `python main.py` to start the bot.
 
 ### 4. Use the sync command - sh!sync - to sync all slash commands. Then, restart your discord client.
 
 ## Files:
   Coming soon
+
 
 
