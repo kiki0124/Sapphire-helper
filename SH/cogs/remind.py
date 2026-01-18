@@ -131,7 +131,7 @@ class remind(commands.Cog):
     async def check_exception_posts(self):
         to_remove = []
         for post_id, tries in reminder_not_sent_posts.items():
-            post = self.client.get_channel(post_id)
+            post = self.client.get_channel(post_id) or await self.client.fetch_channel(post_id)
             if tries < 24:
                 try:
                     message: discord.Message|None = post.last_message or await post.fetch_message(post.last_message_id)
@@ -218,7 +218,7 @@ class remind(commands.Cog):
     @tasks.loop(hours=1)
     async def close_pending_posts(self):
         for post_id in await get_pending_posts():
-            post = self.client.get_channel(post_id)
+            post = self.client.get_channel(post_id) or await self.client.fetch_channel(post_id)
             if post: # check if the post was successfully fetched (not None)
                 ndr = NEED_DEV_REVIEW_TAG_ID not in post._applied_tags
                 more_than_24_hours = await check_post_last_message_time(post_id)
