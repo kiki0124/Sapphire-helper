@@ -22,6 +22,7 @@ class MyClient(commands.Bot):
         super().__init__(PREFIX, help_command=None, intents=intents, strip_after_prefix=True)
 
         self.alert_webhook_url: str | None = None
+        self.incomplete_msg_posts: list[int] = [] # list of the post ids
 
     async def setup_hook(self):
         unittest.main(test_functions, exit=False)

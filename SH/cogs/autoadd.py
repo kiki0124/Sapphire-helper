@@ -144,6 +144,7 @@ class autoadd(commands.Cog):
         if start_msg.content and (len(start_msg.content) < 15 or start_msg.content.casefold() == thread.name.casefold()) or not start_msg.content:
             greets = ["Hi", "Hey", "Hello", "Hi there"]
             await thread.starter_message.reply(content=f"{random.choice(greets)}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
+            self.client.incomplete_msg_posts.append(thread.id)
 
     async def send_suggestion_message(self, message: discord.Message):
         if message.author != self.client.user and message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id):
