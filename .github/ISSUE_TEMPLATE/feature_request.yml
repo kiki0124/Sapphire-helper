@@ -1,0 +1,36 @@
+name: Feature Request
+description: Suggestions/Requests to improve the bot/codebase 
+labels: feature request
+body:
+  - type: input
+    attributes:
+      label: Summary
+      description: >
+        A general overview on what the request is about
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: The Problem
+      description: >
+        What problem does your requested-feature solve, if any
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Your Solution
+      description: >
+        What is your solution to the problem, if any
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: The Current Solution
+      description: >
+        What is the current solution to the problem, if any
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Additional Information
+      description: If more context/information is needed, please do so here.
