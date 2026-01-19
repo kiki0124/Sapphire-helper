@@ -33,4 +33,4 @@ body:
   - type: textarea
     attributes:
       label: Additional Information
-      description: If more context/information is needed, please do so here.
+      description: If more context/information is needed, please add them here.
