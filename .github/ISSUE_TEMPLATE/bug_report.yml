@@ -21,9 +21,9 @@ body:
       required: true
   - type: textarea
     attributes:
-      label: Minimal Reproducible Code/Example
+      label: Minimal Reproducible Code/Example and Traceback
       description: >
-        The specific code that caused the bug, if applicable.
+        The specific code that caused the bug and traceback, if applicable.
       render: python
     validations:
       required: false
