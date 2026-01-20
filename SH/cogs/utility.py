@@ -33,27 +33,50 @@ WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
 UNANSWERED_TAG_ID = int(os.getenv("UNANSWERED_TAG_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv('DEVELOPERS_ROLE_ID'))
 
-class need_dev_review_buttons(ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    
+class NeedDevReviewButtons(ui.ActionRow):
     @ui.button(label="Show an example of the questions answered", style=discord.ButtonStyle.grey, custom_id="need-dev-review-example")
     async def on_show_example_click(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.send_message(
-            content="## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\
-            \n3. Join Roles are not being assigned. Steps:\n  - Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n  - Worked fine for two months.\n  - Suddenly stopped.\
-            \n4. Yes, in one server as well but not in another.\n5. IDs:\n  - 678279978244374528 (my main server)\n  - 181730794815881216 (does not work as well)\n  - 288847386002980875 (works there)\
-            \n6. I did:\n  - Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much", 
-            ephemeral=True
-            )
+        show_example_view = ui.LayoutView()
+        show_example_container = ui.Container(
+            ui.TextDisplay("## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\n3. Join Roles are not being assigned. Steps:\n\\- Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n\\- Worked fine for two months.\n\\- Suddenly stopped.\n4. Yes, in one server as well but not in another.\n5. IDs:\n\\- 678279978244374528 (my main server)\n\\- 181730794815881216 (does not work as well)\n\\- 288847386002980875 (works there)\n6. I did:\n\\- Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much")
+        )
+        show_example_view.add_item(show_example_container)
+        await interaction.response.send_message(view=show_example_view, ephemeral=True)
+
+
     @ui.button(label="How to get a server's ID?", style=discord.ButtonStyle.grey, custom_id="how-to-get-server-id")
     async def on_how_to_get_server_id_click(self, interaction: discord.Interaction, button: ui.Button):
-        embed = discord.Embed(
-            title="How to find your server's ID",
-            description="1. Open [Sapphire's dashboard](https://dashboard.sapph.xyz).\n2. Select your server.\n3. Find your server ID (16-19 long number) in the URL."
+        server_id_view = ui.LayoutView()
+        server_id_container = ui.Container()
+        server_id_view.add_item(server_id_container)
+
+        content = "## How to find your server's ID\n1. Open [Sapphire's dashboard](https://dashboard.sapph.xyz).\n2. Select your server.\n3. Find your server ID (16-19 long number) in the URL."
+        image = "https://img-temp.sapph.xyz/fef61749-efb4-46c5-4015-acc7311d7900"
+        server_id_container.add_item(ui.TextDisplay(content))
+        server_id_container.add_item(
+            ui.MediaGallery(
+                discord.MediaGalleryItem(image, description="Server id location")
+            )
         )
-        embed.set_image(url="https://img-temp.sapph.xyz/fef61749-efb4-46c5-4015-acc7311d7900")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        await interaction.response.send_message(view=server_id_view, ephemeral=True)
+
+
+class NeedDevReviewView(ui.LayoutView):
+    def __init__(self, *, executor_id: int = 0):
+        self.executor_id = executor_id
+        super().__init__(timeout=None)
+
+        container = ui.Container()
+        self.need_dev_review_buttons = NeedDevReviewButtons()
+        self.questions = f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by <@{self.executor_id}>\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _"
+        self.footer = "-# Thank you for helping Sapphire to continuously improve."
+        container.add_item(ui.TextDisplay(self.questions + "\n" + self.footer))
+        container.add_item(ui.Separator())
+        container.add_item(self.need_dev_review_buttons)
+
+        self.add_item(container)
+
 
 class ndr_options_buttons(ui.View):
     def __init__(self, Interaction: discord.Interaction):
@@ -93,12 +116,10 @@ class ndr_options_buttons(ui.View):
     async def on_send_questions_click(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer()
         await self.mark_post_as_ndr(interaction.channel)
-        embed = discord.Embed(
-                    description=f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by {interaction.user.mention}\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _",
-                    colour=0x2b2d31
-                )
-        embed.set_footer(text="Thank you for helping Sapphire to continuously improve.")
-        await interaction.channel.send(embed=embed, view=need_dev_review_buttons())
+        await interaction.channel.send(
+            view=NeedDevReviewView(executor_id=interaction.user.id),
+            allowed_mentions=discord.AllowedMentions.none()
+        )
         await self.Interaction.delete_original_response()
 
 class utility(commands.Cog):
@@ -249,9 +270,9 @@ class utility(commands.Cog):
         """
         return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID))
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        self.client.add_view(need_dev_review_buttons()) # add the need dev review button/view to make it persistent (work after restart)
+    @commands.Cog.listener("on_ready")
+    async def add_persistent_view(self):
+        self.client.add_view(NeedDevReviewView())
 
     @app_commands.command(name="solved", description="Mark the current post as solved")
     @app_commands.check(one_of_mod_expert_op)
@@ -393,6 +414,15 @@ class utility(commands.Cog):
                             await reaction.message.delete()
                             await self.send_qr_log(message=reaction.message, user=user)
                             return
+            elif reaction.message.flags.components_v2:
+                regex = f'-# (Recommended|Sent) by {user.mention}'
+                view = ui.LayoutView.from_message(reaction.message)
+                for child in view.walk_children():
+                    if isinstance(child, ui.TextDisplay) and re.match(regex, child.content, re.IGNORECASE):
+                        await reaction.message.delete()
+                        await self.send_qr_log(reaction.message, user)
+                        break
+
             if reaction.message.reference and reaction.message.reference.cached_message:
                 if user == reaction.message.reference.cached_message.author:
                     await reaction.message.delete()
@@ -415,15 +445,17 @@ class utility(commands.Cog):
                 "high": "We'll fix this as soon as we can.",
                 "special issue": "User specific issue"
             }
-            embed = discord.Embed(
-                title="",
-                description="### The development team has added this bug to their tracking list.",
-                colour=0xe88802
-            )
-            embed.add_field(name="Priority", value=priority, inline=False)
+            view = ui.LayoutView()
+            text = f"### The development team has added this bug to their tracking list\n**Priority**\n{priority}"
             if priority.casefold() != "special issue":
-                embed.add_field(name="When is this issue expected to be resolved?", value=priority_texts.get(priority.casefold()), inline=False)
-            await interaction.response.send_message(embed=embed)
+                text += f"\n**When is this issue expected to be resolved?**\n{priority_texts.get(priority.casefold())}"
+            container = ui.Container(
+                ui.TextDisplay(text),
+                accent_colour=0xE88802
+            )
+            view.add_item(container)
+            await interaction.response.send_message(view=view)
+
             ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
             cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
             appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
@@ -444,15 +476,16 @@ class utility(commands.Cog):
             if SOLVED_TAG_ID not in ctx.channel._applied_tags and NEED_DEV_REVIEW_TAG_ID not in ctx.channel._applied_tags:
                 if ctx.channel.id not in self.client.incomplete_msg_posts:
                     user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
-                    content = None
+                    text_prefix = "## Incomplete support post\nHey"
                     if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
-                        content = f"<@{user_id}>"
-                    embed = discord.Embed(
-                        title="Incomplete support post",
-                        description="Hey, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible",
-                        colour=0xFFA800
+                        text_prefix = f"## Incomplete support post\nHey <@{user_id}>"
+                    view = ui.LayoutView()
+                    container = ui.Container(
+                        ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible\n-# Reccomended by {ctx.author.mention}"),
+                        accent_colour=0xFFA800
                     )
-                    embed.set_footer(text=f"Recommended by @{ctx.author.name}", icon_url=ctx.author.display_avatar.url)
+                    view.add_item(container)
+
                     if not ctx.interaction:
                         await ctx.message.delete()
                     elif ctx.interaction:
@@ -466,9 +499,12 @@ class utility(commands.Cog):
                         action_id = generate_random_id()
                         await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
                         await self.send_action_log(action_id, ctx.channel.mention, tags, "/incomplete-post used")
-                    await ctx.channel.send(content=content, embed=embed)
+                    await ctx.channel.send(
+                        view=view,
+                        allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
+                    )
                 else:
-                    await ctx.reply("You cannot use this command as an automatic message was already sent.", ephemeral=True, delete_after=3)
+                    await ctx.reply("You cannot use this command as an automatic message was already sent.", ephemeral=True, delete_after=5)
             else:
                 await ctx.reply("You cannot use this command as this post has the *Solved* or *Needs dev review* tag.", ephemeral=True, delete_after=3)
         else:
@@ -484,13 +520,6 @@ class utility(commands.Cog):
         
         return commands.Cooldown(1,  5.0 * 60.0)
 
-    # def unrelated_cooldown_key(interaction: discord.Interaction):
-    #     """
-    #     The key used to define the cooldown by
-    #     """
-    #     return interaction.channel_id
-    # this is only here because it may be useful someday idk
-
 
     @app_commands.command(
             name='unrelated',
@@ -500,24 +529,31 @@ class utility(commands.Cog):
     @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
     async def wrong_server(self, interaction: discord.Interaction):
         await interaction.response.defer()
+        user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
 
-        embed = discord.Embed(
-            title="Unrelated question/issue",
-            description="Hey, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query.",
-            colour=discord.Colour.purple()
-        )
-        embed.set_footer(text=f"Recommended by @{interaction.user.name}", icon_url=interaction.user.display_avatar.url)
+        view = ui.LayoutView()
+        container = ui.Container(accent_colour=0xFFA800)
+        view.add_item(container)
 
-        content = ""
+        text_prefix = "Hey"
         if isinstance(interaction.channel, discord.Thread) and await self.is_mod_or_expert(interaction=interaction):
             if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-                user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
-                content = f"<@{user_id}>"
+                text_prefix = f"Hey <@{user_id}>"
                 await self.lock_unrelated_post(interaction.channel)
+        
+        title = "## Unrelated question/issue"
+        description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
+        footer = f"-# Recommended by {interaction.user.mention}"
 
-        await interaction.channel.send(content=content, embed=embed)
+        container.add_item(
+            ui.TextDisplay(f"{title}\n{description}\n{footer}")
+        )
+
+        await interaction.channel.send(
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
+        )
         await interaction.delete_original_response()
 
 async def setup(client: MyClient):
     await client.add_cog(utility(client))
-
