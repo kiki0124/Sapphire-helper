@@ -11,7 +11,7 @@ from aiocache import cached
 from discord import ui
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from main import MyClient #only import for autocomplete/typechecking
+    from main import MyClient
 
 load_dotenv()
 
@@ -27,15 +27,20 @@ MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
 APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
-class confirm_close(ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    
+class ConfirmCloseButtons(ui.ActionRow):
+    def __init__(self, view: 'ConfirmCloseView'):
+        self.__view = view
+        super().__init__()
+
+
     @ui.button(label="Mark as solved", style=discord.ButtonStyle.green, custom_id="auto-close-confirm")
     async def on_confirm_click(self, interaction: discord.Interaction, button: ui.Button):
         is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
         if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner:
-            await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# {interaction.user.name} clicked the confirm button", allowed_mentions=discord.AllowedMentions.none())
+            self.__view.textdisplay.content = f"{self.__view.textdisplay.content}\n-# {interaction.user.name} clicked the confirm button"
+            self.__view.container.remove_item(self)
+            await interaction.message.edit(view=self.__view, allowed_mentions=discord.AllowedMentions.none())
+
             solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
             appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
             cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
@@ -44,11 +49,13 @@ class confirm_close(ui.View):
                 tags.append(appeal)
             if cb in interaction.channel.applied_tags:
                 tags.append(cb)
+
             action_id = generate_random_id()
             try:
                 alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
             except discord.NotFound as e:
                 raise e
+
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Post starter message delete and confirm button clicked- mark post as solved")
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
@@ -57,13 +64,31 @@ class confirm_close(ui.View):
         else:
             await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
 
+
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
     async def on_cancel_click(self, interaction: discord.Interaction, button: ui.Button):
         is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
         if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner:
-            await interaction.message.edit(content=f"~~{interaction.message.content}~~\n-# {interaction.user.name} has clicked the *cancel* button.", view=None, allowed_mentions=discord.AllowedMentions.none())
+            self.__view.textdisplay.content = f"~~{self.__view.textdisplay.content}~~\n-# {interaction.user.name} has clicked the *cancel* button."
+            self.__view.container.remove_item(self)
+            await interaction.response.edit_message(view=self.__view)
         else:
             await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
+
+
+class ConfirmCloseView(ui.LayoutView):
+    def __init__(self, post_author: int = 0):
+        super().__init__(timeout=None)
+
+        self.greetings = ("Hi", "Hey", "Hello", "Hi there")
+        self.textdisplay = ui.TextDisplay(f"{random.choice(self.greetings)} <@{post_author}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.")
+        self.confirm_close_buttons = ConfirmCloseButtons(self)
+        self.container = ui.Container()
+
+        self.container.add_item(self.textdisplay)
+        self.container.add_item(self.confirm_close_buttons)
+        self.add_item(self.container)
+
 
 class autoadd(commands.Cog):
     def __init__(self, client: MyClient):
@@ -72,7 +97,7 @@ class autoadd(commands.Cog):
         
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):
-        self.client.add_view(confirm_close())
+        self.client.add_view(ConfirmCloseView())
 
     def cog_unload(self):
         self.close_abandoned_posts.cancel()
@@ -141,9 +166,21 @@ class autoadd(commands.Cog):
         await thread.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-add unanswered tag to a new post.")
         await self.send_action_log(action_id=action_id, post_mention=thread.mention, tags=tags, context="Auto add unanswered tag")
         start_msg = thread.starter_message
-        if start_msg.content and (len(start_msg.content) < 15 or start_msg.content.casefold() == thread.name.casefold()) or not start_msg.content:
+        if (
+            start_msg.content
+            and (len(start_msg.content) < 15
+            or start_msg.content.casefold() == thread.name.casefold())
+            or not start_msg.content
+            and not thread.owner.bot # prevent the message from sending if it was sent via rtdr
+        ):
+            view = ui.LayoutView()
+            container = ui.Container()
+            view.add_item(container)
             greets = ["Hi", "Hey", "Hello", "Hi there"]
-            await thread.starter_message.reply(content=f"{random.choice(greets)}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
+            container.add_item(
+                ui.TextDisplay(f"{random.choice(greets)}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.")
+            )
+            await thread.starter_message.reply(view=view, mention_author=True)
             self.client.incomplete_msg_posts.add(thread.id)
 
     async def send_suggestion_message(self, message: discord.Message):
@@ -208,10 +245,9 @@ class autoadd(commands.Cog):
                 greetings = ["Hi", "Hey", "Hello", "Hi there"]
                 owner_id = await get_post_creator_id(payload.channel_id) or message_channel.owner_id
                 await message_channel.send(
-                    content=f"{random.choice(greetings)} <@{owner_id}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.",
-                    view=confirm_close()
+                    view=ConfirmCloseView(post_author=owner_id)
                 )
-                
+
     @close_abandoned_posts.before_loop
     async def wait_until_ready(self):
         await self.client.wait_until_ready()
