@@ -80,7 +80,7 @@ class ConfirmCloseView(ui.LayoutView):
     def __init__(self, post_author: int = 0):
         super().__init__(timeout=None)
 
-        self.greetings = ["Hi", "Hey", "Hello", "Hi there"]
+        self.greetings = ("Hi", "Hey", "Hello", "Hi there")
         self.textdisplay = ui.TextDisplay(f"{random.choice(self.greetings)} <@{post_author}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.")
         self.confirm_close_buttons = ConfirmCloseButtons(self)
         self.container = ui.Container()

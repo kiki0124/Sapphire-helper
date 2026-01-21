@@ -38,7 +38,10 @@ class NeedDevReviewButtons(ui.ActionRow):
     async def on_show_example_click(self, interaction: discord.Interaction, button: ui.Button):
         show_example_view = ui.LayoutView()
         show_example_container = ui.Container(
-            ui.TextDisplay("## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\n3. Join Roles are not being assigned. Steps:\n\\- Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n\\- Worked fine for two months.\n\\- Suddenly stopped.\n4. Yes, in one server as well but not in another.\n5. IDs:\n\\- 678279978244374528 (my main server)\n\\- 181730794815881216 (does not work as well)\n\\- 288847386002980875 (works there)\n6. I did:\n\\- Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much")
+            ui.TextDisplay("## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\
+            \n3. Join Roles are not being assigned. Steps:\n  - Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n  - Worked fine for two months.\n  - Suddenly stopped.\
+            \n4. Yes, in one server as well but not in another.\n5. IDs:\n  - 678279978244374528 (my main server)\n  - 181730794815881216 (does not work as well)\n  - 288847386002980875 (works there)\
+            \n6. I did:\n  - Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much")
         )
         show_example_view.add_item(show_example_container)
         await interaction.response.send_message(view=show_example_view, ephemeral=True)
@@ -262,9 +265,9 @@ class utility(commands.Cog):
             return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)) or interaction.user.id == owner_id
         else:
             return False
-        
+
     @staticmethod
-    async def is_mod_or_expert(interaction: discord.Interaction):
+    async def is_mod_or_expert_or_dev(interaction: discord.Interaction):
         """  
         Checks if the interaction user is a Moderator or Community Expert
         """
@@ -528,32 +531,34 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
     async def wrong_server(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+            await interaction.response.defer()
+            user_id = 0
+            view = ui.LayoutView()
+            container = ui.Container(accent_colour=0xFFA800)
+            view.add_item(container)
 
-        view = ui.LayoutView()
-        container = ui.Container(accent_colour=0xFFA800)
-        view.add_item(container)
-
-        text_prefix = "Hey"
-        if isinstance(interaction.channel, discord.Thread) and await self.is_mod_or_expert(interaction=interaction):
-            if interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+            text_prefix = "Hey"
+            if await self.is_mod_or_expert_or_dev(interaction=interaction):
+                user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
                 text_prefix = f"Hey <@{user_id}>"
                 await self.lock_unrelated_post(interaction.channel)
-        
-        title = "## Unrelated question/issue"
-        description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
-        footer = f"-# Recommended by {interaction.user.mention}"
 
-        container.add_item(
-            ui.TextDisplay(f"{title}\n{description}\n{footer}")
-        )
+            title = "## Unrelated question/issue"
+            description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
+            footer = f"-# Recommended by {interaction.user.mention}"
 
-        await interaction.channel.send(
-            view=view,
-            allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
-        )
-        await interaction.delete_original_response()
+            container.add_item(
+                ui.TextDisplay(f"{title}\n{description}\n{footer}")
+            )
+
+            await interaction.channel.send(
+                view=view,
+                allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
+            )
+            await interaction.delete_original_response()
+        else:
+            interaction.response.send_message(f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
 async def setup(client: MyClient):
     await client.add_cog(utility(client))
