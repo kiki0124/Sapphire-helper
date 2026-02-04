@@ -11,17 +11,18 @@
 
 ### 1. Rename `_.env` to `.env` and replace each variable with its respective value.
 
-### 2. Install the libraries listed in requirements.txt -
+### 2. Install the libraries listed in requirements.txt
 ```
 pip install -r requirements.txt
 ```
+
 ### 3. Running the bot 
 - Using docker: [docker-readme](/docker-readme.md)
 
 - If you are not using docker, run these commands in the root folder:
-  ```
+  ```powershell
   cd SH
   python main.py
   ```
 
-### 4. Use the sync command - sh!sync - to sync all slash commands. Then, restart your discord client.
+### 4. Use the sync command - `sh!sync` - to sync all slash commands. Then, restart your discord client.
