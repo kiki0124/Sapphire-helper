@@ -20,9 +20,10 @@ pip install -r requirements.txt
 - Using docker: [docker-readme](/docker-readme.md)
 
 - If you are not using docker, run these commands in the root folder:
-  ```powershell
+  ```
   cd SH
   python main.py
   ```
 
 ### 4. Use the sync command - `sh!sync` - to sync all slash commands. Then, restart your discord client.
+
