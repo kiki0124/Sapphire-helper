@@ -9,5 +9,3 @@
 
 - [ ] If code changes were made then they have been tested.
 - [ ] This PR is not a code change (i.e, README)
-
- 
