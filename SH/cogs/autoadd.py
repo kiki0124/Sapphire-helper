@@ -141,7 +141,8 @@ class autoadd(commands.Cog):
         await thread.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-add unanswered tag to a new post.")
         await self.send_action_log(action_id=action_id, post_mention=thread.mention, tags=tags, context="Auto add unanswered tag")
         start_msg = thread.starter_message
-        if start_msg.content and (len(start_msg.content) < 15 or start_msg.content.casefold() == thread.name.casefold()) or not start_msg.content:
+        content_len = len(start_msg.content) if start_msg.content else 0
+        if content_len + len(thread.name) < 25 or start_msg.content.casefold() == thread.name.casefold():
             greets = ["Hi", "Hey", "Hello", "Hi there"]
             await thread.starter_message.reply(content=f"{random.choice(greets)}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.", mention_author=True)
             self.client.incomplete_msg_posts.add(thread.id)
