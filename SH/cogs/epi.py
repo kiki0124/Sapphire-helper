@@ -24,10 +24,7 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 epi_users: list[int] = []
 
-class get_notified(ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    
+class GetNotifiedButton(ui.ActionRow):
     @ui.button(label="Notify me when this issue is resolved", custom_id="epi-get-notified", style=discord.ButtonStyle.grey)
     async def on_get_notified_click(self, interaction: discord.Interaction, button: ui.Button):
         if interaction.user.id not in epi_users:
@@ -38,6 +35,27 @@ class get_notified(ui.View):
             await delete_epi_user(interaction.user.id)
             epi_users.remove(interaction.user.id)
             await interaction.response.send_message(content="You will no longer be notified for this issue!", ephemeral=True)
+
+
+class GetNotifiedView(ui.LayoutView):
+    def __init__(self, *, description: str = ""):
+        super().__init__(timeout=None)
+        self.description = description
+
+        title = "## Some services are currently experiencing issues"
+        accent_colour = 16749824
+        footer = "We're sorry for the inconvenience caused and thank you for your patience!"
+        get_notified_button = GetNotifiedButton()
+
+        container = ui.Container(accent_colour=accent_colour)
+        full_text = f"{title}\n{description.strip()}"
+        container.add_item(ui.TextDisplay(full_text))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(footer))
+        container.add_item(get_notified_button)
+
+        self.add_item(container)
+
 
 class select_channels(ui.ChannelSelect):
     def __init__(self, action: str, reason: str, i: discord.Interaction, slowmode: int | None = None):
@@ -163,26 +181,18 @@ class epi(commands.Cog):
     epi_data: dict[str, dict[int, int]] = {} # {str(started_iso_format: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
     status_page: Optional[bool|None] = None # true if its working, false if its not working
 
-    def generate_epi_embed(self) -> discord.Embed:
-        embed_data = {
-            "title": "Some services are currently experiencing issues",
-            "description": "",
-            "timestamp": list(self.epi_data.keys())[0],
-            "color": 16749824,
-            "footer": {
-                "text": "We're sorry for the inconvenience caused and thank you for your patience!"
-                }
-            }
+    def generate_epi_layout_view(self) -> GetNotifiedView:
+        description: str = ""
         if self.epi_msg:
-            embed_data["description"] += self.epi_msg
+            description += self.epi_msg
         if self.epi_Message:
-            embed_data["description"] += f"\n\n> ### An official status update has been posted: {self.epi_Message.jump_url}\n> {self.epi_Message.content if len(self.epi_Message.content) + len(self.epi_msg or '') + len(self.epi_Message.jump_url) < 1024 else self.epi_Message.content[:205:]+'*[...]*'}"
+            description += f"\n\n> ### An official status update has been posted: {self.epi_Message.jump_url}\n> {self.epi_Message.content if len(self.epi_Message.content) + len(self.epi_msg or '') + len (self.epi_Message.jump_url) < 1024 else self.epi_Message.content[:205:] + '*[...]*'}"
         if self.epi_Message or self.epi_msg:
-            embed_data["description"] += "\n\n"
-        embed_data["description"] += "-# You can also always check the [Sapphire status page](https://sapph.xyz/status)"
-        if self.status_page == False: # a GET to https://sapph.xyz/status returned a status code that is != 200
-            embed_data["description"] += " (currently not available)"
-        return discord.Embed().from_dict(embed_data)
+            description += "\n\n-# You can also always check the [Sapphire status page](https://sapph.xyz/status)"
+        if self.status_page == False:
+            description += " (currently unavailable)"
+        
+        return GetNotifiedView(description=description)
 
     async def send_epi_log(self, content: str):
         try:
@@ -206,7 +216,7 @@ class epi(commands.Cog):
         )
 
     async def handle_sticky_message(self, channel: discord.TextChannel | discord.PartialMessageable, delay: float = 4.0):
-        embed = self.generate_epi_embed()
+        view = self.generate_epi_layout_view()
         await asyncio.sleep(delay)
         self.is_being_executed = True
         if self.sticky_message:
@@ -214,7 +224,7 @@ class epi(commands.Cog):
                 await self.sticky_message.delete()
             except discord.NotFound:
                 pass
-        self.sticky_message = await channel.send(embed=embed, view=get_notified())
+        self.sticky_message = await channel.send(view=view)
         await update_sticky_message_id(self.pool, self.sticky_message.id)
         self.sticky_task = None
         self.is_being_executed = False
@@ -229,9 +239,9 @@ class epi(commands.Cog):
         self.sticky_message = None
         self.sticky_task = None
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        self.client.add_view(get_notified())
+    @commands.Cog.listener("on_ready")
+    async def add_persistent_view(self):
+        self.client.add_view(GetNotifiedView())
 
     async def cog_unload(self):
         await self.pool.close()
@@ -308,7 +318,15 @@ class epi(commands.Cog):
             await interaction.followup.send(command_response, ephemeral=True)
         else:
             await interaction.followup.send(content=f"EPI Mode is already enabled!", ephemeral=True)
-    
+
+    def find_message(self, message_id: int) -> Optional[discord.Message]:
+        if self.client.cached_messages:
+            for message in reversed(self.client.cached_messages):
+                if message.id == message_id:
+                    return message
+
+        return None
+
     @group.command(name="disable", description="Disable EPI mode- mark the issue as solved & ping all users that asked to be pinged")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(message="[Optional] A custom message to be displayed with the \"Hey, this is fixed now!\" message")
@@ -331,10 +349,17 @@ class epi(commands.Cog):
                 for thread_id, message_id in list(self.epi_data.values())[0].items():
                     thread = self.client.get_channel(thread_id)
                     if thread:
-                        msg = thread.get_partial_message(message_id)
+                        try:
+                            msg = self.find_message(message_id) or await thread.fetch_message(message_id)
+                        except (discord.HTTPException, discord.NotFound):
+                            continue
+                        new_view = ui.LayoutView.from_message(msg)
+                        for child in new_view.walk_children():
+                            if hasattr(child, "disabled"):
+                                child.disabled = True
                         if not thread.archived:
                             try:
-                                await msg.edit(view=None)
+                                await msg.edit(view=new_view)
                                 await msg.reply(
                                     content= content,
                                     mention_author=False
@@ -344,7 +369,7 @@ class epi(commands.Cog):
                         else:
                             await thread.edit(archived=False)
                             try:
-                                msg.edit(view=None)
+                                msg.edit(view=new_view)
                                 await msg.reply(
                                     content= content,
                                     mention_author=False
@@ -382,6 +407,7 @@ class epi(commands.Cog):
                     self.sticky_message = None
                 await interaction.channel.send(content=f"EPI mode successfully disabled by {interaction.user.name}.\nMentioned users: {mentioned}")
                 await self.send_epi_log(f"EPI mode disabled by {interaction.user.mention}\nCustom message: {message or 'not set'}")
+
             button.callback = on_button_click
             view = discord.ui.View()
             view.add_item(button)
@@ -401,7 +427,7 @@ class epi(commands.Cog):
             if self.epi_msg:
                 message = self.epi_msg
             await interaction.followup.send(
-                content=f"Current EPI mode Status message: {Message_url} | Custom message: {message}\nEPI-User count: {len(epi_users)}. Sticky: {bool(self.sticky_message)}",
+                content=f"**Current EPI mode Status message:** {Message_url}\n**Custom message:** {message}\n**EPI-User count:** {len(epi_users)}\n**Sticky:** {bool(self.sticky_message)}",
                 ephemeral=True
             )
         else:
@@ -475,8 +501,8 @@ class epi(commands.Cog):
     async def send_epi_info(self, thread: discord.Thread):
         if thread.parent_id == SUPPORT_CHANNEL_ID and self.epi_data:
             await asyncio.sleep(3) # make sure that epi messages will be sent last (after more info message)
-            embed = self.generate_epi_embed()
-            message = await thread.send(embed=embed, view=get_notified())
+            view = self.generate_epi_layout_view()
+            message = await thread.send(view=view)
             await add_epi_message(self.pool, message.id, thread.id)
             index = list(self.epi_data.keys())[0]
             self.epi_data[index][thread.id] = message.id
@@ -647,7 +673,7 @@ class epi(commands.Cog):
                 await followup.edit(content=f"An error occured while trying to send the notification... {e}")
                 raise e
 
-    @app_commands.command(name="page", description="Alert the developer of any downtime or critical issues")
+    @app_commands.command(name="page", description="Alert the lead developer of any downtime or critical issues")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(
         service="The affected service(s) - Sapphire- bot/dashboard | appeal.gg | All",

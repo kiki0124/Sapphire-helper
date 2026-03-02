@@ -81,8 +81,8 @@ class update_tag_modal(ui.Modal):
             style=discord.TextStyle.paragraph, 
             placeholder="The new content that this tag should have", 
             max_length=950
-            )
-            )
+        )
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -157,9 +157,13 @@ class quick_replies(commands.Cog):
     @app_commands.checks.dynamic_cooldown(tag_use_dynamic_cooldown, key= lambda i: (i.channel.id, i.user.id))
     async def use(self, interaction: discord.Interaction, tag: str):
         await interaction.response.defer(ephemeral=True)
+        view = ui.LayoutView()
+        container = ui.Container()
+        view.add_item(container)
+
         if await check_tag_exists(self.pool, tag):
             content = await get_tag_content(self.pool, tag)
-            confirm = ui.Button(
+            confirm_button = ui.Button(
                 label="Confirm",
                 custom_id="tag-send-confirm",
                 style=discord.ButtonStyle.danger
@@ -175,40 +179,63 @@ class quick_replies(commands.Cog):
                     await i.delete_original_response()
                 except discord.HTTPException:
                     pass # message was most likely already dismissed by the user
-                await interaction.channel.send(f"{content}\n-# Recommended by {i.user.mention}", allowed_mentions=discord.AllowedMentions.none())
-            view = ui.View()
-            confirm.callback = confirm_click
-            view.add_item(confirm)
-            await interaction.followup.send(
-                f"Are you sure you would like to send this tag?\n{content}\n-# Click *Confirm* to confirm, dismiss message to cancel",
-                view=view
-            )
+                tag_view = ui.LayoutView()
+                tag_container = ui.Container()
+                tag_view.add_item(tag_container)
+
+                tag_container.add_item(ui.TextDisplay(content))
+                tag_container.add_item(ui.Separator())
+                tag_container.add_item(ui.TextDisplay(f"Recommended by {i.user.mention}"))
+                await interaction.channel.send(view=tag_view, allowed_mentions=discord.AllowedMentions.none())
+
+            confirm_button.callback = confirm_click
+
+            container.add_item(ui.TextDisplay("### Are you sure you would like to send this tag?\n-# Click *Confirm* to confirm, dismiss message to cancel"))
+            container.add_item(ui.Separator())
+            container.add_item(ui.TextDisplay(content))
+            container.add_item(ui.Separator())
+            container.add_item(ui.ActionRow(confirm_button))
+
+            await interaction.followup.send(view=view)
         else:
             content = "Tag not found."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f" Similar tags:\n"
+                content += f"\n### Similar tags:\n"
                 content += "\n".join(suggestions)
-            await interaction.followup.send(content, ephemeral=True)
+            container.add_item(ui.TextDisplay(content))
+            await interaction.followup.send(view=view, ephemeral=True)
 
     @tag_group.command(name="info", description="Get info about a specific tag")
     @app_commands.describe(tag="The name of the tag")
     async def info(self, interaction: discord.Interaction, tag: str):
         await interaction.response.defer(ephemeral=True)
+
+        view = ui.LayoutView()
+        container = ui.Container()
+        view.add_item(container)
+
         tag_data = await get_tag_data(self.pool, tag)
         if tag_data:
             created_ts = tag_data["created_ts"]
             creator_id = tag_data["creator_id"]
             content = tag_data["content"]
             uses = tag_data["uses"]
-            await interaction.followup.send(f"Name: `{tag}`\nCreated by: <@{creator_id}>\nCreated on: <t:{created_ts}:f>\nUses: `{uses}`\nContent: ```\n{content}\n```", ephemeral=True)
+
+            tag_data_textdisplay = ui.TextDisplay(f"Name: {tag}\nCreated by: <@{creator_id}>\nCreated on: <t:{created_ts}>\nUses: {uses}")
+            container.add_item(tag_data_textdisplay)
+            container.add_item(ui.Separator())
+            container.add_item(ui.TextDisplay(content))
+
+            await interaction.followup.send(view=view, ephemeral=True)
         else:
             content = f"There's no tag with the name `{tag}`."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f" Similar tags:\n"
+                content += f"\n### Similar tags:\n"
                 content += '\n'.join(suggestions)
-            await interaction.followup.send(content, ephemeral=True)
+            container.add_item(ui.TextDisplay(content))
+            await interaction.followup.send(view=view, ephemeral=True)
 
     @tasks.loop(minutes=1)
     async def refresh_use_count(self):
@@ -229,8 +256,13 @@ class quick_replies(commands.Cog):
     @app_commands.describe(tag="The name of the tag to be deleted")
     async def delete(self, interaction: discord.Interaction, tag: str):
         await interaction.response.defer(ephemeral=True)
+
+        view = ui.LayoutView()
+        container = ui.Container()
+        view.add_item(container)
+
         if await check_tag_exists(self.pool, tag):
-            confirm = ui.Button(
+            confirm_button = ui.Button(
                 label="Confirm",
                 style=discord.ButtonStyle.danger,
                 custom_id="tag-delete-confirm"
@@ -245,21 +277,28 @@ class quick_replies(commands.Cog):
                     if tag in self.used_tags:
                         del self.used_tags[tag]
                 try:
-                    await interaction.delete_original_response()
+                    tag_deleted_view = ui.LayoutView()
+                    tag_deleted_container = ui.Container(
+                        ui.TextDisplay(f"Successfully deleted tag `{tag}`!")
+                    )
+                    tag_deleted_view.add_item(tag_deleted_container)
+                    await interaction.edit_original_response(view=tag_deleted_view)
                 except discord.HTTPException: # message was most likely already dismissed by the user
                     pass
-                await i.followup.send(f"Successfully deleted tag `{tag}`!", ephemeral=True)
-            confirm.callback = on_confirm_click
-            view = ui.View()
-            view.add_item(confirm)
-            await interaction.followup.send(f"Are you sure you would like to delete the tag `{tag}`?\n-# Click *Confirm* to confirm, dismiss message to cancel", view=view)
+            confirm_button.callback = on_confirm_click
+
+            container.add_item(ui.TextDisplay(f"Are you sure you would like to delete the tag `{tag}`?\n-# Click *Confirm* to confirm, dismiss message to cancel"))
+            container.add_item(ui.ActionRow(confirm_button))
+
+            await interaction.followup.send(view=view)
         else:
             content = f"Couldn't delete tag `{tag}` because it doesn't exist or has already been deleted."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f" Similar tags:\n"
+                content += f"\n### Similar tags:\n"
                 content += '\n'.join(suggestions)
-            await interaction.followup.send(content, ephemeral=True)
+            container.add_item(ui.TextDisplay(content))
+            await interaction.followup.send(view=view, ephemeral=True)
 
     @tag_group.command(name="edit", description="edit the content for an existing tag")
     @app_commands.describe(tag="The name of the tag that should be editted")
@@ -270,9 +309,15 @@ class quick_replies(commands.Cog):
             content = f"Couldn't edit tag `{tag}` because it doesn't exist."
             suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
             if suggestions:
-                content += f" Similar tags:\n"
+                content += f"\n### Similar tags:\n"
                 content += '\n'.join(suggestions)
-            await interaction.response.send_message(content, ephemeral=True)
+
+            view = ui.LayoutView()
+            container = ui.Container()
+            view.add_item(container)
+
+            container.add_item(ui.TextDisplay(content))
+            await interaction.response.send_message(view=view, ephemeral=True)
 
 async def setup(client: MyClient):
     await client.add_cog(quick_replies(client))
