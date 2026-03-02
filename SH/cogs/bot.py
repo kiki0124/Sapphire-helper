@@ -107,7 +107,7 @@ class bot(commands.Cog):
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def stats(self, ctx: commands.Context):
         embed = discord.Embed(
-            title="Sapphire Helper | Version 6.0",
+            title="Sapphire Helper | Version 6.1",
             colour=discord.Colour.purple(),
             url="https://github.com/kiki0124/sapphire-helper"
         )
