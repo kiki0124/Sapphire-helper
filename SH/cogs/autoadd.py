@@ -166,11 +166,10 @@ class autoadd(commands.Cog):
         await thread.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-add unanswered tag to a new post.")
         await self.send_action_log(action_id=action_id, post_mention=thread.mention, tags=tags, context="Auto add unanswered tag")
         start_msg = thread.starter_message
+        content_len = len(start_msg.content) if start_msg.content else 0
         if (
-            start_msg.content
-            and (len(start_msg.content) < 15
-            or start_msg.content.casefold() == thread.name.casefold())
-            or not start_msg.content
+            content_len + len(thread.name) < 25
+            or start_msg.content.casefold() == thread.name.casefold()
             and not thread.owner.bot # prevent the message from sending if it was sent via rtdr
         ):
             view = ui.LayoutView()
