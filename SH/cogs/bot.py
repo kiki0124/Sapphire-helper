@@ -25,8 +25,8 @@ class bot(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
 
+    # Removed the role restriction from the ping command so all members can use it.
     @commands.command(name="ping")
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def ping(self, ctx: commands.Context):
         now = datetime.datetime.now()
         message = await ctx.reply(content=f"Pong!\nClient latency: {str(self.client.latency)[:4]}s", mention_author=False)
