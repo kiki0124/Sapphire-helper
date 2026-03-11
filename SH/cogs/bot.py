@@ -25,6 +25,11 @@ class bot(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
 
+    async def ping_cooldown(interaction: discord.Interaction):
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
+            return
+        return commands.Cooldown(1, 15) # 1 use per 15 seconds
+
     @commands.command(name="ping")
     async def ping(self, ctx: commands.Context):
         now = datetime.datetime.now()
