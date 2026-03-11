@@ -25,12 +25,14 @@ class bot(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
 
-    async def ping_cooldown(interaction: discord.Interaction):
-        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
-            return
-        return commands.Cooldown(1, 15) # 1 use per 15 seconds
+    def get_cooldown_key(ctx: commands.Context):
+        if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
+            return None
+        return commands.Cooldown(1, 15)
 
     @commands.command(name="ping")
+    @commands.guild_only()
+    @commands.dynamic_cooldown(get_cooldown_key, type=commands.BucketType.member)
     async def ping(self, ctx: commands.Context):
         now = datetime.datetime.now()
         message = await ctx.reply(content=f"Pong!\nClient latency: {str(self.client.latency)[:4]}s", mention_author=False)
