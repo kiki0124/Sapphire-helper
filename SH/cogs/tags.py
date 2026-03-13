@@ -106,6 +106,38 @@ class update_tag_modal(ui.Modal):
         )
         await interaction.followup.send(f"Successfully updated `{self.tag}`'s content!")
 
+
+class TagConfirmRow(ui.ActionRow):
+    def __init__(self, parent: quick_replies, tag: str, tag_content: str):
+        self.__parent = parent
+        self.tag = tag
+        self.tag_content = tag_content
+        super().__init__()
+
+    @ui.button(label="Confirm", style=discord.ButtonStyle.success)
+    async def confirm(self, interaction: discord.Interaction, button):
+        await interaction.response.defer()
+        async with self.__parent.used_tags_lock:
+            if self.tag in self.__parent.used_tags.keys():
+                self.__parent.used_tags[self.tag] += 1
+            else:
+                self.__parent.used_tags[self.tag] = 1
+        try:
+            await interaction.delete_original_response()
+        except discord.HTTPException:
+            pass # user likely dismissed the message already
+
+        tag_view = ui.LayoutView()
+        tag_container = ui.Container()
+        tag_view.add_item(tag_container)
+
+        tag_container.add_item(ui.TextDisplay(self.tag_content))
+        tag_container.add_item(ui.Separator())
+
+        tag_container.add_item(ui.TextDisplay(f"Reccomended by {interaction.user.mention}"))
+        await interaction.channel.send(view=tag_view, allowed_mentions=discord.AllowedMentions.none())
+
+
 class quick_replies(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
@@ -163,38 +195,11 @@ class quick_replies(commands.Cog):
 
         if await check_tag_exists(self.pool, tag):
             content = await get_tag_content(self.pool, tag)
-            confirm_button = ui.Button(
-                label="Confirm",
-                custom_id="tag-send-confirm",
-                style=discord.ButtonStyle.danger
-            )
-            async def confirm_click(i: discord.Interaction):
-                await i.response.defer(ephemeral=True)
-                async with self.used_tags_lock:
-                    if tag in self.used_tags.keys():
-                        self.used_tags[tag] +=1
-                    else:
-                        self.used_tags[tag] = 1
-                try:
-                    await i.delete_original_response()
-                except discord.HTTPException:
-                    pass # message was most likely already dismissed by the user
-                tag_view = ui.LayoutView()
-                tag_container = ui.Container()
-                tag_view.add_item(tag_container)
-
-                tag_container.add_item(ui.TextDisplay(content))
-                tag_container.add_item(ui.Separator())
-                tag_container.add_item(ui.TextDisplay(f"Recommended by {i.user.mention}"))
-                await interaction.channel.send(view=tag_view, allowed_mentions=discord.AllowedMentions.none())
-
-            confirm_button.callback = confirm_click
-
             container.add_item(ui.TextDisplay("### Are you sure you would like to send this tag?\n-# Click *Confirm* to confirm, dismiss message to cancel"))
             container.add_item(ui.Separator())
             container.add_item(ui.TextDisplay(content))
             container.add_item(ui.Separator())
-            container.add_item(ui.ActionRow(confirm_button))
+            container.add_item(TagConfirmRow(self, tag, content))
 
             await interaction.followup.send(view=view)
         else:
