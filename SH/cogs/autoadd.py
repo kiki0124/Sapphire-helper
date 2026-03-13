@@ -28,7 +28,7 @@ APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class ConfirmCloseButtons(ui.ActionRow):
-    def __init__(self, view: 'ConfirmCloseView'):
+    def __init__(self, view: ConfirmCloseView):
         self.__view = view
         super().__init__()
 
