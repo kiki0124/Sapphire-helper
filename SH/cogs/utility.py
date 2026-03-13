@@ -424,7 +424,7 @@ class utility(commands.Cog):
                     if isinstance(child, ui.TextDisplay) and re.match(regex, child.content, re.IGNORECASE):
                         await reaction.message.delete()
                         await self.send_qr_log(reaction.message, user)
-                        break
+                        return
 
             if reaction.message.reference and reaction.message.reference.cached_message:
                 if user == reaction.message.reference.cached_message.author:
