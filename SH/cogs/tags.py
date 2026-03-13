@@ -118,7 +118,7 @@ class TagConfirmRow(ui.ActionRow):
     async def confirm(self, interaction: discord.Interaction, button):
         await interaction.response.defer()
         async with self.__parent.used_tags_lock:
-            if self.tag in self.__parent.used_tags.keys():
+            if self.tag in self.__parent.used_tags:
                 self.__parent.used_tags[self.tag] += 1
             else:
                 self.__parent.used_tags[self.tag] = 1
