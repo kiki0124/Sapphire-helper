@@ -134,7 +134,7 @@ class TagConfirmRow(ui.ActionRow):
         tag_container.add_item(ui.TextDisplay(self.tag_content))
         tag_container.add_item(ui.Separator())
 
-        tag_container.add_item(ui.TextDisplay(f"Reccomended by {interaction.user.mention}"))
+        tag_container.add_item(ui.TextDisplay(f"Recommended by {interaction.user.mention}"))
         await interaction.channel.send(view=tag_view, allowed_mentions=discord.AllowedMentions.none())
 
 
