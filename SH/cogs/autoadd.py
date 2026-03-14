@@ -77,7 +77,7 @@ class ConfirmCloseButtons(ui.ActionRow):
 
 
 class ConfirmCloseView(ui.LayoutView):
-    def __init__(self, *, post_author: int = 0):
+    def __init__(self, post_author: int = 0):
         super().__init__(timeout=None)
 
         self.greetings = ("Hi", "Hey", "Hello", "Hi there")
