@@ -531,34 +531,36 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
     async def wrong_server(self, interaction: discord.Interaction):
-        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            await interaction.response.defer()
-            user_id = 0
-            view = ui.LayoutView()
-            container = ui.Container(accent_colour=0xFFA800)
-            view.add_item(container)
-
-            text_prefix = "Hey"
-            if await self.is_mod_or_expert_or_dev(interaction=interaction):
-                user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
-                text_prefix = f"Hey <@{user_id}>"
-                await self.lock_unrelated_post(interaction.channel)
-
-            title = "## Unrelated question/issue"
-            description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
-            footer = f"-# Recommended by {interaction.user.mention}"
-
-            container.add_item(
-                ui.TextDisplay(f"{title}\n{description}\n{footer}")
-            )
-
-            await interaction.channel.send(
-                view=view,
-                allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
-            )
-            await interaction.delete_original_response()
-        else:
+        if not isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             interaction.response.send_message(f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
+            return
+        
+        await interaction.response.defer()
+        user_id = 0
+        view = ui.LayoutView()
+        container = ui.Container(accent_colour=0xFFA800)
+        view.add_item(container)
+
+        text_prefix = "Hey"
+        if await self.is_mod_or_expert_or_dev(interaction=interaction):
+            user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+            text_prefix = f"Hey <@{user_id}>"
+            await self.lock_unrelated_post(interaction.channel)
+
+        title = "## Unrelated question/issue"
+        description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
+        footer = f"-# Recommended by {interaction.user.mention}"
+
+        container.add_item(
+            ui.TextDisplay(f"{title}\n{description}\n{footer}")
+        )
+
+        await interaction.channel.send(
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
+        )
+        await interaction.delete_original_response()
+            
 
 async def setup(client: MyClient):
     await client.add_cog(utility(client))

@@ -109,7 +109,7 @@ class readthedamnrules(commands.Cog):
         footer = ui.TextDisplay(f"{self.get_extra_content(reference_message)}\n-# Created by {user.mention} | In the future please always create a post in <#{SUPPORT_CHANNEL_ID}> for all Sapphire and appeal.gg related questions.")
 
         container = ui.Container(user_message)
-        if len(gallery_items) > 0:
+        if gallery_items:
             container.add_item(ui.MediaGallery(*gallery_items))
         container.add_item(ui.Separator(spacing=discord.SeparatorSpacing.large))
         container.add_item(footer)
