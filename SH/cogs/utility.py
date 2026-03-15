@@ -532,7 +532,7 @@ class utility(commands.Cog):
     @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
     async def wrong_server(self, interaction: discord.Interaction):
         if not isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            interaction.response.send_message(f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
+            await interaction.response.send_message(f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
             return
         
         await interaction.response.defer()
