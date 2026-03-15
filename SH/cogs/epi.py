@@ -179,7 +179,7 @@ class epi(commands.Cog):
     epi_msg: Optional[str] = None
     epi_Message: Optional[discord.Message] = None
     epi_data: dict[str, dict[int, int]] = {} # {str(started_iso_format: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
-    status_page: Optional[bool|None] = None # true if its working, false if its not working
+    status_page: Optional[bool] = None # true if its working, false if its not working
 
     def generate_epi_layout_view(self) -> GetNotifiedView:
         description: str = ""
@@ -189,7 +189,7 @@ class epi(commands.Cog):
             description += f"\n\n> ### An official status update has been posted: {self.epi_Message.jump_url}\n> {self.epi_Message.content if len(self.epi_Message.content) + len(self.epi_msg or '') + len (self.epi_Message.jump_url) < 1024 else self.epi_Message.content[:205:] + '*[...]*'}"
         if self.epi_Message or self.epi_msg:
             description += "\n\n-# You can also always check the [Sapphire status page](https://sapph.xyz/status)"
-        if self.status_page == False:
+        if not self.status_page:
             description += " (currently unavailable)"
         
         return GetNotifiedView(description=description)
@@ -351,7 +351,7 @@ class epi(commands.Cog):
                     if thread:
                         try:
                             msg = self.find_message(message_id) or await thread.fetch_message(message_id)
-                        except (discord.HTTPException, discord.NotFound):
+                        except discord.HTTPException:
                             continue
                         new_view = ui.LayoutView.from_message(msg)
                         for child in new_view.walk_children():

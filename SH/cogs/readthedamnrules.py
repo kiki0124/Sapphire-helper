@@ -56,7 +56,7 @@ class readthedamnrules(commands.Cog):
             for attachment in msg.attachments:
                 try:
                     file = await attachment.to_file()
-                except (discord.HTTPException, discord.NotFound):
+                except discord.HTTPException:
                     continue
                 item = discord.MediaGalleryItem(
                     media=file,
