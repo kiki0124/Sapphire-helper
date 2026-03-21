@@ -241,7 +241,6 @@ class autoadd(commands.Cog):
             tag_filters = NEED_DEV_REVIEW_TAG_ID not in tags and SOLVED_TAG_ID not in tags
             other_filters = not message_channel.locked and not message_channel.archived
             if tag_filters and other_filters:
-                greetings = ["Hi", "Hey", "Hello", "Hi there"]
                 owner_id = await get_post_creator_id(payload.channel_id) or message_channel.owner_id
                 await message_channel.send(
                     view=ConfirmCloseView(post_author=owner_id)
