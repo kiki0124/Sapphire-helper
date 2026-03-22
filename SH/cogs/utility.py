@@ -41,7 +41,8 @@ class NeedDevReviewButtons(ui.ActionRow):
             ui.TextDisplay("## Example message on how you could answer these questions for an imaginary issue.\n\n1. Join Roles\n2. Last join role assigned yesterday at 6:03 am UTC\
             \n3. Join Roles are not being assigned. Steps:\n  - Added role \"Users\" (701822101941649558) to Join Roles in dashboard.\n  - Worked fine for two months.\n  - Suddenly stopped.\
             \n4. Yes, in one server as well but not in another.\n5. IDs:\n  - 678279978244374528 (my main server)\n  - 181730794815881216 (does not work as well)\n  - 288847386002980875 (works there)\
-            \n6. I did:\n  - Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much")
+            \n6. I did:\n  - Removed Join Role and set it again in the dashboard\n7. Yes, we rely on Sapphire's Join Roles very much"),
+            accent_color=discord.Color.purple()
         )
         show_example_view.add_item(show_example_container)
         await interaction.response.send_message(view=show_example_view, ephemeral=True)
@@ -50,7 +51,7 @@ class NeedDevReviewButtons(ui.ActionRow):
     @ui.button(label="How to get a server's ID?", style=discord.ButtonStyle.grey, custom_id="how-to-get-server-id")
     async def on_how_to_get_server_id_click(self, interaction: discord.Interaction, button: ui.Button):
         server_id_view = ui.LayoutView()
-        server_id_container = ui.Container()
+        server_id_container = ui.Container(accent_color=discord.Color.purple())
         server_id_view.add_item(server_id_container)
 
         content = "## How to find your server's ID\n1. Open [Sapphire's dashboard](https://dashboard.sapph.xyz).\n2. Select your server.\n3. Find your server ID (16-19 long number) in the URL."
@@ -70,7 +71,7 @@ class NeedDevReviewView(ui.LayoutView):
         self.executor_id = executor_id
         super().__init__(timeout=None)
 
-        container = ui.Container()
+        container = ui.Container(accent_color=discord.Color.purple())
         self.need_dev_review_buttons = NeedDevReviewButtons()
         self.questions = f"# Waiting for dev review\nThis post was marked as **<:sapphire_red:908755238473834536> Needs dev review** by <@{self.executor_id}>\n\n### Please answer _all_ of the following questions, regardless of whether they have already been answered somewhere in this post.\n1. Which feature(s) are connected to this issue?\n2. When did this issue start to occur?\n3. What is the issue and which steps lead to it?\n4. Can this issue be reproduced by other users/in other servers?\n5. Which server IDs are related to this issue?\n6. What did you already try to fix this issue by yourself? Did it work?\n7. Does this issue need to be fixed urgently?\n\n_ _"
         self.footer = "-# Thank you for helping Sapphire to continuously improve."
