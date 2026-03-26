@@ -182,7 +182,7 @@ class remind(commands.Cog):
         for post in await support.guild.active_threads():
             now_dt = time_snowflake(datetime.now(timezone.utc))
             more_than_day = check_time_more_than_day(snowflake_time(post.last_message_id or now_dt).timestamp()) # Check time before making any further API/DB calls
-            if not more_than_day or (post.id in reminder_not_sent_posts and post.id in pending_posts):
+            if not more_than_day or post.id in reminder_not_sent_posts or post.id in pending_posts:
                 continue
             if not await self.reminders_filter(post):
                 continue
