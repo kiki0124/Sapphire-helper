@@ -5,7 +5,7 @@ from discord.ext import commands, tasks
 from functions import add_post_to_pending, \
     remove_post_from_pending, get_pending_posts, \
     check_post_last_message_time, check_time_more_than_day,\
-    get_post_creator_id, remove_post_from_rtdr, generate_random_id, in_pending_posts, bulk_add_posts_to_pending, bulk_remove_post_from_pending
+    get_post_creator_id, remove_post_from_rtdr, generate_random_id, in_pending_posts, bulk_add_posts_to_pending, bulk_remove_posts_from_pending
 import random
 from discord import ui
 from datetime import datetime, timezone
@@ -258,7 +258,7 @@ class remind(commands.Cog):
 
         if not posts_to_remove:
             return
-        await bulk_remove_post_from_pending(posts_to_remove)
+        await bulk_remove_posts_from_pending(posts_to_remove)
 
 
     @check_for_pending_posts.before_loop

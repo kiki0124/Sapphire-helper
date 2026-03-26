@@ -124,7 +124,7 @@ async def get_pending_posts():
             await cu.execute("SELECT post_id FROM pending_posts")
             return [row['post_id'] for row in await cu.fetchall()]
         
-async def bulk_remove_post_from_pending(post_ids: list[int]) -> None:
+async def bulk_remove_posts_from_pending(post_ids: list[int]) -> None:
     post_ids_sql = ",".join("?" for _ in range(len(post_ids)))
     async with sql.connect(DB_PATH) as conn:
         await conn.execute(f'DELETE FROM pending_posts WHERE post_id in ({post_ids_sql})', tuple(post_ids))
