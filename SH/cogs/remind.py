@@ -226,7 +226,10 @@ class remind(commands.Cog):
     async def close_pending_posts(self):
         posts_to_remove: list[int] = []
         for post_id in await get_pending_posts():
-            post = self.client.get_channel(post_id) or await self.client.fetch_channel(post_id)
+            try:
+                post = self.client.get_channel(post_id) or await self.client.fetch_channel(post_id)
+            except discord.NotFound:
+                continue
             if not post: # check if the post was successfully fetched (not None)
                 continue
             ndr = NEED_DEV_REVIEW_TAG_ID not in post._applied_tags
