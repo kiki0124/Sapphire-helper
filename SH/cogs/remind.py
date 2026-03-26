@@ -225,13 +225,18 @@ class remind(commands.Cog):
     @tasks.loop(hours=1)
     async def close_pending_posts(self):
         posts_to_remove: list[int] = []
-        for post_id in await get_pending_posts():
+        pending_posts = await get_pending_posts()
+
+        for post_id in pending_posts:
             try:
                 post = self.client.get_channel(post_id) or await self.client.fetch_channel(post_id)
             except discord.NotFound:
                 continue
+
             if not post: # check if the post was successfully fetched (not None)
+                posts_to_remove.append(post_id)
                 continue
+
             ndr = NEED_DEV_REVIEW_TAG_ID not in post._applied_tags
             if ndr and await check_post_last_message_time(post_id):
                 applied_tags = post.applied_tags
@@ -245,13 +250,11 @@ class remind(commands.Cog):
                 action_id = generate_random_id()
                 try:
                     await post.edit(archived=True, reason=f"ID: {action_id}. Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
-                except Exception:
+                except discord.HTTPException:
                     continue
                 await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
                 await remove_post_from_rtdr(post.id)
                 posts_to_remove.append(post.id)
-            else:
-                posts_to_remove.append(post_id)
 
         if not posts_to_remove:
             return
