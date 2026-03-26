@@ -9,7 +9,6 @@ from functions import add_post_to_pending, \
 import random
 from discord import ui
 from datetime import datetime, timezone
-from time import perf_counter
 import os
 from dotenv import load_dotenv
 from typing import TYPE_CHECKING
