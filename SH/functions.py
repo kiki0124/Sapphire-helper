@@ -85,6 +85,15 @@ async def execute_sql(cmd: str) -> dict[str, Any] | Exception:
             await conn.commit()
             result = await cu.fetchall()
             return sql_to_dict(result)
+        
+async def bulk_add_posts_to_pending(post_ids: list[int]) -> None:
+    now = int(datetime.datetime.now().timestamp())
+    args = ((post_id, now) for post_id in post_ids)
+
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.transaction():
+            await conn.executemany(f"INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING",
+                               args)
 
 async def add_post_to_pending(post_id: int) -> None:
     """
@@ -114,6 +123,12 @@ async def get_pending_posts():
         async with conn.cursor() as cu:
             await cu.execute("SELECT post_id FROM pending_posts")
             return [row['post_id'] for row in await cu.fetchall()]
+        
+async def bulk_remove_post_from_pending(post_ids: list[int]) -> None:
+    post_ids_sql = ",".join("?" for _ in range(len(post_ids)))
+    async with sql.connect(DB_PATH) as conn:
+        await conn.execute(f'DELETE FROM pending_posts WHERE post_id in ({post_ids_sql})', tuple(post_ids))
+        await conn.commit()
 
 async def remove_post_from_pending(post_id: int) -> None:
     """  
