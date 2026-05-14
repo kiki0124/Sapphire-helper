@@ -35,7 +35,7 @@ class ConfirmCloseButtons(ui.ActionRow):
 
     @ui.button(label="Mark as solved", style=discord.ButtonStyle.green, custom_id="auto-close-confirm")
     async def on_confirm_click(self, interaction: discord.Interaction, button: ui.Button):
-        is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
+        is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
         if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner:
             self.__view.textdisplay.content = f"{self.__view.textdisplay.content}\n-# {interaction.user.name} clicked the confirm button"
             self.__view.container.remove_item(self)
@@ -67,7 +67,7 @@ class ConfirmCloseButtons(ui.ActionRow):
 
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
     async def on_cancel_click(self, interaction: discord.Interaction, button: ui.Button):
-        is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
+        is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
         if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner:
             self.__view.textdisplay.content = f"~~{self.__view.textdisplay.content}~~\n-# {interaction.user.name} has clicked the *cancel* button."
             self.__view.container.remove_item(self)
@@ -153,6 +153,7 @@ class autoadd(commands.Cog):
     async def message(self, message: discord.Message):
         if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
             if message.id == message.channel.id:
+                self.client.add_member_to_cache(message.author)
                 await self.on_thread_create(message.channel)
             if message.channel.id not in self.sent_post_ids:
                 await self.send_suggestion_message(message)
@@ -170,7 +171,7 @@ class autoadd(commands.Cog):
         if (
             content_len + len(thread.name) < 25
             or start_msg.content.casefold() == thread.name.casefold()
-            and not thread.owner.bot # prevent the message from sending if it was sent via rtdr
+            and thread.owner_id != self.client.user.id # do not sent if rtdr
         ):
             view = ui.LayoutView()
             container = ui.Container()
@@ -183,7 +184,7 @@ class autoadd(commands.Cog):
             self.client.incomplete_msg_posts.add(thread.id)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if message.author != self.client.user and message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id):
+        if (message.author != self.client.user and message.author.id == message.channel.owner_id) or (message.author.id == await get_post_creator_id(message.channel.id)):
             tags = message.channel._applied_tags
             if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
                 pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
@@ -212,23 +213,35 @@ class autoadd(commands.Cog):
     @tasks.loop(hours=1)
     async def close_abandoned_posts(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        if support:
-            for post in await support.guild.active_threads():
-                if post.parent_id == SUPPORT_CHANNEL_ID and not post.locked:
-                    if NEED_DEV_REVIEW_TAG_ID not in post._applied_tags:
-                        owner = post.guild.get_member(await get_post_creator_id(post.id)) or post.owner
-                        if not owner: # post owner/creator will be None if they left the server
-                            tags = [support.get_tag(SOLVED_TAG_ID)]
-                            cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-                            appeal = support.get_tag(APPEAL_GG_TAG_ID)
-                            if CUSTOM_BRANDING_TAG_ID in post._applied_tags: 
-                                tags.append(cb)
-                            if APPEAL_GG_TAG_ID in post._applied_tags:
-                                tags.append(appeal)
-                            action_id = generate_random_id()
-                            await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
-                            await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
-                            await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
+        if not support:
+            return
+
+        for post in await support.guild.active_threads():
+            if post.parent_id != SUPPORT_CHANNEL_ID or post.locked:
+                continue
+            if NEED_DEV_REVIEW_TAG_ID in post._applied_tags:
+                continue
+
+            owner_id = post.owner_id if post.owner_id != self.client.user.id else await get_post_creator_id(post.id)
+            if owner_id:
+                try:
+                    self.client.member_in_cache(owner_id) or await support.guild.fetch_member(owner_id)
+                except discord.NotFound:
+                    pass
+                else:
+                    # owner still in server, we skip
+                    continue
+            tags = [support.get_tag(SOLVED_TAG_ID)]
+            cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
+            appeal = support.get_tag(APPEAL_GG_TAG_ID)
+            if CUSTOM_BRANDING_TAG_ID in post._applied_tags: 
+                tags.append(cb)
+            if APPEAL_GG_TAG_ID in post._applied_tags:
+                tags.append(appeal)
+            action_id = generate_random_id()
+            await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
+            await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
+            await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
 
     @commands.Cog.listener('on_raw_message_delete')
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):

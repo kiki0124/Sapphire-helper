@@ -94,6 +94,8 @@ class readthedamnrules(commands.Cog):
             return f"{reference_msg.author.mention} please provide any additional information here so we can give you the best help." # default message - if none of the special ones above are used
 
     async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
+        self.client.add_member_to_cache(user)
+
         await reference_message.channel.typing()
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
         gallery_items, files = await self.get_media_gallery_items(messages_to_move)

@@ -33,7 +33,7 @@ class ErrorHandler(commands.Cog):
 		content = f"<@1105414178937774150>\nUnhandled error: `{error}`"
 		if self.client.alert_webhook_url is None:
 			try:
-					alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+				alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
 			except discord.NotFound as e:
 				raise e
 			if alerts_thread.archived:

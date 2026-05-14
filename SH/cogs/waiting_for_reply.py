@@ -78,7 +78,7 @@ class waiting_for_reply(commands.Cog):
             support = message.channel.parent
             wfr = support.get_tag(WAITING_FOR_REPLY_TAG_ID)
             applied_tags = message.channel._applied_tags
-            message_author_is_owner = message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id)
+            message_author_is_owner = message.author.id == message.channel.owner_id or message.author.id == await get_post_creator_id(message.channel.id)
             has_wfr = WAITING_FOR_REPLY_TAG_ID in applied_tags
             if message.id != message.channel.id and NEED_DEV_REVIEW_TAG_ID not in applied_tags and UNANSWERED_TAG_ID not in applied_tags and SOLVED_TAG_ID not in applied_tags:
                 if not has_wfr:

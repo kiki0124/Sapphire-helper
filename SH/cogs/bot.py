@@ -22,9 +22,10 @@ ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class bot(commands.Cog):
-    def __init__(self, client: commands.Bot):
-        self.client: commands.Bot = client
+    def __init__(self, client: MyClient):
+        self.client = client
 
+    @staticmethod
     def get_cooldown_key(ctx: commands.Context):
         if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
             return None
