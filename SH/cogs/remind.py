@@ -48,10 +48,8 @@ class CloseNow(ui.View):
                 tags.append(appeal)
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button", archived=True)
-            try:
-                alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
-            except discord.NotFound as e:
-                raise e
+
+            alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: Close now button clicked")
@@ -67,7 +65,7 @@ class remind(commands.Cog):
         self.close_pending_posts.start()
         self.check_exception_posts.start()
 
-    async def reminders_filter(self, thread: discord.Thread):
+    def reminders_filter(self, thread: discord.Thread):
         """  
         Filter function for posts in reminder system, returns true if all of the following criteria are met:
         * Not locked, not archived
@@ -98,10 +96,8 @@ class remind(commands.Cog):
                 return
             except Exception:
                 pass #pass so that it can try the other methods below
-        try:
-            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
+
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
         webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
@@ -181,7 +177,7 @@ class remind(commands.Cog):
                 more_than_day = check_time_more_than_day(snowflake_time(post.last_message_id or now_dt).timestamp()) # Check time before making any further API/DB calls
                 if not more_than_day:
                     continue
-                if await self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
+                if self.reminders_filter(post): # reminders_filter includes all criteria for a post (tags, state, parent channel...)
                     if post.id not in reminder_not_sent_posts and post.id not in pending_posts:
                         try:
                             message: discord.Message|None = post.last_message or await post.fetch_message(post.last_message_id)

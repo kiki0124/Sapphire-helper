@@ -25,6 +25,7 @@ class bot(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client: commands.Bot = client
 
+    @staticmethod
     def get_cooldown_key(ctx: commands.Context):
         if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
             return None

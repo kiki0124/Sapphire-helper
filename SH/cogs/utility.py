@@ -97,10 +97,8 @@ class ndr_options_buttons(ui.View):
         if appeal in post.applied_tags:
             tags.append(appeal)
         action_id = generate_random_id()
-        try:
-            alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
+
+        alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as needs-dev-review with /needs-dev-review")
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
@@ -144,10 +142,8 @@ class utility(commands.Cog):
                 return
             except Exception:
                 pass #pass to try the other methods below
-        try:
-            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
+
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
         if alerts_thread.archived:
             await alerts_thread.edit(archived=False)
         webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
@@ -317,10 +313,8 @@ class utility(commands.Cog):
                 return
             await interaction.channel.remove_user(user)
             await interaction.response.send_message(content=f"Successfully removed {user.mention} from this post.", ephemeral=True)
-            try:
-                alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-            except discord.NotFound as e:
-                raise e
+
+            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
             if alerts_thread.archived:
                 await alerts_thread.edit(archived=False)
             await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}.\nReason: {reason}", allowed_mentions=discord.AllowedMentions.none())
@@ -353,10 +347,7 @@ class utility(commands.Cog):
             await interaction.response.send_message(f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
     async def send_qr_log(self, message: discord.Message, user: discord.Member):
-        try:
-            qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID) or await self.client.fetch_channel(QR_LOG_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
+        qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID) or await self.client.fetch_channel(QR_LOG_THREAD_ID)
         webhooks = [webhook for webhook in await qr_logs_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]
@@ -419,10 +410,10 @@ class utility(commands.Cog):
                             await self.send_qr_log(message=reaction.message, user=user)
                             return
             elif reaction.message.flags.components_v2:
-                regex = f'-# (Recommended|Sent) by {user.mention}'
+                patterns =  (f'-# Recommended by {user.mention}', f"-# Sent by {user.mention}")
                 view = ui.LayoutView.from_message(reaction.message)
                 for child in view.walk_children():
-                    if isinstance(child, ui.TextDisplay) and re.match(regex, child.content, re.IGNORECASE):
+                    if isinstance(child, ui.TextDisplay) and any(child.content.endswith(pattern) for pattern in patterns):
                         await reaction.message.delete()
                         await self.send_qr_log(reaction.message, user)
                         return
@@ -532,7 +523,7 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
     async def wrong_server(self, interaction: discord.Interaction):
-        if not isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
+        if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != SUPPORT_CHANNEL_ID:
             await interaction.response.send_message(f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
             return
         
