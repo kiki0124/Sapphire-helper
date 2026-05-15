@@ -512,7 +512,7 @@ class utility(commands.Cog):
         """
         if interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
             return None
-        
+
         return commands.Cooldown(1,  5.0 * 60.0)
 
 
