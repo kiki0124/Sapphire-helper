@@ -23,36 +23,6 @@ class waiting_for_reply(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
         
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
-        if self.client.alert_webhook_url is not None:
-            webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
-            try:
-                await webhook.send(
-                    content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
-                    username=self.client.user.name,
-                    avatar_url=self.client.user.display_avatar.url,
-                    thread=discord.Object(id=ALERTS_THREAD_ID),
-                    wait=False
-                )
-                return
-            except Exception:
-                pass #pass to try the other methods below
-
-        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
-        try:
-            webhook = webhooks[0]
-        except IndexError:
-            webhook = await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        await webhook.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
-            username=self.client.user.name,
-            avatar_url=self.client.user.display_avatar.url,
-            thread=discord.Object(id=ALERTS_THREAD_ID),
-            wait=False
-        )
-        self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
-        
     posts: dict[int, asyncio.Task] = {}
 
     async def add_waiting_tag(self, post: discord.Thread) -> None:
@@ -64,7 +34,7 @@ class waiting_for_reply(commands.Cog):
             action_id = generate_random_id()
             applied_tags.append(wfr)
             await post.edit(applied_tags=applied_tags, reason=f"ID: {action_id}. Waiting for reply system")
-            await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=applied_tags, context="Add Waiting for reply")
+            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=applied_tags, context="Add Waiting for reply")
             self.posts.pop(post.id)
 
     @commands.Cog.listener('on_message')
@@ -89,7 +59,7 @@ class waiting_for_reply(commands.Cog):
                     tags = message.channel.applied_tags
                     tags.remove(wfr)
                     await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag")
-                    await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
+                    await self.client.send_log(thread_id=ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
 
 async def setup(client: MyClient):
     await client.add_cog(waiting_for_reply(client))

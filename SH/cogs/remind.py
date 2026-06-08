@@ -79,36 +79,6 @@ class remind(commands.Cog):
             return ndr and solved and archived and locked
         else:
             return False
-        
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
-        if self.client.alert_webhook_url is not None:
-            webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
-            try:
-                await webhook.send(
-                    content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
-                    username=self.client.user.name,
-                    avatar_url=self.client.user.display_avatar.url,
-                    thread=discord.Object(id=ALERTS_THREAD_ID),
-                    wait=False
-                )
-                return
-            except Exception:
-                pass #pass so that it can try the other methods below
-
-        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
-        try:
-            webhook = webhooks[0]
-        except IndexError:
-            webhook = await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        await webhook.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
-            username=self.client.user.name,
-            avatar_url=self.client.user.display_avatar.url,
-            thread=discord.Object(id=ALERTS_THREAD_ID),
-            wait=False
-        )
-        self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
 
     @commands.Cog.listener("on_ready")
     async def add_persistent_view(self):
@@ -240,7 +210,7 @@ class remind(commands.Cog):
                     await post.edit(archived=True, reason=f"ID: {action_id}. Post inactive for 2 days", applied_tags=tags) # make the post archived and add the tags
                 except discord.HTTPException:
                     continue
-                await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
+                await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Close pending post")
                 await remove_post_from_rtdr(post.id)
                 posts_to_remove.append(post.id)
 

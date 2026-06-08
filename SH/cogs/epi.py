@@ -189,22 +189,6 @@ class epi(commands.Cog):
         
         return GetNotifiedView(description=description)
 
-    async def send_epi_log(self, content: str):
-        epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID) or await self.client.fetch_channel(EPI_LOG_THREAD_ID)
-        webhooks = [webhook for webhook in await epi_thread.parent.webhooks() if webhook.token]
-        try:
-            webhook = webhooks[0] 
-        except IndexError:
-            webhook = await epi_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        await webhook.send(
-            content=content,
-            username=self.client.user.name,
-            avatar_url=self.client.user.display_avatar.url,
-            thread=discord.Object(id=EPI_LOG_THREAD_ID),
-            wait=False,
-            allowed_mentions=discord.AllowedMentions.none()
-        )
-
     async def handle_sticky_message(self, channel: discord.TextChannel | discord.PartialMessageable, delay: float = 4.0):
         view = self.generate_epi_layout_view()
         await asyncio.sleep(delay)
@@ -304,7 +288,9 @@ class epi(commands.Cog):
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
             command_response += f"\nSticky: {sticky}"
-            await self.send_epi_log(f"EPI mode enabled by {interaction.user.mention}.\nCustom message: {message or 'not set'} | Status message: {_message.jump_url if _message else 'Not set'} | Sticky: {sticky}")
+
+            content = f"EPI mode enabled by {interaction.user.mention}.\nCustom message: {message or 'not set'} | Status message: {_message.jump_url if _message else 'Not set'} | Sticky: {sticky}"
+            await self.client.send_log(EPI_LOG_THREAD_ID, content=content)
             await interaction.followup.send(command_response, ephemeral=True)
         else:
             await interaction.followup.send(content=f"EPI Mode is already enabled!", ephemeral=True)
@@ -396,7 +382,7 @@ class epi(commands.Cog):
                         pass
                     self.sticky_message = None
                 await interaction.channel.send(content=f"EPI mode successfully disabled by {interaction.user.name}.\nMentioned users: {mentioned}")
-                await self.send_epi_log(f"EPI mode disabled by {interaction.user.mention}\nCustom message: {message or 'not set'}")
+                await self.client.send_log(EPI_LOG_THREAD_ID, content=f"EPI mode disabled by {interaction.user.mention}\nCustom message: {message or 'not set'}")
 
             button.callback = on_button_click
             view = discord.ui.View()
@@ -543,10 +529,10 @@ class epi(commands.Cog):
         another ntfy topic (NTFY_SECOND_TOPIC_ID from .env) when a button from the notification
         is clicked while SH is listening to events in that topic
         """
-        await self.send_epi_log(f"Attempting to connect to WS.\nID: `{id}`")
+        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"Attempting to connect to WS.\nID: `{id}`")
         async with aiohttp.ClientSession() as cs:
             async with cs.ws_connect(f"https://ntfy.sh/{NTFY_SECOND_TOPIC}/ws") as ws:
-                await self.send_epi_log(f"WS connected.\nID: `{id}`")
+                await self.client.send_log(EPI_LOG_THREAD_ID, content=f"WS connected.\nID: `{id}`")
                 async for msg in ws:
                     types = {
                         1: "TEXT",
@@ -555,15 +541,15 @@ class epi(commands.Cog):
                         4: "PING",
                         5: "PONG"
                     }
-                    await self.send_epi_log(f"WS event received.\nType: `{types.get(msg.type, '?')}` | ID: `{id}`")
+                    await self.client.send_log(EPI_LOG_THREAD_ID, content=f"WS event received.\nType: `{types.get(msg.type, '?')}` | ID: `{id}`")
                     exception_types = [aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR] 
                     if msg.type == aiohttp.WSMsgType.TEXT:
                         data = json.loads(msg.data)
                         if data["event"] == "message":
                             if data["message"] == id:
-                                await self.send_epi_log(f"WS `message` event received. response: `{data['title']}` | ID: `{data['message']}`")
+                                await self.client.send_log(EPI_LOG_THREAD_ID, content=f"WS `message` event received. response: `{data['title']}` | ID: `{data['message']}`")
                                 await ws.close(code=aiohttp.WSCloseCode.OK)
-                                await self.send_epi_log(f"Attempted to close WS. Closed: `{ws.closed}` | ID: `{data['message']}`")
+                                await self.client.send_log(EPI_LOG_THREAD_ID, content=f"Attempted to close WS. Closed: `{ws.closed}` | ID: `{data['message']}`")
                                 response = data["title"] # the button that Xge clicked in the notification
                                 channel = self.client.get_channel(message.channel.id)
                                 webhooks = [webhook for webhook in await channel.webhooks() if webhook.token]
@@ -580,10 +566,10 @@ class epi(commands.Cog):
                                 del self.page_websockets[id]
                                 return
                             else:
-                                await self.send_epi_log(f"WS `message` received with another random ID (expected `{id}`, received `{data['message']}`). Ignoring.")
+                                await self.client.send_log(EPI_LOG_THREAD_ID, content=f"WS `message` received with another random ID (expected `{id}`, received `{data['message']}`). Ignoring.")
                     elif msg.type in exception_types:
                         await ws.close(code=aiohttp.WSCloseCode.INTERNAL_ERROR)
-                        await self.send_epi_log(f"Received invalid WSMsgType - `{msg.type}`.\n`{msg}`.\nWS closed: {ws.closed}")
+                        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"Received invalid WSMsgType - `{msg.type}`.\n`{msg}`.\nWS closed: {ws.closed}")
 
     async def send_page(self, 
                         title: str, 
@@ -649,11 +635,11 @@ class epi(commands.Cog):
                     if req.status == 200: # OK
                         if user:
                             service = title.removesuffix(f" | Sent by @{user.name}")
-                            await self.send_epi_log(f"{user.mention} used /page. Service: {service} | Message: `{message}` | Priority: {priority} | Custom Branding Affected: {cb_affected}.\n-# ID: {random_id}")
+                            await self.client.send_log(EPI_LOG_THREAD_ID, content=f"{user.mention} used /page. Service: {service} | Message: `{message}` | Priority: {priority} | Custom Branding Affected: {cb_affected}.\n-# ID: {random_id}")
                             await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority} | Service: {service} | ID: {random_id}")
                         else:
                             await followup.edit(content=f"Automated page for [ratelimits]({ratelimit_url}) sent successfully.\n-# Priority: {priority} | ID: {random_id}")
-                            await self.send_epi_log(f"Sent automated page for rate limits. Priority: {priority}.\n-# ID: {random_id}")    
+                            await self.client.send_log(EPI_LOG_THREAD_ID, content=f"Sent automated page for rate limits. Priority: {priority}.\n-# ID: {random_id}")    
                         task = asyncio.create_task(self.handle_websocket(followup, random_id))
                         self.page_websockets[random_id] = task
                     else:
@@ -754,7 +740,7 @@ class epi(commands.Cog):
                     close = self.page_websockets[id].cancel()
                     if close:
                         await interaction.followup.send(f"Successfully closed websocket with id `{id}`.")
-                        await self.send_epi_log(f"{interaction.user.mention} closed page websocket with id `{id}`")
+                        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"{interaction.user.mention} closed page websocket with id `{id}`")
                     else:
                         await interaction.followup.send("Websocket could not be closed... This could be due to it already being done (Xge responded) or someone else already cancelled it.")
                 else:
@@ -778,7 +764,7 @@ class epi(commands.Cog):
                             ephemeral=True
                         )
                         await interaction.edit_original_response(view=None)
-                        await self.send_epi_log(f"{i.user.mention} manually closed all currently open websockets ({len(keys)})")
+                        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"{i.user.mention} manually closed all currently open websockets ({len(keys)})")
                 confirm.callback = callback
                 view = ui.View()
                 view.add_item(confirm)
