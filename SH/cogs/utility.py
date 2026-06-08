@@ -497,7 +497,7 @@ class utility(commands.Cog):
         else:
             await ctx.reply(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
 
-
+    @staticmethod
     async def non_expert_mod_cooldown(interaction: discord.Interaction):
         """
         Returns a cooldown of 1 use per 5 minutes if the command author is not expert or mod
