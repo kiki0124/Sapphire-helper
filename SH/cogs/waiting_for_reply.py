@@ -39,8 +39,6 @@ class waiting_for_reply(commands.Cog):
                 pass #pass to try the other methods below
 
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        if alerts_thread.archived:
-            await alerts_thread.edit(archived=False)
         webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]

@@ -77,8 +77,6 @@ class select_channels(ui.ChannelSelect):
             webhook = webhooks[0]
         except IndexError:
             webhook = await epi_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        if epi_thread.archived:
-            await epi_thread.edit(archived=False)
         await webhook.send(
             content,
             username=self.i.client.user.name,
@@ -198,8 +196,6 @@ class epi(commands.Cog):
             webhook = webhooks[0] 
         except IndexError:
             webhook = await epi_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        if epi_thread.archived:
-            await epi_thread.edit(archived=False)
         await webhook.send(
             content=content,
             username=self.client.user.name,

@@ -100,8 +100,6 @@ class ndr_options_buttons(ui.View):
 
         alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as needs-dev-review with /needs-dev-review")
-        if alerts_thread.archived:
-            await alerts_thread.edit(archived=False)
         await alerts_thread.send(content=f"ID: {action_id}\nPost: {post.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: /needs-dev-review command used")
         channel = post.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {post.mention}')
@@ -144,8 +142,6 @@ class utility(commands.Cog):
                 pass #pass to try the other methods below
 
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        if alerts_thread.archived:
-            await alerts_thread.edit(archived=False)
         webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0] 
@@ -315,8 +311,6 @@ class utility(commands.Cog):
             await interaction.response.send_message(content=f"Successfully removed {user.mention} from this post.", ephemeral=True)
 
             alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-            if alerts_thread.archived:
-                await alerts_thread.edit(archived=False)
             await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}.\nReason: {reason}", allowed_mentions=discord.AllowedMentions.none())
         else:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
@@ -353,8 +347,6 @@ class utility(commands.Cog):
             webhook = webhooks[0]
         except IndexError:
             webhook = await qr_logs_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        if qr_logs_thread.archived:
-            await qr_logs_thread.edit(archived=False)
         await webhook.send(
             content=f"Message deleted by {user.mention} in {message.channel.mention}\nMessage id: `{message.id}`",
             username=self.client.user.name,

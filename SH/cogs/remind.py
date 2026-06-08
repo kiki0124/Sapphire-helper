@@ -50,8 +50,6 @@ class CloseNow(ui.View):
             await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button", archived=True)
 
             alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
-            if alerts_thread.archived:
-                await alerts_thread.edit(archived=False)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: Close now button clicked")
             await remove_post_from_pending(interaction.channel_id)
             await remove_post_from_rtdr(interaction.channel_id)
@@ -98,8 +96,6 @@ class remind(commands.Cog):
                 pass #pass so that it can try the other methods below
 
         alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        if alerts_thread.archived:
-            await alerts_thread.edit(archived=False)
         webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]
@@ -153,8 +149,6 @@ class remind(commands.Cog):
                         alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
                     except discord.NotFound as e2:
                         raise ExceptionGroup('Tried to fetch message and Alerts Thread', [e, e2])
-                    if alerts_thread.archived:
-                        await alerts_thread.edit(archived=False)
                     await alerts_thread.send(
                         content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: `{e.status}`"
                     )
@@ -192,8 +186,6 @@ class remind(commands.Cog):
                     alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
                 except discord.NotFound as e2:
                     raise ExceptionGroup('Tried to fetch message and Alerts Thread', [e, e2])
-                if alerts.archived:
-                    await alerts.edit(archived=False)
                 await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
                 continue
             post_author_id = await get_post_creator_id(post.id) or post.owner_id
