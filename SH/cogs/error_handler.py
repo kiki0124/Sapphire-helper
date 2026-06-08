@@ -38,7 +38,7 @@ class ErrorHandler(commands.Cog):
 				webhook = await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
 			else:
 				webhook = webhooks[0]
-			self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
+			self.client.alert_webhook_url = webhook.url # Assign only if the url is None. This should normally only be called once when running the bot
 		else:
 			webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
 
@@ -57,9 +57,9 @@ class ErrorHandler(commands.Cog):
 				content += f"\n```{options_formatted}```"
 			else:
 				content += f"\n```json\n{interaction.data}```"
-			await webhook.send(content, allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150)])) #1105414178937774150 is Kiki's user ID
+			await webhook.send(content, allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150)]), thread=discord.Object(ALERTS_THREAD_ID)) #1105414178937774150 is Kiki's user ID
 		else:
-			await alerts_thread.send(content=content)
+			await webhook.send(content=content, thread=discord.Object(ALERTS_THREAD_ID))
 
 
 	@commands.Cog.listener()

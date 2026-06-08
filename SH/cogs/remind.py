@@ -180,7 +180,7 @@ class remind(commands.Cog):
             more_than_day = check_time_more_than_day(snowflake_time(post.last_message_id or now_dt).timestamp()) # Check time before making any further API/DB calls
             if not more_than_day or post.id in reminder_not_sent_posts or post.id in pending_posts:
                 continue
-            if not await self.reminders_filter(post):
+            if not self.reminders_filter(post):
                 continue
             try:
                 message: discord.Message | None = post.last_message or await post.fetch_message(post.last_message_id)

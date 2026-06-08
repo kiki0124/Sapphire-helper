@@ -476,7 +476,7 @@ class utility(commands.Cog):
                         text_prefix = f"## Incomplete support post\nHey <@{user_id}>"
                     view = ui.LayoutView()
                     container = ui.Container(
-                        ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible\n-# Reccomended by {ctx.author.mention}"),
+                        ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible\n-# Recommended by {ctx.author.mention}"),
                         accent_colour=0xFFA800
                     )
                     view.add_item(container)
