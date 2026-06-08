@@ -189,7 +189,7 @@ class autoadd(commands.Cog):
                             action_id = generate_random_id()
                             await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
                             await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
-                            await self.client.send_log(ALERTS_THREAD_ID, saction_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
+                            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
 
     @commands.Cog.listener('on_raw_message_delete')
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
