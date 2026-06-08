@@ -11,6 +11,7 @@ load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
 PREFIX = os.getenv("PREFIX")
+ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 
 class MyClient(commands.Bot):
     def __init__(self) -> None:
@@ -38,6 +39,43 @@ class MyClient(commands.Bot):
                 print(f"Loaded extension {filename[:-3]}")
             else:
                 print(f"Skipped loading {filename[:-3]}")
+
+    async def send_log(self, thread_id: int, *, content: str = "", **kwargs) -> None:
+        if 'action_id' in kwargs:
+            content = f"ID: {kwargs['action_id']}\nPost: {kwargs['post_mention']}\nTags: {', '.join([tag.name for tag in kwargs['tags']])}\nContext: {kwargs['context']}"
+    
+        if thread_id == ALERTS_THREAD_ID and self.alert_webhook_url is not None:
+            webhook = discord.Webhook.from_url(self.alert_webhook_url, client=self)
+            try:
+                await webhook.send(
+                    content=content,
+                    username=self.user.name,
+                    avatar_url=self.user.display_avatar.url,
+                    thread=discord.Object(thread_id),
+                    wait=kwargs.get('wait', False),
+                    allowed_mentions=kwargs.get('allowed_mentions', discord.AllowedMentions.none())
+                )
+            except discord.HTTPException:
+                pass
+            else:
+                return
+        log_thread = self.get_channel(thread_id) or await self.fetch_channel(thread_id)
+        webhooks = [webhook for webhook in await log_thread.parent.webhooks() if webhook.token]
+        if not webhooks:
+            webhook = await log_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
+        else:
+            webhook = webhooks[0]
+
+        if thread_id == ALERTS_THREAD_ID:
+            self.alert_webhook_url = webhook.url # Assign only if the url is None. This should normally only be called once when running the bot
+        await webhook.send(
+            content=content,
+            username=self.user.name,
+            avatar_url=self.user.display_avatar.url,
+            thread=discord.Object(thread_id),
+            wait=kwargs.get('wait', False),
+            allowed_mentions=kwargs.get('allowed_mentions', discord.AllowedMentions.none())
+        )
 
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")

@@ -125,36 +125,6 @@ class ndr_options_buttons(ui.View):
 class utility(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
-        
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
-        if self.client.alert_webhook_url is not None:
-            webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
-            try:
-                await webhook.send(
-                    content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
-                    username=self.client.user.name,
-                    avatar_url=self.client.user.display_avatar.url,
-                    thread=discord.Object(id=ALERTS_THREAD_ID),
-                    wait=False
-                )
-                return
-            except Exception:
-                pass #pass to try the other methods below
-
-        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
-        try:
-            webhook = webhooks[0] 
-        except IndexError:
-            webhook = await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        await webhook.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
-            username=self.client.user.name,
-            avatar_url=self.client.user.display_avatar.url,
-            thread=discord.Object(id=ALERTS_THREAD_ID),
-            wait=False
-        )
-        self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
 
     @cached()
     async def get_unsolve_id(self) -> int:
@@ -214,7 +184,7 @@ class utility(commands.Cog):
             tags.append(appeal)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as solved with /solved")
-        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
+        await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
         task = asyncio.create_task(self.close_post(post=post))
         self.close_tasks[post.id] = task
 
@@ -225,7 +195,7 @@ class utility(commands.Cog):
         solved = [post.parent.get_tag(SOLVED_TAG_ID)]
         action_id = generate_random_id()
         await post.edit(locked=True, applied_tags=solved, reason=f'ID: {action_id}. Post locked as it was not sapphire related')
-        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=solved, context="/unrelated used")
+        await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=solved, context="/unrelated used")
         asyncio.create_task(self.close_post(post=post, close_delay=600))
 
     async def unsolve_post(self, post: discord.Thread) -> None:
@@ -245,7 +215,7 @@ class utility(commands.Cog):
             tags.append(appeal)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post unsolved with /unsolve")
-        await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="/unsolve used")
+        await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/unsolve used")
 
     @staticmethod
     async def one_of_mod_expert_op(interaction: discord.Interaction):
@@ -485,7 +455,7 @@ class utility(commands.Cog):
                             tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
                         action_id = generate_random_id()
                         await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
-                        await self.send_action_log(action_id, ctx.channel.mention, tags, "/incomplete-post used")
+                        await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=ctx.channel.mention, tag=tags, context="/incomplete-post used")
                     await ctx.channel.send(
                         view=view,
                         allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])

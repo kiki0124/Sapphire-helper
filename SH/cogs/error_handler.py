@@ -31,16 +31,6 @@ class ErrorHandler(commands.Cog):
 
 	async def send_unhandled_error(self, error: commands.CommandError | app_commands.AppCommandError, interaction: discord.Interaction | None = None) -> None:
 		content = f"<@1105414178937774150>\nUnhandled error: `{error}`"
-		if self.client.alert_webhook_url is None:
-			alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-			webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
-			if not webhooks:
-				webhook = await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-			else:
-				webhook = webhooks[0]
-			self.client.alert_webhook_url = webhook.url # Assign only if the url is None. This should normally only be called once when running the bot
-		else:
-			webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
 
 		if interaction:
 			interaction_created_at = interaction.created_at.timestamp()
@@ -57,9 +47,9 @@ class ErrorHandler(commands.Cog):
 				content += f"\n```{options_formatted}```"
 			else:
 				content += f"\n```json\n{interaction.data}```"
-			await webhook.send(content, allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150)]), thread=discord.Object(ALERTS_THREAD_ID)) #1105414178937774150 is Kiki's user ID
+			await self.client.send_log(ALERTS_THREAD_ID, content=content, allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150)])) #1105414178937774150 is Kiki's user ID
 		else:
-			await webhook.send(content=content, thread=discord.Object(ALERTS_THREAD_ID))
+			await self.client.send_log(ALERTS_THREAD_ID, content=content)
 
 
 	@commands.Cog.listener()
