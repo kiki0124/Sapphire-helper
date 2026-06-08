@@ -83,7 +83,7 @@ class NeedDevReviewView(ui.LayoutView):
 
 
 class ndr_options_buttons(ui.View):
-    def __init__(self, Interaction: discord.Interaction):
+    def __init__(self, Interaction: discord.Interaction[MyClient]):
         super().__init__(timeout=None)
         self.Interaction = Interaction
     
@@ -98,9 +98,8 @@ class ndr_options_buttons(ui.View):
             tags.append(appeal)
         action_id = generate_random_id()
 
-        alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as needs-dev-review with /needs-dev-review")
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {post.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: /needs-dev-review command used")
+        await self.Interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/needs-dev-review command used")
         channel = post.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {post.mention}')
         await remove_post_from_pending(post.id)
