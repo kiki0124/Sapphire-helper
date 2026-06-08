@@ -50,8 +50,6 @@ class create_tag(ui.Modal):
         if not await check_tag_exists(self.pool, self.name.component.value):
             await save_tag(self.pool, name=self.name.component.value, content=self.content.component.value, creator_id=interaction.user.id)
             tag_thread = interaction.guild.get_thread(TAG_LOGGING_THREAD_ID) or await interaction.guild.fetch_channel(TAG_LOGGING_THREAD_ID)
-            if tag_thread.archived:
-                await tag_thread.edit(archived=False)
             webhooks = [webhook for webhook in await tag_thread.parent.webhooks() if webhook.token]
             try:
                 webhook = webhooks[0] 
@@ -89,8 +87,6 @@ class update_tag_modal(ui.Modal):
         new_content = self.label.component.value
         await update_tag(self.pool, self.tag, new_content)
         tag_thread = interaction.guild.get_thread(TAG_LOGGING_THREAD_ID) or await interaction.guild.fetch_channel(TAG_LOGGING_THREAD_ID)
-        if tag_thread.archived:
-            await tag_thread.edit(archived=False)
         webhooks = [webhook for webhook in await tag_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0] 
@@ -134,7 +130,7 @@ class TagConfirmRow(ui.ActionRow):
         tag_container.add_item(ui.TextDisplay(self.tag_content))
         tag_container.add_item(ui.Separator())
 
-        tag_container.add_item(ui.TextDisplay(f"Recommended by {interaction.user.mention}"))
+        tag_container.add_item(ui.TextDisplay(f"-# Recommended by {interaction.user.mention}"))
         await interaction.channel.send(view=tag_view, allowed_mentions=discord.AllowedMentions.none())
 
 
@@ -147,8 +143,6 @@ class quick_replies(commands.Cog):
 
     async def send_tag_log(self, content: str):
         tag_thread = self.client.get_channel(TAG_LOGGING_THREAD_ID) or await self.client.fetch_channel(TAG_LOGGING_THREAD_ID)
-        if tag_thread.archived:
-            await tag_thread.edit(archived=False)
         webhooks = [webhook for webhook in await tag_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0] 

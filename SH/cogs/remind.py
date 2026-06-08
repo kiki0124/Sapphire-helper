@@ -48,12 +48,8 @@ class CloseNow(ui.View):
                 tags.append(appeal)
             action_id = generate_random_id()
             await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button", archived=True)
-            try:
-                alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
-            except discord.NotFound as e:
-                raise e
-            if alerts_thread.archived:
-                await alerts_thread.edit(archived=False)
+
+            alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: Close now button clicked")
             await remove_post_from_pending(interaction.channel_id)
             await remove_post_from_rtdr(interaction.channel_id)
@@ -67,7 +63,7 @@ class remind(commands.Cog):
         self.close_pending_posts.start()
         self.check_exception_posts.start()
 
-    async def reminders_filter(self, thread: discord.Thread):
+    def reminders_filter(self, thread: discord.Thread):
         """  
         Filter function for posts in reminder system, returns true if all of the following criteria are met:
         * Not locked, not archived
@@ -98,12 +94,8 @@ class remind(commands.Cog):
                 return
             except Exception:
                 pass #pass so that it can try the other methods below
-        try:
-            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
-        if alerts_thread.archived:
-            await alerts_thread.edit(archived=False)
+
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
         webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]
@@ -157,8 +149,6 @@ class remind(commands.Cog):
                         alerts_thread = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
                     except discord.NotFound as e2:
                         raise ExceptionGroup('Tried to fetch message and Alerts Thread', [e, e2])
-                    if alerts_thread.archived:
-                        await alerts_thread.edit(archived=False)
                     await alerts_thread.send(
                         content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: `{e.status}`"
                     )
@@ -184,7 +174,7 @@ class remind(commands.Cog):
             more_than_day = check_time_more_than_day(snowflake_time(post.last_message_id or now_dt).timestamp()) # Check time before making any further API/DB calls
             if not more_than_day or post.id in reminder_not_sent_posts or post.id in pending_posts:
                 continue
-            if not await self.reminders_filter(post):
+            if not self.reminders_filter(post):
                 continue
             try:
                 message: discord.Message | None = post.last_message or await post.fetch_message(post.last_message_id)
@@ -196,8 +186,6 @@ class remind(commands.Cog):
                     alerts = post.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await post.guild.fetch_channel(ALERTS_THREAD_ID)
                 except discord.NotFound as e2:
                     raise ExceptionGroup('Tried to fetch message and Alerts Thread', [e, e2])
-                if alerts.archived:
-                    await alerts.edit(archived=False)
                 await alerts.send(content=f"Reminder message could not be sent to {post.mention}.\nError: `{e.text}` Error code: `{e.code}` Status: {e.status}")
                 continue
             post_author_id = await get_post_creator_id(post.id) or post.owner_id

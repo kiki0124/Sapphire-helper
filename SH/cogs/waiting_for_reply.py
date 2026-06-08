@@ -37,12 +37,8 @@ class waiting_for_reply(commands.Cog):
                 return
             except Exception:
                 pass #pass to try the other methods below
-        try:
-            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
-        if alerts_thread.archived:
-            await alerts_thread.edit(archived=False)
+
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
         webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]

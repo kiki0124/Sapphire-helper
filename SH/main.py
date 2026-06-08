@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import os
 from dotenv import load_dotenv
 from functions import main
@@ -19,7 +20,10 @@ class MyClient(commands.Bot):
         intents.guilds = True
         intents.members = True
         intents.guild_reactions = True
-        super().__init__(PREFIX, help_command=None, intents=intents, strip_after_prefix=True)
+        super().__init__(PREFIX, help_command=None, intents=intents, strip_after_prefix=True, 
+                        allowed_contexts=app_commands.AppCommandContext(guild=True),
+                        allowed_installs=app_commands.AppInstallationType(guild=True)
+                         )
 
         self.alert_webhook_url: str | None = None
         self.incomplete_msg_posts: set[int] = set() # list of the post ids

@@ -51,14 +51,9 @@ class ConfirmCloseButtons(ui.ActionRow):
                 tags.append(cb)
 
             action_id = generate_random_id()
-            try:
-                alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
-            except discord.NotFound as e:
-                raise e
 
+            alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Post starter message delete and confirm button clicked- mark post as solved")
-            if alerts_thread.archived:
-                await alerts_thread.edit(archived=False)
             await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
             await remove_post_from_rtdr(interaction.channel_id)
         else:
@@ -127,12 +122,7 @@ class autoadd(commands.Cog):
                 return
             except Exception:
                 pass #pass to try the other methods below
-        try:
-            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
-        if alerts_thread.archived:
-            await alerts_thread.edit(archived=False)
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
         webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]

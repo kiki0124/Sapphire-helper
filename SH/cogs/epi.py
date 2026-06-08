@@ -71,17 +71,12 @@ class select_channels(ui.ChannelSelect):
         self.i = i
 
     async def send_log(self, content: str):
-        try:
-            epi_thread = self.i.guild.get_thread(EPI_LOG_THREAD_ID) or await self.i.guild.fetch_channel(EPI_LOG_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
+        epi_thread = self.i.guild.get_thread(EPI_LOG_THREAD_ID) or await self.i.guild.fetch_channel(EPI_LOG_THREAD_ID)
         webhooks = [webhook for webhook in await epi_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0]
         except IndexError:
             webhook = await epi_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        if epi_thread.archived:
-            await epi_thread.edit(archived=False)
         await webhook.send(
             content,
             username=self.i.client.user.name,
@@ -195,17 +190,12 @@ class epi(commands.Cog):
         return GetNotifiedView(description=description)
 
     async def send_epi_log(self, content: str):
-        try:
-            epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID) or await self.client.fetch_channel(EPI_LOG_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
+        epi_thread = self.client.get_channel(EPI_LOG_THREAD_ID) or await self.client.fetch_channel(EPI_LOG_THREAD_ID)
         webhooks = [webhook for webhook in await epi_thread.parent.webhooks() if webhook.token]
         try:
             webhook = webhooks[0] 
         except IndexError:
             webhook = await epi_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        if epi_thread.archived:
-            await epi_thread.edit(archived=False)
         await webhook.send(
             content=content,
             username=self.client.user.name,
@@ -313,7 +303,7 @@ class epi(commands.Cog):
             if sticky:
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
-            command_response += f"Sticky: {sticky}"
+            command_response += f"\nSticky: {sticky}"
             await self.send_epi_log(f"EPI mode enabled by {interaction.user.mention}.\nCustom message: {message or 'not set'} | Status message: {_message.jump_url if _message else 'Not set'} | Sticky: {sticky}")
             await interaction.followup.send(command_response, ephemeral=True)
         else:
@@ -518,7 +508,7 @@ class epi(commands.Cog):
 
     channel_permissions: dict[discord.TextChannel | discord.ForumChannel, dict[discord.Role|discord.Member|discord.Object, discord.PermissionOverwrite]] = {}
 
-    @app_commands.command(name="lock", description="Lock selected channels. Channel selector appears after sending command. Emergencies only.")
+    @app_commands.command(name="lock", description="Lock the given channels through the select menu sent. Should only be used in emergencies.")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(reason="The reason for locking the channels.")
     async def lock(self, interaction: discord.Interaction, reason: app_commands.Range[str, 1, 200]):
@@ -527,7 +517,7 @@ class epi(commands.Cog):
         view.add_item(select_channels("lock", reason, interaction))
         await interaction.followup.send(content="Select the channels to be locked below.\n-# Minimum of 1, maximum of 5.", view=view)
                 
-    @app_commands.command(name="unlock", description="Unlock selected channels. Channel selector appears after sending command. Emergencies only.")
+    @app_commands.command(name="unlock", description="Unlock the given channels through the select menu sent. Should only be used in emergencies.")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(reason="What is the reason for unlocking the channels?")
     async def unlock(self, interaction: discord.Interaction, reason: app_commands.Range[str, 1, 200]):
@@ -536,7 +526,7 @@ class epi(commands.Cog):
         view.add_item(select_channels("unlock", reason, interaction))
         await interaction.followup.send("Select the channels that should be unlocked below.\n-# Minimum of 1, maximum of 5.", view=view, ephemeral=True)
 
-    @app_commands.command(name="slowmode", description="Set slowmode in selected channels. Channel selector appears after sending command. Emergencies only")
+    @app_commands.command(name="slowmode", description="Set a slowmode to channels using the select menu sent. Should only be used in emergencies.")
     @app_commands.describe(time="The new slowmode time for the channel, in seconds. Max 21600. Put 0 to disable slowmode.", reason="What's the reason for this slowmode?")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def slowmode(self, interaction: discord.Interaction, time: app_commands.Range[int, 0, 21600], reason: app_commands.Range[str, 1, 200]):
