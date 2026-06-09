@@ -140,56 +140,61 @@ class autoadd(commands.Cog):
             container.add_item(
                 ui.TextDisplay(f"{random.choice(greets)}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.")
             )
-            await thread.starter_message.reply(view=view, mention_author=True)
+            await thread.starter_message.reply(view=view, mention_author=True)  
             self.client.incomplete_msg_posts.add(thread.id)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if message.author != self.client.user and message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id):
-            tags = message.channel._applied_tags
-            if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
-                pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
-                negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t|advance\b|ahead o?f? time"
-                if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
-                    await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.get_solved_id()}>")
-                    self.sent_post_ids.append(message.channel.id)
+        if message.author == self.client.user or (message.author != message.channel.owner and message.author.id != await get_post_creator_id(message.channel.id)):
+            return
+        tags = message.channel._applied_tags
+        if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
+            pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
+            negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t|advance\b|ahead o?f? time"
+            if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
+                await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.get_solved_id()}>")
+                self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
-        if UNANSWERED_TAG_ID in message.channel._applied_tags and message.author != self.client.user:
-            applied_tags = message.channel.applied_tags
-            owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
-            author_not_owner = message.author.id != owner_id
-            if author_not_owner:
-                tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-                cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-                appeal = message.channel.parent.get_tag(APPEAL_GG_TAG_ID)
-                if cb in applied_tags: 
-                    tags.append(cb)
-                if appeal in applied_tags:
-                    tags.append(appeal)
-                action_id = generate_random_id()
-                await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
-                await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
+        if UNANSWERED_TAG_ID not in message.channel._applied_tags or message.author == self.client.user:
+            return
+        applied_tags = message.channel.applied_tags
+        owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
+        author_not_owner = message.author.id != owner_id
+        if author_not_owner:
+            tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+            cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+            appeal = message.channel.parent.get_tag(APPEAL_GG_TAG_ID)
+            if cb in applied_tags: 
+                tags.append(cb)
+            if appeal in applied_tags:
+                tags.append(appeal)
+            action_id = generate_random_id()
+            await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
+            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
 
     @tasks.loop(hours=1)
     async def close_abandoned_posts(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        if support:
-            for post in await support.guild.active_threads():
-                if post.parent_id == SUPPORT_CHANNEL_ID and not post.locked:
-                    if NEED_DEV_REVIEW_TAG_ID not in post._applied_tags:
-                        owner = post.guild.get_member(await get_post_creator_id(post.id)) or post.owner
-                        if not owner: # post owner/creator will be None if they left the server
-                            tags = [support.get_tag(SOLVED_TAG_ID)]
-                            cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-                            appeal = support.get_tag(APPEAL_GG_TAG_ID)
-                            if CUSTOM_BRANDING_TAG_ID in post._applied_tags: 
-                                tags.append(cb)
-                            if APPEAL_GG_TAG_ID in post._applied_tags:
-                                tags.append(appeal)
-                            action_id = generate_random_id()
-                            await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
-                            await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
-                            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
+        if not support:
+            return
+        for post in await support.guild.active_threads():
+            if post.parent_id != SUPPORT_CHANNEL_ID or post.locked or NEED_DEV_REVIEW_TAG_ID in post._applied_tags:
+                continue
+            owner = post.guild.get_member(await get_post_creator_id(post.id)) or post.owner
+            if owner is not None: # post owner/creator will be None if they left the server
+                continue
+
+            tags = [support.get_tag(SOLVED_TAG_ID)]
+            cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
+            appeal = support.get_tag(APPEAL_GG_TAG_ID)
+            if CUSTOM_BRANDING_TAG_ID in post._applied_tags: 
+                tags.append(cb)
+            if APPEAL_GG_TAG_ID in post._applied_tags:
+                tags.append(appeal)
+            action_id = generate_random_id()
+            await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
+            await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
+            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
 
     @commands.Cog.listener('on_raw_message_delete')
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):

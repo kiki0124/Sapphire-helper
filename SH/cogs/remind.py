@@ -37,24 +37,24 @@ class CloseNow(ui.View):
     @ui.button(label="Issue already solved? Close post now", custom_id="remind-close-now", style=discord.ButtonStyle.grey)
     async def on_close_now_click(self, interaction: discord.Interaction, button: ui.Button):
         is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
-        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner:
-            await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
-            tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
-            cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-            appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
-            if cb in interaction.channel.applied_tags:
-                tags.append(cb)
-            if appeal in interaction.channel.applied_tags:
-                tags.append(appeal)
-            action_id = generate_random_id()
-            await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button", archived=True)
-
-            alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
-            await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: Close now button clicked")
-            await remove_post_from_pending(interaction.channel_id)
-            await remove_post_from_rtdr(interaction.channel_id)
-        else:
+        if not (interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner):
             await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
+            return
+        await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
+        tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
+        cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
+        if cb in interaction.channel.applied_tags:
+            tags.append(cb)
+        if appeal in interaction.channel.applied_tags:
+            tags.append(appeal)
+        action_id = generate_random_id()
+        await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button", archived=True)
+
+        alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
+        await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: Close now button clicked")
+        await remove_post_from_pending(interaction.channel_id)
+        await remove_post_from_rtdr(interaction.channel_id)
 
 class remind(commands.Cog):
     def __init__(self, client: MyClient):
@@ -70,15 +70,15 @@ class remind(commands.Cog):
         * Doesn't have needs dev review & solved
         * Is in #support (parent_id==SUPPORT_CHANNEL_ID)
         """
-        if thread.parent_id == SUPPORT_CHANNEL_ID:
-            applied_tags = thread._applied_tags
-            ndr = NEED_DEV_REVIEW_TAG_ID not in applied_tags
-            solved = SOLVED_TAG_ID not in applied_tags
-            archived = not thread.archived
-            locked = not thread.locked
-            return ndr and solved and archived and locked
-        else:
+        if thread.parent_id != SUPPORT_CHANNEL_ID:
             return False
+
+        applied_tags = thread._applied_tags
+        ndr = NEED_DEV_REVIEW_TAG_ID not in applied_tags
+        solved = SOLVED_TAG_ID not in applied_tags
+        archived = not thread.archived
+        locked = not thread.locked
+        return ndr and solved and archived and locked
 
     @commands.Cog.listener("on_ready")
     async def add_persistent_view(self):
@@ -96,7 +96,7 @@ class remind(commands.Cog):
             post = self.client.get_channel(post_id) or await self.client.fetch_channel(post_id)
             if tries < 24:
                 try:
-                    message: discord.Message|None = post.last_message or await post.fetch_message(post.last_message_id)
+                    message: discord.Message | None = post.last_message or await post.fetch_message(post.last_message_id)
                 except discord.NotFound:
                     tries+=1
                     reminder_not_sent_posts[post.id] = tries
@@ -107,10 +107,8 @@ class remind(commands.Cog):
                         await message.channel.send(content=f"{random.choice(greetings)} {post.owner.mention}, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
                         await add_post_to_pending(post_id=post.id)
                         to_remove.append(post.id)
-                        continue
                 else:
                     to_remove.append(post.id)
-                    continue
             elif tries == 24: 
                 try:
                     message = post.last_message or await post.fetch_message(post.last_message_id)
@@ -160,11 +158,10 @@ class remind(commands.Cog):
                 continue
             post_author_id = await get_post_creator_id(post.id) or post.owner_id
             author_not_owner = message.author.id != post_author_id
-            if author_not_owner and message.author != self.client.user:
-                if post.owner: # make sure post owner isn't None- still in server
-                    greetings = ["Hi", "Hello", "Hey", "Hi there"]
-                    await message.channel.send(content=f"{random.choice(greetings)} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
-                    posts_to_add.append(post.id)
+            if author_not_owner and message.author != self.client.user and post.owner:
+                greetings = ["Hi", "Hello", "Hey", "Hi there"]
+                await message.channel.send(content=f"{random.choice(greetings)} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
+                posts_to_add.append(post.id)
 
         if not posts_to_add:
             return
@@ -172,13 +169,15 @@ class remind(commands.Cog):
             
     @commands.Cog.listener('on_message')
     async def remove_pending_posts(self, message: discord.Message):
-        if message.author != self.client.user:
-            if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
-                others_filter = not message.channel.locked and NEED_DEV_REVIEW_TAG_ID not in message.channel._applied_tags
-                owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
-                message_author = message.author.id == owner_id
-                if message_author and others_filter and await in_pending_posts(message.channel.id):
-                    await remove_post_from_pending(message.channel.id)
+        if message.author == self.client.user:
+            return
+        
+        if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
+            others_filter = not message.channel.locked and NEED_DEV_REVIEW_TAG_ID not in message.channel._applied_tags
+            owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
+            message_author = message.author.id == owner_id
+            if message_author and others_filter and await in_pending_posts(message.channel.id):
+                await remove_post_from_pending(message.channel.id)
 
     @tasks.loop(hours=1)
     async def close_pending_posts(self):

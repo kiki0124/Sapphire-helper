@@ -136,19 +136,15 @@ class utility(commands.Cog):
             if command.name == "unsolve": 
                 unsolve_id=command.id
                 break
-            else:
-                continue
         return unsolve_id
     
     @cached()
     async def get_solved_id(self):
         solved_id = 1274997472162349079
         for command in await self.client.tree.fetch_commands():
-                if command.name == "solved": 
-                    solved_id=command.id
-                    break
-                else:
-                    continue
+            if command.name == "solved": 
+                solved_id=command.id
+                break
         return solved_id
 
     close_tasks: dict[int, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
@@ -244,15 +240,15 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     async def solved(self, interaction: discord.Interaction):
         if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags and "forwarded" not in interaction.channel.name.casefold():
-            if SOLVED_TAG_ID not in interaction.channel._applied_tags:
-                await self.mark_post_as_solved(interaction.channel)
-                one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
-                try:
-                    await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
-                except discord.NotFound:
-                    await interaction.channel.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
-            else:
+            if SOLVED_TAG_ID in interaction.channel._applied_tags:
                 await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
+                return
+            await self.mark_post_as_solved(interaction.channel)
+            one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
+            try:
+                await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
+            except discord.NotFound:
+                await interaction.channel.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
         else:
             button = ui.Button(label="Confirm", style=discord.ButtonStyle.green, custom_id="solved-confirm")
             async def on_confirm_button_click(Interaction: discord.Interaction):
@@ -271,18 +267,18 @@ class utility(commands.Cog):
     @app_commands.describe(user="What user do you want to remove?", reason="The reason for removing the user")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def remove(self, interaction: discord.Interaction, user: discord.Member, reason: str = "No reason provided."):
-        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            is_owner = user.id == interaction.channel.owner_id or user.id == await get_post_creator_id(interaction.channel_id)
-            if is_owner:
-                await interaction.response.send_message(f"{user.mention} is the owner of this post. Therefore they cannot be removed.", ephemeral=True)
-                return
-            await interaction.channel.remove_user(user)
-            await interaction.response.send_message(content=f"Successfully removed {user.mention} from this post.", ephemeral=True)
-
-            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-            await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}.\nReason: {reason}", allowed_mentions=discord.AllowedMentions.none())
-        else:
+        if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != SUPPORT_CHANNEL_ID:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
+            return
+        is_owner = user.id == interaction.channel.owner_id or user.id == await get_post_creator_id(interaction.channel_id)
+        if is_owner:
+            await interaction.response.send_message(f"{user.mention} is the owner of this post. Therefore they cannot be removed.", ephemeral=True)
+            return
+        await interaction.channel.remove_user(user)
+        await interaction.response.send_message(content=f"Successfully removed {user.mention} from this post.", ephemeral=True)
+
+        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+        await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}.\nReason: {reason}", allowed_mentions=discord.AllowedMentions.none())
 
     @app_commands.command(name="unsolve", description="Cancel the post from being closed")
     @app_commands.check(one_of_mod_expert_op)
@@ -343,129 +339,132 @@ class utility(commands.Cog):
             and reaction.message.channel.parent_id == SUPPORT_CHANNEL_ID
         from_sapphire_or_helper = reaction.message.author.id == 678344927997853742 or \
                                 reaction.message.author.id == self.client.user.id
-        reaction_allowed = reaction.emoji in ["🗑️", "❌"]
-        if in_support and from_sapphire_or_helper and reaction_allowed:
-            if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
+        reaction_allowed = reaction.emoji in ("🗑️", "❌")
+        if not in_support or not from_sapphire_or_helper or not reaction_allowed:
+            return
+    
+        if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
+            await reaction.message.delete()
+            await self.send_qr_log(reaction.message, user)
+            return
+        if reaction.message.interaction_metadata:
+            if reaction.message.interaction_metadata.user == user:
                 await reaction.message.delete()
-                await self.send_qr_log(reaction.message, user)
+                await self.send_qr_log(message=reaction.message, user=user)
                 return
-            if reaction.message.interaction_metadata:
-                if reaction.message.interaction_metadata.user == user:
+        elif reaction.message.embeds:
+            if reaction.message.embeds[len(reaction.message.embeds)-1].footer:
+                footer = reaction.message.embeds[len(reaction.message.embeds)-1].footer
+
+                regex = f'(Recommended|Sent) by @{user.name}'
+                if footer.text and re.match(regex, footer.text, re.IGNORECASE):
                     await reaction.message.delete()
                     await self.send_qr_log(message=reaction.message, user=user)
                     return
-            elif reaction.message.embeds:
-                if reaction.message.embeds[len(reaction.message.embeds)-1].footer:
-                    footer = reaction.message.embeds[len(reaction.message.embeds)-1].footer
 
-                    regex = f'(Recommended|Sent) by @{user.name}'
-                    if footer.text and re.match(regex, footer.text, re.IGNORECASE):
+                if footer.icon_url:
+                    user_id = self.get_user_id_from_avatar(footer.icon_url)
+                    if user_id is not None and user_id == user.id:
                         await reaction.message.delete()
                         await self.send_qr_log(message=reaction.message, user=user)
                         return
-
-                    if footer.icon_url:
-                        user_id = self.get_user_id_from_avatar(footer.icon_url)
-                        if user_id is not None and user_id == user.id:
-                            await reaction.message.delete()
-                            await self.send_qr_log(message=reaction.message, user=user)
-                            return
-            elif reaction.message.flags.components_v2:
-                patterns =  (f'-# Recommended by {user.mention}', f"-# Sent by {user.mention}")
-                view = ui.LayoutView.from_message(reaction.message)
-                for child in view.walk_children():
-                    if isinstance(child, ui.TextDisplay) and any(child.content.endswith(pattern) for pattern in patterns):
-                        await reaction.message.delete()
-                        await self.send_qr_log(reaction.message, user)
-                        return
-
-            if reaction.message.reference and reaction.message.reference.cached_message:
-                if user == reaction.message.reference.cached_message.author:
+        elif reaction.message.flags.components_v2:
+            patterns =  (f'-# Recommended by {user.mention}', f"-# Sent by {user.mention}")
+            view = ui.LayoutView.from_message(reaction.message)
+            for child in view.walk_children():
+                if isinstance(child, ui.TextDisplay) and any(child.content.endswith(pattern) for pattern in patterns):
                     await reaction.message.delete()
                     await self.send_qr_log(reaction.message, user)
                     return
-            if reaction.message.content and reaction.message.content.endswith(f"Recommended by {user.mention}"):
+
+        if reaction.message.reference and reaction.message.reference.cached_message:
+            if user == reaction.message.reference.cached_message.author:
                 await reaction.message.delete()
                 await self.send_qr_log(reaction.message, user)
-                return    
+                return
+        if reaction.message.content and reaction.message.content.endswith(f"Recommended by {user.mention}"):
+            await reaction.message.delete()
+            await self.send_qr_log(reaction.message, user)
+            return    
 
     @app_commands.command(name="atbl", description="Mark the current post as 'Added to bug list'")
     @app_commands.describe(priority="The priority of this issue")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def atbl(self, interaction: discord.Interaction, priority: Literal["Very Low", "Low", "Medium", "High", "Special Issue"]):
-        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            priority_texts = {
-                "very low": "We'll get to this eventually.",
-                "low": "We'll take care of this when we have time and if there are no higher-priority bugs.",
-                "medium": "We'll probably get to this in about 1-2 weeks, unless something more urgent comes up.",
-                "high": "We'll fix this as soon as we can.",
-                "special issue": "User specific issue"
-            }
-            view = ui.LayoutView()
-            text = f"### The development team has added this bug to their tracking list\n**Priority**\n{priority}"
-            if priority.casefold() != "special issue":
-                text += f"\n**When is this issue expected to be resolved?**\n{priority_texts.get(priority.casefold())}"
-            container = ui.Container(
-                ui.TextDisplay(text),
-                accent_colour=0xE88802
-            )
-            view.add_item(container)
-            await interaction.response.send_message(view=view)
-
-            ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
-            cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-            appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
-            tags = [ndr]
-            if cb in interaction.channel.applied_tags:
-                tags.append(cb)
-            if appeal in interaction.channel.applied_tags:
-                tags.append(appeal)
-            await interaction.channel.edit(name=f"[ATBL] {interaction.channel.name}", reason=f"@{interaction.user.name} used /atbl", applied_tags=tags)
-        else:
+        if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != SUPPORT_CHANNEL_ID:
             await interaction.response.send_message(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
+            return
+        priority_texts = {
+            "very low": "We'll get to this eventually.",
+            "low": "We'll take care of this when we have time and if there are no higher-priority bugs.",
+            "medium": "We'll probably get to this in about 1-2 weeks, unless something more urgent comes up.",
+            "high": "We'll fix this as soon as we can.",
+            "special issue": "User specific issue"
+        }
+        view = ui.LayoutView()
+        text = f"### The development team has added this bug to their tracking list\n**Priority**\n{priority}"
+        if priority.casefold() != "special issue":
+            text += f"\n**When is this issue expected to be resolved?**\n{priority_texts.get(priority.casefold())}"
+        container = ui.Container(
+            ui.TextDisplay(text),
+            accent_colour=0xE88802
+        )
+        view.add_item(container)
+        await interaction.response.send_message(view=view)
+
+        ndr = interaction.channel.parent.get_tag(NEED_DEV_REVIEW_TAG_ID)
+        cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
+        tags = [ndr]
+        if cb in interaction.channel.applied_tags:
+            tags.append(cb)
+        if appeal in interaction.channel.applied_tags:
+            tags.append(appeal)
+        await interaction.channel.edit(name=f"[ATBL] {interaction.channel.name}", reason=f"@{interaction.user.name} used /atbl", applied_tags=tags)
 
     @commands.hybrid_command(name="incomplete-post", description="Request more information from the post creator")
     @commands.guild_only()
     async def incomplete_post(self, ctx: commands.Context):
         await ctx.defer(ephemeral=True)
-        if isinstance(ctx.channel, discord.Thread) and ctx.channel.parent_id == SUPPORT_CHANNEL_ID:
-            if SOLVED_TAG_ID not in ctx.channel._applied_tags and NEED_DEV_REVIEW_TAG_ID not in ctx.channel._applied_tags:
-                if ctx.channel.id not in self.client.incomplete_msg_posts:
-                    user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
-                    text_prefix = "## Incomplete support post\nHey"
-                    if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
-                        text_prefix = f"## Incomplete support post\nHey <@{user_id}>"
-                    view = ui.LayoutView()
-                    container = ui.Container(
-                        ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible\n-# Recommended by {ctx.author.mention}"),
-                        accent_colour=0xFFA800
-                    )
-                    view.add_item(container)
-
-                    if not ctx.interaction:
-                        await ctx.message.delete()
-                    elif ctx.interaction:
-                        await ctx.interaction.delete_original_response()
-                    if WAITING_FOR_REPLY_TAG_ID in ctx.channel._applied_tags or UNANSWERED_TAG_ID in ctx.channel._applied_tags:
-                        tags = [ctx.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-                        if CUSTOM_BRANDING_TAG_ID in ctx.channel._applied_tags:
-                            tags.append(ctx.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-                        if APPEAL_GG_TAG_ID in ctx.channel._applied_tags:
-                            tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
-                        action_id = generate_random_id()
-                        await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
-                        await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=ctx.channel.mention, tag=tags, context="/incomplete-post used")
-                    await ctx.channel.send(
-                        view=view,
-                        allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
-                    )
-                else:
-                    await ctx.reply("You cannot use this command as an automatic message was already sent.", ephemeral=True, delete_after=5)
-            else:
-                await ctx.reply("You cannot use this command as this post has the *Solved* or *Needs dev review* tag.", ephemeral=True, delete_after=3)
-        else:
+        if not isinstance(ctx.channel, discord.Thread) or ctx.channel.parent_id != SUPPORT_CHANNEL_ID:
             await ctx.reply(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
+            return
+    
+        if SOLVED_TAG_ID in ctx.channel._applied_tags or NEED_DEV_REVIEW_TAG_ID in ctx.channel._applied_tags:
+            await ctx.reply("You cannot use this command as this post has the *Solved* or *Needs dev review* tag.", ephemeral=True, delete_after=3)
+            return
+        
+        if ctx.channel.id in self.client.incomplete_msg_posts:
+            await ctx.reply("You cannot use this command as an automatic message was already sent.", ephemeral=True, delete_after=5)
+            return
+        user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
+        text_prefix = "## Incomplete support post\nHey"
+        if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
+            text_prefix = f"## Incomplete support post\nHey <@{user_id}>"
+        view = ui.LayoutView()
+        container = ui.Container(
+            ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible\n-# Recommended by {ctx.author.mention}"),
+            accent_colour=0xFFA800
+        )
+        view.add_item(container)
 
+        if not ctx.interaction:
+            await ctx.message.delete()
+        elif ctx.interaction:
+            await ctx.interaction.delete_original_response()
+        if WAITING_FOR_REPLY_TAG_ID in ctx.channel._applied_tags or UNANSWERED_TAG_ID in ctx.channel._applied_tags:
+            tags = [ctx.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+            if CUSTOM_BRANDING_TAG_ID in ctx.channel._applied_tags:
+                tags.append(ctx.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+            if APPEAL_GG_TAG_ID in ctx.channel._applied_tags:
+                tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
+            action_id = generate_random_id()
+            await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
+            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=ctx.channel.mention, tag=tags, context="/incomplete-post used")
+        await ctx.channel.send(
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
+        )
     @staticmethod
     async def non_expert_mod_cooldown(interaction: discord.Interaction):
         """
