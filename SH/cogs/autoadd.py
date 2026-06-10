@@ -101,11 +101,9 @@ class autoadd(commands.Cog):
     async def get_solved_id(self):
         solved_id = 1274997472162349079
         for command in await self.client.tree.fetch_commands():
-                if command.name == "solved": 
-                    solved_id=command.id
-                    break
-                else:
-                    continue
+            if command.name == "solved": 
+                solved_id=command.id
+                break
         return solved_id
 
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved

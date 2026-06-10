@@ -48,20 +48,21 @@ class waiting_for_reply(commands.Cog):
         applied_tags = message.channel._applied_tags
         message_author_is_owner = message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id)
         has_wfr = WAITING_FOR_REPLY_TAG_ID in applied_tags
-        if message.id != message.channel.id and NEED_DEV_REVIEW_TAG_ID not in applied_tags and UNANSWERED_TAG_ID not in applied_tags and SOLVED_TAG_ID not in applied_tags:
-            if not has_wfr:
-                if message_author_is_owner and channel_id not in self.posts:
-                    task = asyncio.create_task(self.add_waiting_tag(post=message.channel))
-                    self.posts[channel_id] = task
-                elif not message_author_is_owner and channel_id in self.posts:
-                    self.posts[channel_id].cancel()
-                    self.posts.pop(channel_id)
-            elif not message_author_is_owner:
-                action_id = generate_random_id()
-                tags = message.channel.applied_tags
-                tags.remove(wfr)
-                await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag")
-                await self.client.send_log(thread_id=ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
+        if message.id == message.channel.id or NEED_DEV_REVIEW_TAG_ID in applied_tags or UNANSWERED_TAG_ID in applied_tags or SOLVED_TAG_ID in applied_tags:
+            return
+        if not has_wfr:
+            if message_author_is_owner and channel_id not in self.posts:
+                task = asyncio.create_task(self.add_waiting_tag(post=message.channel))
+                self.posts[channel_id] = task
+            elif not message_author_is_owner and channel_id in self.posts:
+                self.posts[channel_id].cancel()
+                self.posts.pop(channel_id)
+        elif not message_author_is_owner:
+            action_id = generate_random_id()
+            tags = message.channel.applied_tags
+            tags.remove(wfr)
+            await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag")
+            await self.client.send_log(thread_id=ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
 
 async def setup(client: MyClient):
     await client.add_cog(waiting_for_reply(client))
