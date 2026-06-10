@@ -106,20 +106,20 @@ class ndr_options_buttons(ui.View):
 
     @ui.button(label="Only add tag", style=discord.ButtonStyle.grey, custom_id="ndr-only-add-tag")
     async def on_only_add_tag_click(self, interaction: discord.Interaction, button: ui.Button):
+        await self.Interaction.delete_original_response()
         await interaction.response.defer(ephemeral=False)
         await self.mark_post_as_ndr(interaction.channel)
         await interaction.channel.send(content="Post successfully marked as *needs-dev-review*.")
-        await self.Interaction.delete_original_response()
 
     @ui.button(label="Add tag & send questions", style=discord.ButtonStyle.grey, custom_id="ndr-tag-and-questions")
     async def on_send_questions_click(self, interaction: discord.Interaction, button: ui.Button):
+        await self.Interaction.delete_original_response()
         await interaction.response.defer()
         await self.mark_post_as_ndr(interaction.channel)
         await interaction.channel.send(
             view=NeedDevReviewView(executor_id=interaction.user.id),
             allowed_mentions=discord.AllowedMentions.none()
         )
-        await self.Interaction.delete_original_response()
 
 class utility(commands.Cog):
     def __init__(self, client: MyClient):
