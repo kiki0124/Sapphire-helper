@@ -16,7 +16,11 @@
 pip install -r requirements.txt
 ```
 
-### 3. Running the bot 
+### 3. Setting up the database
+- Create an empty folder named `database` in the `SH` folder.
+  - This will automatically be used to store the database files.
+
+### 4. Running the bot 
 - Using docker: [docker-readme](/docker-readme.md)
 
 - If you are not using docker, run these commands in the root folder:

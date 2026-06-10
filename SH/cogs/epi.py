@@ -302,7 +302,7 @@ class epi(commands.Cog):
             custom_id="epi-disable-confirm"
         )
         async def on_button_click(i: discord.Interaction):
-            self.ping_status_page.stop()
+            self.ping_status_page.cancel()
             await i.channel.typing()
             await i.response.defer(ephemeral=True)
             await i.delete_original_response()
