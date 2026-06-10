@@ -23,40 +23,6 @@ class waiting_for_reply(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
         
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
-        if self.client.alert_webhook_url is not None:
-            webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
-            try:
-                await webhook.send(
-                    content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
-                    username=self.client.user.name,
-                    avatar_url=self.client.user.display_avatar.url,
-                    thread=discord.Object(id=ALERTS_THREAD_ID),
-                    wait=False
-                )
-                return
-            except Exception:
-                pass #pass to try the other methods below
-        try:
-            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
-        if alerts_thread.archived:
-            await alerts_thread.edit(archived=False)
-        webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
-        try:
-            webhook = webhooks[0]
-        except IndexError:
-            webhook = await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        await webhook.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
-            username=self.client.user.name,
-            avatar_url=self.client.user.display_avatar.url,
-            thread=discord.Object(id=ALERTS_THREAD_ID),
-            wait=False
-        )
-        self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
-        
     posts: dict[int, asyncio.Task] = {}
 
     async def add_waiting_tag(self, post: discord.Thread) -> None:
@@ -68,32 +34,35 @@ class waiting_for_reply(commands.Cog):
             action_id = generate_random_id()
             applied_tags.append(wfr)
             await post.edit(applied_tags=applied_tags, reason=f"ID: {action_id}. Waiting for reply system")
-            await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=applied_tags, context="Add Waiting for reply")
+            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=applied_tags, context="Add Waiting for reply")
             self.posts.pop(post.id)
 
     @commands.Cog.listener('on_message')
     async def add_remove_waiting_for_reply(self, message: discord.Message):
         channel_id = message.channel.id
-        if message.author != self.client.user and isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
-            support = message.channel.parent
-            wfr = support.get_tag(WAITING_FOR_REPLY_TAG_ID)
-            applied_tags = message.channel._applied_tags
-            message_author_is_owner = message.author.id == message.channel.owner_id or message.author.id == await get_post_creator_id(message.channel.id)
-            has_wfr = WAITING_FOR_REPLY_TAG_ID in applied_tags
-            if message.id != message.channel.id and NEED_DEV_REVIEW_TAG_ID not in applied_tags and UNANSWERED_TAG_ID not in applied_tags and SOLVED_TAG_ID not in applied_tags:
-                if not has_wfr:
-                    if message_author_is_owner and channel_id not in self.posts:
-                        task = asyncio.create_task(self.add_waiting_tag(post=message.channel))
-                        self.posts[channel_id] = task
-                    elif not message_author_is_owner and channel_id in self.posts:
-                        self.posts[channel_id].cancel()
-                        self.posts.pop(channel_id)
-                elif not message_author_is_owner and has_wfr:
-                    action_id = generate_random_id()
-                    tags = message.channel.applied_tags
-                    tags.remove(wfr)
-                    await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag")
-                    await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
+        if message.author == self.client.user or not isinstance(message.channel, discord.Thread) or message.channel.parent_id != SUPPORT_CHANNEL_ID:
+            return
+
+        support = message.channel.parent
+        wfr = support.get_tag(WAITING_FOR_REPLY_TAG_ID)
+        applied_tags = message.channel._applied_tags
+        message_author_is_owner = message.author.id == message.channel.owner_id or message.author.id == await get_post_creator_id(message.channel.id)
+        has_wfr = WAITING_FOR_REPLY_TAG_ID in applied_tags
+        if message.id == message.channel.id or NEED_DEV_REVIEW_TAG_ID in applied_tags or UNANSWERED_TAG_ID in applied_tags or SOLVED_TAG_ID in applied_tags:
+            return
+        if not has_wfr:
+            if message_author_is_owner and channel_id not in self.posts:
+                task = asyncio.create_task(self.add_waiting_tag(post=message.channel))
+                self.posts[channel_id] = task
+            elif not message_author_is_owner and channel_id in self.posts:
+                self.posts[channel_id].cancel()
+                self.posts.pop(channel_id)
+        elif not message_author_is_owner:
+            action_id = generate_random_id()
+            tags = message.channel.applied_tags
+            tags.remove(wfr)
+            await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag")
+            await self.client.send_log(thread_id=ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
 
 async def setup(client: MyClient):
     await client.add_cog(waiting_for_reply(client))

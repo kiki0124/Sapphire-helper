@@ -126,27 +126,34 @@ class readthedamnrules(commands.Cog):
         await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire or appeal.gg. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire or appeal.gg related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300, allowed_mentions=discord.AllowedMentions.none())
         await reference_message.channel.delete_messages(messages_to_move, reason=f"rtdr system used by {user.name}")
         return post[0]
-
+    
+    @staticmethod
+    def is_allowed_rtdr_channel(channel: discord.TextChannel | discord.Thread, everyone_role: discord.Role):
+        return channel.permissions_for(everyone_role).view_channel and (channel.permissions_for(everyone_role).send_messages or isinstance(channel, discord.Thread) and channel.parent_id == FEEDBACK_CHANNEL_ID)
+    
     @commands.Cog.listener('on_message')
     async def redirect_to_support(self, message: discord.Message):
         if not message.author.bot and message.reference and message.content.startswith(self.client.user.mention) and message.guild:
             everyone = message.guild.default_role
-            if message.channel.permissions_for(everyone).view_channel and (message.channel.permissions_for(everyone).send_messages or isinstance(message.channel, discord.Thread) and message.channel.parent_id == FEEDBACK_CHANNEL_ID):
-                if message.author.get_role(EXPERTS_ROLE_ID) or message.author.get_role(MODERATORS_ROLE_ID) or message.author.get_role(DEVELOPERS_ROLE_ID):
-                    replied_message = message.reference.cached_message or await message.channel.fetch_message(message.reference.message_id)
-                    if not replied_message.author == message.author:
-                        await self.handle_request(reference_message=replied_message, user=message.author, message=message)
-                        await message.delete(delay=5) # delete the trigger message when the reply message with the post was sent
+            if not self.is_allowed_rtdr_channel(message.channel, everyone):
+                return
+            if message.author.get_role(EXPERTS_ROLE_ID) or message.author.get_role(MODERATORS_ROLE_ID) or message.author.get_role(DEVELOPERS_ROLE_ID):
+                replied_message = message.reference.cached_message or await message.channel.fetch_message(message.reference.message_id)
+                if replied_message.author == message.author:
+                    return
+                await self.handle_request(reference_message=replied_message, user=message.author, message=message)
+                await message.delete(delay=5) # delete the trigger message when the reply message with the post was sent
 
     @commands.Cog.listener('on_reaction_add')
     async def reaction_redirect_to_support(self, reaction: discord.Reaction, user: Union[discord.Member, discord.User]):
-        if reaction.message.guild and reaction.message.author != user and not reaction.message.author.bot:
-            everyone = reaction.message.guild.default_role
-            if reaction.message.channel.permissions_for(everyone).view_channel and (reaction.message.channel.permissions_for(everyone).send_messages or isinstance(reaction.message.channel, discord.Thread) and reaction.message.channel.parent_id == FEEDBACK_CHANNEL_ID):
-                reactions = ("❓", "❔") # allowed reactions, all other reactions will be ignored in this context
-                if reaction.emoji in reactions:
-                    if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
-                        await self.handle_request(reaction.message, user=user)
+        if reaction.message.guild is None or reaction.message.author == user or reaction.message.author.bot:
+            return
+        everyone = reaction.message.guild.default_role
+        #                                                                          allowed reactions, all other reactions will be ignored in this context
+        if not self.is_allowed_rtdr_channel(reaction.message.channel, everyone) or reaction.emoji not in ("❓", "❔"): 
+            return
+        if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
+            await self.handle_request(reaction.message, user=user)
 
 async def setup(client: MyClient):
     await client.add_cog(readthedamnrules(client))

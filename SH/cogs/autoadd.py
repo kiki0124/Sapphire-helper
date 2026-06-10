@@ -51,14 +51,9 @@ class ConfirmCloseButtons(ui.ActionRow):
                 tags.append(cb)
 
             action_id = generate_random_id()
-            try:
-                alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
-            except discord.NotFound as e:
-                raise e
 
+            alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
             await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Post starter message delete and confirm button clicked- mark post as solved")
-            if alerts_thread.archived:
-                await alerts_thread.edit(archived=False)
             await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
             await remove_post_from_rtdr(interaction.channel_id)
         else:
@@ -106,46 +101,10 @@ class autoadd(commands.Cog):
     async def get_solved_id(self):
         solved_id = 1274997472162349079
         for command in await self.client.tree.fetch_commands():
-                if command.name == "solved": 
-                    solved_id=command.id
-                    break
-                else:
-                    continue
+            if command.name == "solved": 
+                solved_id=command.id
+                break
         return solved_id
-
-    async def send_action_log(self, action_id: str, post_mention: str, tags: list[discord.ForumTag], context: str):
-        if self.client.alert_webhook_url is not None:
-            webhook = discord.Webhook.from_url(self.client.alert_webhook_url, client=self.client)
-            try:
-                await webhook.send(
-                    content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
-                    username=self.client.user.name,
-                    avatar_url=self.client.user.display_avatar.url,
-                    thread=discord.Object(id=ALERTS_THREAD_ID),
-                    wait=False
-                )
-                return
-            except Exception:
-                pass #pass to try the other methods below
-        try:
-            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
-        except discord.NotFound as e:
-            raise e
-        if alerts_thread.archived:
-            await alerts_thread.edit(archived=False)
-        webhooks = [webhook for webhook in await alerts_thread.parent.webhooks() if webhook.token]
-        try:
-            webhook = webhooks[0]
-        except IndexError:
-            webhook = await alerts_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        await webhook.send(
-            content=f"ID: {action_id}\nPost: {post_mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: {context}",
-            username=self.client.user.name,
-            avatar_url=self.client.user.display_avatar.url,
-            thread=discord.Object(id=ALERTS_THREAD_ID),
-            wait=False
-        )
-        self.client.alert_webhook_url = webhook.url #Assign only if the url is None. This should normally only be called once when running the bot
 
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
@@ -165,7 +124,7 @@ class autoadd(commands.Cog):
         tags.append(thread.parent.get_tag(UNANSWERED_TAG_ID))
         action_id = generate_random_id()
         await thread.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-add unanswered tag to a new post.")
-        await self.send_action_log(action_id=action_id, post_mention=thread.mention, tags=tags, context="Auto add unanswered tag")
+        await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=thread.mention, tags=tags, context="Auto add unanswered tag")
         start_msg = thread.starter_message
         content_len = len(start_msg.content) if start_msg.content else 0
         if (
@@ -184,31 +143,33 @@ class autoadd(commands.Cog):
             self.client.incomplete_msg_posts.add(thread.id)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if (message.author != self.client.user and message.author.id == message.channel.owner_id) or (message.author.id == await get_post_creator_id(message.channel.id)):
-            tags = message.channel._applied_tags
-            if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
-                pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
-                negative_pattern = r"doe?s?n.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t|advance\b|ahead o?f? time"
-                if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
-                    await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.get_solved_id()}>")
-                    self.sent_post_ids.append(message.channel.id)
+        if message.author == self.client.user or (message.author.id != message.channel.owner_id and message.author.id != await get_post_creator_id(message.channel.id)):
+            return
+        tags = message.channel._applied_tags
+        if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
+            pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
+            negative_pattern = r"doe?s?n.?t|hasn.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t|advance\b|ahead o?f? time"
+            if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
+                await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.get_solved_id()}>")
+                self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
-        if UNANSWERED_TAG_ID in message.channel._applied_tags and message.author != self.client.user:
-            applied_tags = message.channel.applied_tags
-            owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
-            author_not_owner = message.author.id != owner_id
-            if author_not_owner:
-                tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-                cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-                appeal = message.channel.parent.get_tag(APPEAL_GG_TAG_ID)
-                if cb in applied_tags: 
-                    tags.append(cb)
-                if appeal in applied_tags:
-                    tags.append(appeal)
-                action_id = generate_random_id()
-                await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
-                await self.send_action_log(action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
+        if UNANSWERED_TAG_ID not in message.channel._applied_tags or message.author == self.client.user:
+            return
+        applied_tags = message.channel.applied_tags
+        owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
+        author_not_owner = message.author.id != owner_id
+        if author_not_owner:
+            tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
+            cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+            appeal = message.channel.parent.get_tag(APPEAL_GG_TAG_ID)
+            if cb in applied_tags: 
+                tags.append(cb)
+            if appeal in applied_tags:
+                tags.append(appeal)
+            action_id = generate_random_id()
+            await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
+            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
 
     @tasks.loop(hours=1)
     async def close_abandoned_posts(self):
@@ -217,9 +178,7 @@ class autoadd(commands.Cog):
             return
 
         for post in await support.guild.active_threads():
-            if post.parent_id != SUPPORT_CHANNEL_ID or post.locked:
-                continue
-            if NEED_DEV_REVIEW_TAG_ID in post._applied_tags:
+            if post.parent_id != SUPPORT_CHANNEL_ID or post.locked or NEED_DEV_REVIEW_TAG_ID in post._applied_tags:
                 continue
 
             owner_id = post.owner_id if post.owner_id != self.client.user.id else await get_post_creator_id(post.id)
@@ -231,6 +190,7 @@ class autoadd(commands.Cog):
                 else:
                     # owner still in server, we skip
                     continue
+
             tags = [support.get_tag(SOLVED_TAG_ID)]
             cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
             appeal = support.get_tag(APPEAL_GG_TAG_ID)
@@ -241,7 +201,7 @@ class autoadd(commands.Cog):
             action_id = generate_random_id()
             await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
             await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
-            await self.send_action_log(action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
+            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
 
     @commands.Cog.listener('on_raw_message_delete')
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
