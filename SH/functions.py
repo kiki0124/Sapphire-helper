@@ -37,14 +37,13 @@ def generate_random_id() -> str:
     characters = ascii_letters + digits
     return ''.join(random.choice(characters) for _ in range(6))
 
-def check_time_more_than_day(timestamp: float) -> bool:
+def check_time_more_than(timestamp: float, to_compare: datetime.timedelta) -> bool:
     """  
-    Check if the given time is more than a day ago
+    Check if the given time is more than a certain amount of time ago
     """
-    tz_info = datetime.datetime.now().astimezone().tzinfo
-    time = datetime.datetime.fromtimestamp(timestamp, tz=tz_info)
-    one_day_ago = datetime.datetime.now(tz=tz_info) - datetime.timedelta(days=1)
-    return not one_day_ago < time 
+    timestamp_dt = datetime.datetime.fromtimestamp(timestamp, datetime.UTC)
+
+    return timestamp_dt + to_compare <  datetime.datetime.now(datetime.UTC)
 
 def format_list(items: Sequence, conjunction: str = "or") -> str:
     return ", ".join(items[:-1]) + f" {conjunction} " + items[-1]
@@ -156,8 +155,10 @@ async def check_post_last_message_time(post_id: int) -> bool:
     """
     Returns if the timestamp of a post (from db) is more than one day ago (24 hours).
     """
-    timestamp = await get_post_timestamp(post_id) or datetime.datetime.now().timestamp()
-    return check_time_more_than_day(timestamp)
+    timestamp = await get_post_timestamp(post_id)
+    if timestamp is None:
+        return False
+    return check_time_more_than(timestamp, datetime.timedelta(days=1))
 
 # readthedamnrules system related functions
 

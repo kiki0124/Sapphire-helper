@@ -94,7 +94,7 @@ class bot(commands.Cog):
             owner_id = await functions.get_post_creator_id(post.id) or post.owner_id
             if last_message:
                 author_is_owner = last_message.author.id != owner_id
-                message_time = functions.check_time_more_than_day(last_message.created_at.timestamp())
+                message_time = functions.check_time_more_than(last_message.created_at.timestamp(), datetime.timedelta(days=1))
             await interaction.response.send_message(f"NDR: {ndr} | solved: {solved} | archived: {archived} | locked: {locked} | message time: {message_time} | author is owner: {author_is_owner} | pending: {is_pending} | **total: {ndr and solved and archived and locked and author_is_owner and message_time and is_pending}**")
         else:
             await interaction.response.send_message(content="Debug not found...", ephemeral=True)

@@ -14,8 +14,7 @@ if TYPE_CHECKING:
     from main import MyClient
     from collections import OrderedDict
 
-SUPPORT_SERVER_ID = 678279978244374528
-
+SUPPORT_SERVER_ID = 1146016764275200061
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
@@ -74,7 +73,7 @@ class MemberCache(commands.Cog):
 
     @cache_group.command(name="stats", description="Get info/stats on the current member cache")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def clear_cache(self, interaction: discord.Interaction):
+    async def stats(self, interaction: discord.Interaction):
         await interaction.response.send_message(view=MemberCacheView(self.client._members, self.client._max_member_cache_size))
 
     @cache_group.command(name="clear", description="Clear the custom member cache")
@@ -102,10 +101,10 @@ class MemberCache(commands.Cog):
         new_num, new_size = len(self.client._members), sys.getsizeof(self.client._members)
         self.client._max_member_cache_size = size
 
-        response = (f"Diff:",
-                        f"- No. of members in cache: `{old_num}` -> `{new_num}`",
-                        f"- Total Size: `{old_size}` -> `{new_size}` (bytes)",
-                        f"- Max Size: `{old_max_size} -> `{size}`")
+        response = (f"Diff (Before vs After):",
+                        f"- Members in cache: `{old_num}` -> `{new_num}`",
+                        f"- Total Size (bytes): `{old_size}` -> `{new_size}`",
+                        f"- Max members: `{old_max_size}` -> `{size}`")
 
         await interaction.response.send_message('\n'.join(response))
 

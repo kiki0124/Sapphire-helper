@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 import re
 import random
 import os
@@ -88,14 +88,10 @@ class ConfirmCloseView(ui.LayoutView):
 class autoadd(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
-        self.close_abandoned_posts.start()
         
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):
         self.client.add_view(ConfirmCloseView())
-
-    def cog_unload(self):
-        self.close_abandoned_posts.cancel()
 
     @cached()
     async def get_solved_id(self):
@@ -171,38 +167,6 @@ class autoadd(commands.Cog):
             await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
             await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
 
-    @tasks.loop(hours=1)
-    async def close_abandoned_posts(self):
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        if not support:
-            return
-
-        for post in await support.guild.active_threads():
-            if post.parent_id != SUPPORT_CHANNEL_ID or post.locked or NEED_DEV_REVIEW_TAG_ID in post._applied_tags:
-                continue
-
-            owner_id = post.owner_id if post.owner_id != self.client.user.id else await get_post_creator_id(post.id)
-            if owner_id:
-                try:
-                    self.client.member_in_cache(owner_id) or await support.guild.fetch_member(owner_id)
-                except discord.NotFound:
-                    pass
-                else:
-                    # owner still in server, we skip
-                    continue
-
-            tags = [support.get_tag(SOLVED_TAG_ID)]
-            cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-            appeal = support.get_tag(APPEAL_GG_TAG_ID)
-            if CUSTOM_BRANDING_TAG_ID in post._applied_tags: 
-                tags.append(cb)
-            if APPEAL_GG_TAG_ID in post._applied_tags:
-                tags.append(appeal)
-            action_id = generate_random_id()
-            await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
-            await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
-            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
-
     @commands.Cog.listener('on_raw_message_delete')
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
         message_channel = self.client.get_channel(payload.channel_id)
@@ -218,10 +182,6 @@ class autoadd(commands.Cog):
                 await message_channel.send(
                     view=ConfirmCloseView(post_author=owner_id)
                 )
-
-    @close_abandoned_posts.before_loop
-    async def wait_until_ready(self):
-        await self.client.wait_until_ready()
 
 async def setup(client: MyClient):
     await client.add_cog(autoadd(client))

@@ -35,26 +35,6 @@ class MyClient(commands.Bot):
         self._members: OrderedDict[int, int] = OrderedDict()
         self._max_member_cache_size: int = 100
 
-    def add_member_to_cache(self, member: discord.Member, /) -> None:
-        """
-        Adds a member's id to the custom cache.
-        This should be called only when a post is created in the support forum.
-        Since we only need to cache members there.
-        """
-        if member.id in self._members:
-            self._members.move_to_end(member.id)
-        else:
-            self._members[member.id] = member.id
-            if len(self._members) > self._max_member_cache_size:
-                self._members.popitem(last=False)
-
-    def member_in_cache(self, id: int, /) -> bool:
-        """
-        Check if the member is in the cache.
-        Recommended to use REST api to check if not.
-        """
-        return bool(self._members.get(id))
-
     async def setup_hook(self):
         unittest.main(test_functions, exit=False)
         await main() # function that creates the db tables if they don't already exist
@@ -102,6 +82,26 @@ class MyClient(commands.Bot):
             wait=kwargs.get('wait', False),
             allowed_mentions=kwargs.get('allowed_mentions', discord.AllowedMentions.none())
         )
+
+    def add_member_to_cache(self, member: discord.Member, /) -> None:
+        """
+        Adds a member's id to the custom cache.
+        This should be called only when a post is created in the support forum.
+        Since we only need to cache members there.
+        """
+        print(f"Adding {member.name} to cache")
+        if member.id in self._members:
+            self._members.move_to_end(member.id)
+        else:
+            self._members[member.id] = member.id
+            if len(self._members) > self._max_member_cache_size:
+                print(f"Removing {self._members.popitem(last=False)}")
+
+    def get_member_id(self, id: int, /) -> int | None:
+        """
+        Get the member id from the custom cache.
+        """
+        return self._members.get(id)
 
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")
