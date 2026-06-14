@@ -7,7 +7,6 @@ import random
 import os
 from dotenv import load_dotenv
 from functions import get_post_creator_id, generate_random_id, remove_post_from_rtdr
-from aiocache import cached
 from discord import ui
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -62,7 +61,7 @@ class ConfirmCloseButtons(ui.ActionRow):
     async def interaction_check(self, interaction: discord.Interaction[MyClient]) -> bool:
         is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
         if not (is_owner or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)):
-            await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
+            await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
             return False
         return True
 
@@ -72,12 +71,12 @@ class ConfirmCloseView(ui.LayoutView):
         super().__init__(timeout=None)
 
         greetings = ("Hi", "Hey", "Hello", "Hi there")
-        self.textdisplay = ui.TextDisplay(f"{random.choice(greetings)} <@{post_author}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.",
+        main_content = ui.TextDisplay(f"{random.choice(greetings)} <@{post_author}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.",
                                           id=10)
         self.confirm_close_buttons = ConfirmCloseButtons()
         self.container = ui.Container()
 
-        self.container.add_item(self.textdisplay)
+        self.container.add_item(main_content)
         self.container.add_item(discord.ui.Separator())
         self.container.add_item(self.confirm_close_buttons)
         self.add_item(self.container)

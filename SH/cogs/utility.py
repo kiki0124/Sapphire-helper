@@ -9,7 +9,6 @@ import os
 from dotenv import load_dotenv
 from functions import remove_post_from_rtdr, get_post_creator_id, \
                     generate_random_id, remove_post_from_pending
-from aiocache import cached
 from typing import Union, Literal, Callable, TYPE_CHECKING
 import re
 if TYPE_CHECKING:

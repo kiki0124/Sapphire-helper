@@ -51,8 +51,8 @@ class CloseNowRow(ui.ActionRow):
 
         action_id = generate_random_id()
 
-        await interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=interaction.channel.mention, tags=tags, context="Post starter message delete and confirm button clicked- mark post as solved")
-        await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
+        await interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=interaction.channel.mention, tags=tags, context=f"Close now button clicked")
+        await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
         await remove_post_from_pending(interaction.channel_id)
         await remove_post_from_rtdr(interaction.channel_id)
 
@@ -67,7 +67,7 @@ class CloseNowRow(ui.ActionRow):
     async def interaction_check(self, interaction: discord.Interaction[MyClient]) -> bool:
         is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
         if not (interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner):
-            await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
+            await interaction.response.send_message(content="Only Moderators, Community Experts, Developers and the post creator can use this.", ephemeral=True)
             return False
         return True
 
@@ -161,7 +161,7 @@ class remind(commands.Cog):
         for post_id in to_remove:
             reminder_not_sent_posts.pop(post_id)
 
-    @tasks.loop(seconds=15)
+    @tasks.loop(hours=1)
     async def check_for_pending_posts(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         if not support:
