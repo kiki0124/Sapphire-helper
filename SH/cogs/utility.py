@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from functions import remove_post_from_rtdr, get_post_creator_id, \
                     generate_random_id, remove_post_from_pending
 from aiocache import cached
-from typing import Union, Literal, Optional, TYPE_CHECKING
+from typing import Union, Literal, Callable, TYPE_CHECKING
 import re
 if TYPE_CHECKING:
     from main import MyClient
@@ -121,31 +121,48 @@ class ndr_options_buttons(ui.View):
             allowed_mentions=discord.AllowedMentions.none()
         )
 
+class SolvedView(ui.LayoutView):
+    def __init__(self, unsolve_id: int) -> None:
+        super().__init__(timeout=None)
+        container = ui.Container()
+        title = "### Marked as Solved"
+
+        one_hour_from_now = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
+        footer= f"-# Closes {discord.utils.format_dt(one_hour_from_now, 'R')}. Use </unsolve:{unsolve_id}> to cancel."
+
+        container.add_item(ui.TextDisplay(title))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(footer))
+        self.add_item(container)
+
+
+class SolvedRowWithNDR(ui.ActionRow):
+    def __init__(self, mark_post_as_solved: Callable) -> None:
+        super().__init__()
+        self.mark_post_as_solved = mark_post_as_solved
+    
+    @ui.button(label="Confirm", style=discord.ButtonStyle.green, custom_id="solved-confirm")
+    async def on_confirm_button_click(self, interaction: discord.Interaction[MyClient], button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        await interaction.delete_original_response()
+        await interaction.channel.send(view=SolvedView(await interaction.client.get_unsolve_id()))
+        await self.mark_post_as_solved(interaction.channel)
+
+
+# This is sent when the post has a NDR tag
+class SolvedViewWithNDR(ui.LayoutView):
+    def __init__(self, mark_post_as_solved: Callable) -> None:
+        super().__init__(timeout=None)
+        container = ui.Container()
+        container.add_item(ui.TextDisplay("This post has the **needs-dev-review tag**, are you sure you would like to mark it as solved?"))
+        container.add_item(ui.Separator())
+        container.add_item(SolvedRowWithNDR(mark_post_as_solved))
+        self.add_item(container)
+
+
 class utility(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
-
-    @cached()
-    async def get_unsolve_id(self) -> int:
-        """  
-        Get the id of /unsolve command.
-        This fetches the command from discord and caches the result
-        """
-        unsolve_id = 1281211280618950708
-        for command in await self.client.tree.fetch_commands():
-            if command.name == "unsolve": 
-                unsolve_id=command.id
-                break
-        return unsolve_id
-    
-    @cached()
-    async def get_solved_id(self):
-        solved_id = 1274997472162349079
-        for command in await self.client.tree.fetch_commands():
-            if command.name == "solved": 
-                solved_id=command.id
-                break
-        return solved_id
 
     close_tasks: dict[int, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
 
@@ -243,24 +260,10 @@ class utility(commands.Cog):
             if SOLVED_TAG_ID in interaction.channel._applied_tags:
                 await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
                 return
+            await interaction.response.send_message(view=SolvedView(await self.client.get_unsolve_id()))
             await self.mark_post_as_solved(interaction.channel)
-            one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
-            try:
-                await interaction.response.send_message(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
-            except discord.NotFound:
-                await interaction.channel.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
         else:
-            button = ui.Button(label="Confirm", style=discord.ButtonStyle.green, custom_id="solved-confirm")
-            async def on_confirm_button_click(Interaction: discord.Interaction):
-                await self.mark_post_as_solved(interaction.channel)
-                one_hour_from_now = datetime.datetime.now() + datetime.timedelta(hours=1)
-                await Interaction.response.defer(ephemeral=True)
-                await Interaction.delete_original_response()
-                await Interaction.channel.send(content=f"This post was marked as solved.\n-# It will be automatically closed <t:{round(one_hour_from_now.timestamp())}:R>. Use </unsolve:{await self.get_unsolve_id()}> to cancel.")
-            button.callback = on_confirm_button_click
-            view = ui.View() # construct an empty view item
-            view.add_item(button)
-            await interaction.response.send_message(content="This post has the **needs-dev-review tag**, are you sure you would like to mark it as solved?", view=view, ephemeral=True)
+            await interaction.response.send_message(view=SolvedViewWithNDR(self.mark_post_as_solved), ephemeral=True)
             
     @app_commands.command(name="remove", description="Remove the given member from the current post")
     @app_commands.guild_only()
@@ -285,11 +288,15 @@ class utility(commands.Cog):
     @app_commands.guild_only()
     async def unsolved(self, interaction: discord.Interaction):
         if interaction.channel in self.close_tasks or SOLVED_TAG_ID in interaction.channel._applied_tags:
-            await self.unsolve_post(interaction.channel)
-            content = f"Post successfully unsolved!\nPlease send a message here explaining what you still need help with.\n-# If the post is solved you may use </solved:{await self.get_solved_id()}> to mark it as solved."
             if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
-                content = "Post successfully unsolved!"
-            await interaction.response.send_message(content=content)
+                await interaction.response.send_message("Post successfully unsolved!")
+                return
+            title = "### Post Successfully Unsolved"
+            description = "Please send a message here explaining what you still need help with"
+            footer = f"-# If the issue is resolved, you may use </solved:{await self.client.get_solved_id()}> to mark it as solved."
+            view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(title), ui.Separator(visible=False), ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
+            await interaction.response.send_message(view=view)
+            await self.unsolve_post(interaction.channel)
         else:
             await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
 

@@ -38,7 +38,7 @@ class GetNotifiedButton(ui.ActionRow):
 
 
 class GetNotifiedView(ui.LayoutView):
-    def __init__(self, *, description: str = ""):
+    def __init__(self, description: str = "", *, status_page: bool = True, epi_message: discord.Message | None = None):
         super().__init__(timeout=None)
         self.description = description
 
@@ -48,11 +48,18 @@ class GetNotifiedView(ui.LayoutView):
         get_notified_button = GetNotifiedButton()
 
         container = ui.Container(accent_colour=accent_colour)
-        full_text = f"{title}\n{description.strip()}"
-        container.add_item(ui.TextDisplay(full_text))
+
+        container.add_item(ui.TextDisplay(title))
+        if epi_message is not None:
+            container.add_item(ui.Separator(visible=False))
+            container.add_item(ui.TextDisplay(f"### - [Official Status Update]({epi_message.jump_url})"))
+        if description:
+            container.add_item(ui.TextDisplay(f"- {description.strip()}"))
         container.add_item(ui.Separator())
         container.add_item(ui.TextDisplay(footer))
         container.add_item(get_notified_button)
+        if status_page:
+            get_notified_button.add_item(discord.ui.Button(label="Status Page", url="https://sapph.xyz/status", style=discord.ButtonStyle.link))
 
         self.add_item(container)
 
@@ -158,20 +165,14 @@ class epi(commands.Cog):
     epi_msg: Optional[str] = None
     epi_Message: Optional[discord.Message] = None
     epi_data: dict[str, dict[int, int]] = {} # {str(started_iso_format: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
-    status_page: Optional[bool] = None # true if its working, false if its not working
+    status_page: bool = True # true if its working, false if its not working
 
     def generate_epi_layout_view(self) -> GetNotifiedView:
         description: str = ""
         if self.epi_msg:
             description += self.epi_msg
-        if self.epi_Message:
-            description += f"\n\n> ### An official status update has been posted: {self.epi_Message.jump_url}\n> {self.epi_Message.content if len(self.epi_Message.content) + len(self.epi_msg or '') + len (self.epi_Message.jump_url) < 1024 else self.epi_Message.content[:205:] + '*[...]*'}"
-        if self.epi_Message or self.epi_msg:
-            description += "\n\n-# You can also always check the [Sapphire status page](https://sapph.xyz/status)"
-        if not self.status_page:
-            description += " (currently unavailable)"
-        
-        return GetNotifiedView(description=description)
+
+        return GetNotifiedView(description, status_page=self.status_page, epi_message=self.epi_Message)
 
     async def handle_sticky_message(self, channel: discord.TextChannel | discord.PartialMessageable, delay: float = 4.0):
         view = self.generate_epi_layout_view()

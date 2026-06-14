@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from functions import main
 import unittest, test_functions
 from pathlib import Path
+from aiocache import cached
 
 load_dotenv()
 
@@ -67,7 +68,7 @@ class MyClient(commands.Bot):
             webhook = webhooks[0]
 
         if thread_id == ALERTS_THREAD_ID:
-            self.alert_webhook_url = webhook.url # Assign only if the url is None. This should normally only be called once when running the bot
+            self.alert_webhook_url = webhook.url # Assign only if the url is None.
         await webhook.send(
             content=content,
             username=self.user.name,
@@ -76,6 +77,28 @@ class MyClient(commands.Bot):
             wait=kwargs.get('wait', False),
             allowed_mentions=kwargs.get('allowed_mentions', discord.AllowedMentions.none())
         )
+
+    @cached()
+    async def get_unsolve_id(self) -> int:
+        """  
+        Get the id of /unsolve command.
+        This fetches the command from discord and caches the result
+        """
+        unsolve_id = 1281211280618950708
+        for command in await self.tree.fetch_commands():
+            if command.name == "unsolve": 
+                unsolve_id=command.id
+                break
+        return unsolve_id
+
+    @cached()
+    async def get_solved_id(self):
+        solved_id = 1274997472162349079
+        for command in await self.tree.fetch_commands():
+            if command.name == "solved": 
+                solved_id=command.id
+                break
+        return solved_id
 
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")

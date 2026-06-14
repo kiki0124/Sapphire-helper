@@ -105,7 +105,7 @@ class readthedamnrules(commands.Cog):
 
         view = ui.LayoutView()
 
-        user_message = ui.TextDisplay(f"## Original message:\n{content}")
+        user_message = ui.TextDisplay(f"## Original Message:\n{content}")
         footer = ui.TextDisplay(f"{self.get_extra_content(reference_message)}\n-# Created by {user.mention} | In the future please always create a post in <#{SUPPORT_CHANNEL_ID}> for all Sapphire and appeal.gg related questions.")
 
         container = ui.Container(user_message)
