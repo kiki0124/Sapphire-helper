@@ -7,7 +7,6 @@ import random
 import os
 from dotenv import load_dotenv
 from functions import get_post_creator_id, generate_random_id, remove_post_from_rtdr
-from aiocache import cached
 from discord import ui
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -28,59 +27,57 @@ APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class ConfirmCloseButtons(ui.ActionRow):
-    def __init__(self, view: ConfirmCloseView):
-        self.__view = view
+    def __init__(self):
         super().__init__()
 
-
     @ui.button(label="Mark as solved", style=discord.ButtonStyle.green, custom_id="auto-close-confirm")
-    async def on_confirm_click(self, interaction: discord.Interaction, button: ui.Button):
-        is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
-        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner:
-            self.__view.textdisplay.content = f"{self.__view.textdisplay.content}\n-# {interaction.user.name} clicked the confirm button"
-            self.__view.container.remove_item(self)
-            await interaction.message.edit(view=self.__view, allowed_mentions=discord.AllowedMentions.none())
+    async def on_confirm_click(self, interaction: discord.Interaction[MyClient], _: ui.Button):
+        text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
+        new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(f"-# Closed by {interaction.user}")))
+        await interaction.message.edit(view=new_view)
 
-            solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
-            appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
-            cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
-            tags = [solved]
-            if appeal in interaction.channel.applied_tags:
-                tags.append(appeal)
-            if cb in interaction.channel.applied_tags:
-                tags.append(cb)
+        solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
+        appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
+        cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        tags = [solved]
+        if appeal in interaction.channel.applied_tags:
+            tags.append(appeal)
+        if cb in interaction.channel.applied_tags:
+            tags.append(cb)
 
-            action_id = generate_random_id()
+        action_id = generate_random_id()
 
-            alerts_thread = interaction.guild.get_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
-            await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {', '.join([tag.name for tag in tags])}\nContext: Post starter message delete and confirm button clicked- mark post as solved")
-            await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
-            await remove_post_from_rtdr(interaction.channel_id)
-        else:
-            await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
+        await interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=interaction.channel.mention, tags=tags, context="Post starter message delete and confirm button clicked- mark post as solved")
+        await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
+        await remove_post_from_rtdr(interaction.channel_id)
 
 
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
     async def on_cancel_click(self, interaction: discord.Interaction, button: ui.Button):
-        is_owner = interaction.user == interaction.channel.owner or interaction.user.id == await get_post_creator_id(interaction.channel_id)
-        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner:
-            self.__view.textdisplay.content = f"~~{self.__view.textdisplay.content}~~\n-# {interaction.user.name} has clicked the *cancel* button."
-            self.__view.container.remove_item(self)
-            await interaction.response.edit_message(view=self.__view)
-        else:
+        text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
+        new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(f"-# Cancelled by {interaction.user}")))
+        await interaction.response.edit_message(view=new_view)
+
+    async def interaction_check(self, interaction: discord.Interaction[MyClient]) -> bool:
+        is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
+        if not (is_owner or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)):
             await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
+            return False
+        return True
 
 
 class ConfirmCloseView(ui.LayoutView):
     def __init__(self, post_author: int = 0):
         super().__init__(timeout=None)
 
-        self.greetings = ("Hi", "Hey", "Hello", "Hi there")
-        self.textdisplay = ui.TextDisplay(f"{random.choice(self.greetings)} <@{post_author}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.")
-        self.confirm_close_buttons = ConfirmCloseButtons(self)
+        greetings = ("Hi", "Hey", "Hello", "Hi there")
+        main_content = ui.TextDisplay(f"{random.choice(greetings)} <@{post_author}>, it seems like this post's starter message was deleted. Please select one of the buttons below to choose whether to mark this post as solved if you no longer need help or keep it open if you still require help.",
+                                          id=10)
+        self.confirm_close_buttons = ConfirmCloseButtons()
         self.container = ui.Container()
 
-        self.container.add_item(self.textdisplay)
+        self.container.add_item(main_content)
+        self.container.add_item(discord.ui.Separator())
         self.container.add_item(self.confirm_close_buttons)
         self.add_item(self.container)
 
@@ -96,15 +93,6 @@ class autoadd(commands.Cog):
 
     def cog_unload(self):
         self.close_abandoned_posts.cancel()
-
-    @cached()
-    async def get_solved_id(self):
-        solved_id = 1274997472162349079
-        for command in await self.client.tree.fetch_commands():
-            if command.name == "solved": 
-                solved_id=command.id
-                break
-        return solved_id
 
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
@@ -149,7 +137,7 @@ class autoadd(commands.Cog):
             pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
             negative_pattern = r"doe?s?n.?t|hasn.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t|advance\b|ahead o?f? time"
             if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
-                await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.get_solved_id()}>")
+                await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.client.get_solved_id()}>")
                 self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):

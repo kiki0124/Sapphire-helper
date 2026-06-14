@@ -30,31 +30,63 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 reminder_not_sent_posts: dict[int, int] = {} # dictionary of post ids: the amount of tries
 
-class CloseNow(ui.View):
+class CloseNowRow(ui.ActionRow):
     def __init__(self):
-        super().__init__(timeout=None)
-        
-    @ui.button(label="Issue already solved? Close post now", custom_id="remind-close-now", style=discord.ButtonStyle.grey)
-    async def on_close_now_click(self, interaction: discord.Interaction, button: ui.Button):
-        is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
-        if not (interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner):
-            await interaction.response.send_message(content="Only Moderators, Community Experts and the post creator can use this.", ephemeral=True)
-            return
-        await interaction.message.edit(view=None, content=f"{interaction.message.content}\n-# Closed by {interaction.user.name}")
-        tags = [interaction.channel.parent.get_tag(SOLVED_TAG_ID)]
-        cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        super().__init__()
+
+    @ui.button(label="Issue Resolved? Close Post Now", style=discord.ButtonStyle.green, custom_id="remind-close-now")
+    async def on_close_now_click(self, interaction: discord.Interaction[MyClient], _: ui.Button):
+        text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
+        new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(f"-# Closed by {interaction.user}")))
+        await interaction.message.edit(view=new_view)
+
+        solved = interaction.channel.parent.get_tag(SOLVED_TAG_ID)
         appeal = interaction.channel.parent.get_tag(APPEAL_GG_TAG_ID)
-        if cb in interaction.channel.applied_tags:
-            tags.append(cb)
+        cb = interaction.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
+        tags = [solved]
         if appeal in interaction.channel.applied_tags:
             tags.append(appeal)
-        action_id = generate_random_id()
-        await interaction.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button", archived=True)
+        if cb in interaction.channel.applied_tags:
+            tags.append(cb)
 
-        alerts_thread = interaction.guild.get_channel_or_thread(ALERTS_THREAD_ID) or await interaction.guild.fetch_channel(ALERTS_THREAD_ID)
-        await alerts_thread.send(content=f"ID: {action_id}\nPost: {interaction.channel.mention}\nTags: {','.join([tag.name for tag in tags])}\nContext: Close now button clicked")
+        action_id = generate_random_id()
+
+        await interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=interaction.channel.mention, tags=tags, context=f"Close now button clicked")
+        await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
         await remove_post_from_pending(interaction.channel_id)
         await remove_post_from_rtdr(interaction.channel_id)
+
+
+    @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="remind-cancel")
+    async def on_cancel_click(self, interaction: discord.Interaction, _: ui.Button):
+        text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
+        new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(f"-# Cancelled by {interaction.user}")))
+        await interaction.response.edit_message(view=new_view)
+        await remove_post_from_pending(interaction.channel_id)
+
+    async def interaction_check(self, interaction: discord.Interaction[MyClient]) -> bool:
+        is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
+        if not (interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or is_owner):
+            await interaction.response.send_message(content="Only Moderators, Community Experts, Developers and the post creator can use this.", ephemeral=True)
+            return False
+        return True
+
+
+class CloseNowView(ui.LayoutView):
+    def __init__(self, post_author: int = 0):
+        super().__init__(timeout=None)
+
+        greetings = ("Hi", "Hey", "Hello", "Hi there")
+        textdisplay = ui.TextDisplay(f"{random.choice(greetings)} <@{post_author}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.",
+                                          id=10)
+        self.confirm_close_buttons = CloseNowRow()
+        self.container = ui.Container()
+
+        self.container.add_item(textdisplay)
+        self.container.add_item(discord.ui.Separator())
+        self.container.add_item(self.confirm_close_buttons)
+        self.add_item(self.container)
+
 
 class remind(commands.Cog):
     def __init__(self, client: MyClient):
@@ -82,7 +114,7 @@ class remind(commands.Cog):
 
     @commands.Cog.listener("on_ready")
     async def add_persistent_view(self):
-        self.client.add_view(CloseNow())
+        self.client.add_view(CloseNowView())
 
     async def cog_unload(self):
         self.check_for_pending_posts.cancel()
@@ -159,8 +191,7 @@ class remind(commands.Cog):
             post_author_id = await get_post_creator_id(post.id) or post.owner_id
             author_not_owner = message.author.id != post_author_id
             if author_not_owner and message.author != self.client.user and post.owner:
-                greetings = ["Hi", "Hello", "Hey", "Hi there"]
-                await message.channel.send(content=f"{random.choice(greetings)} <@{post_author_id}>, it seems like your last message was sent more than 24 hours ago.\nIf we don't hear back from you we'll assume the issue is resolved and mark your post as solved.", view=CloseNow())
+                await message.channel.send(view=CloseNowView(post_author_id))
                 posts_to_add.append(post.id)
 
         if not posts_to_add:

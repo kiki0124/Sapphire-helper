@@ -118,14 +118,14 @@ class bot(commands.Cog):
 
         title = ui.TextDisplay("## [Sapphire helper | Version 6.1](https://github.com/kiki0124/sapphire-helper)")
 
-        info_text = (f"**CPU Count:** {os.cpu_count()}\n"
-                     f"**CPU Load:** {psutil.cpu_percent()}%\n"
-                     f"**Available memory:** {str(round(psutil.virtual_memory()[0]/1000000000))}GB\n"
-                     f"**Memory Usage:** {psutil.virtual_memory()[2]}%\n"
+        info_text = (f"- **CPU Count:** {os.cpu_count()}\n"
+                     f"- **CPU Load:** {psutil.cpu_percent()}%\n"
+                     f"- **Available memory:** {str(round(psutil.virtual_memory()[0]/1000000000))}GB\n"
+                     f"- **Memory Usage:** {psutil.virtual_memory()[2]}%\n"
                      f"-# discord.py version {discord.__version__}")
         
         container.add_item(title)
-        container.add_item(ui.Separator(spacing=discord.SeparatorSpacing.large))
+        container.add_item(ui.Separator())
         container.add_item(ui.TextDisplay(info_text))
         view.add_item(container)
         await ctx.reply(view=view, mention_author=False)
