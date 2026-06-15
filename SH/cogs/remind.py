@@ -261,5 +261,18 @@ class remind(commands.Cog):
     async def cep_before_loop(self):
         await self.client.wait_until_ready()
 
+
+    @check_for_pending_posts.error
+    async def cfpp_error(self, error: BaseException):
+        await self.client.send_unhandled_error(error, task=self.check_for_pending_posts)
+
+    @close_pending_posts.error
+    async def cpp_error(self, error: BaseException):
+        await self.client.send_unhandled_error(error, task=self.close_pending_posts)
+    
+    @check_exception_posts.error
+    async def cep_error(self, error: BaseException):
+        await self.client.send_unhandled_error(error, task=self.check_exception_posts)
+
 async def setup(client: MyClient):
     await client.add_cog(remind(client))

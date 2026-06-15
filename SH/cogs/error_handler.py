@@ -29,29 +29,6 @@ class ErrorHandler(commands.Cog):
 		self.client.tree.on_error = self.on_tree_error
 
 
-	async def send_unhandled_error(self, error: commands.CommandError | app_commands.AppCommandError, interaction: discord.Interaction | None = None) -> None:
-		content = f"<@1105414178937774150>\nUnhandled error: `{error}`"
-
-		if interaction:
-			interaction_created_at = interaction.created_at.timestamp()
-			interaction_data = interaction.data or {}
-			content += f"\n### Interaction Error:\n>>> Interaction created at <t:{round(interaction_created_at)}:T> (<t:{round(interaction_created_at)}:R>)\
-                \nUser: {interaction.user.mention} | Channel: {interaction.channel.mention} | Type: {interaction.type.name}"
-			if interaction.command and interaction.command.parent is None:
-				command_id = interaction_data.get('id', 0)
-				options_dict  = interaction_data.get("options", [])
-				command_mention = f"</{interaction.command.qualified_name}:{command_id}>"
-				content += f"\nCommand: {command_mention}, inputted values:"
-
-				options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict])
-				content += f"\n```{options_formatted}```"
-			else:
-				content += f"\n```json\n{interaction.data}```"
-			await self.client.send_log(ALERTS_THREAD_ID, content=content, allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150)])) #1105414178937774150 is Kiki's user ID
-		else:
-			await self.client.send_log(ALERTS_THREAD_ID, content=content)
-
-
 	@commands.Cog.listener()
 	async def on_command_error(self, ctx: commands.Context, e: commands.CommandError):
 		"""
@@ -67,7 +44,7 @@ class ErrorHandler(commands.Cog):
 			error_message = f"This command is on cooldown for another **{e.retry_after:.2f} seconds**!"
 			await ctx.reply(content=error_message, mention_author=False)
 		else:
-			await self.send_unhandled_error(error=e) # send error to #sapphire-helper-alerts thread under sapphire-experts channel
+			await self.client.send_unhandled_error(e) # send error to #sapphire-helper-alerts thread under sapphire-experts channel
 			raise e
 
 
@@ -80,7 +57,7 @@ class ErrorHandler(commands.Cog):
 		if isinstance(e, app_commands.CheckFailure):
 			await self.handle_app_command_check_failure(interaction, e)
 		else:
-			await self.send_unhandled_error(e, interaction)
+			await self.client.send_unhandled_error(e, interaction=interaction)
 			print_exception(e)
 
 
