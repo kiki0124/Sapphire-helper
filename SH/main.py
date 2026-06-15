@@ -80,7 +80,7 @@ class MyClient(commands.Bot):
 
     # This is defined here so that tasks.loop errors can use this
     async def send_unhandled_error(self, error: BaseException, *, interaction: discord.Interaction | None = None, task: tasks.Loop | None = None) -> None:
-        content = f"<1105414178937774150>\nUnhandled error: `{error}`"
+        content = f"<@1105414178937774150>\nUnhandled error: `{error}`"
 
         if interaction:
             interaction_created_at = interaction.created_at.timestamp()
