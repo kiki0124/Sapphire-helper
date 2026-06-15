@@ -312,19 +312,7 @@ class utility(commands.Cog):
             await interaction.response.send_message(f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
     async def send_qr_log(self, message: discord.Message, user: discord.Member):
-        qr_logs_thread = self.client.get_channel(QR_LOG_THREAD_ID) or await self.client.fetch_channel(QR_LOG_THREAD_ID)
-        webhooks = [webhook for webhook in await qr_logs_thread.parent.webhooks() if webhook.token]
-        try:
-            webhook = webhooks[0]
-        except IndexError:
-            webhook = await qr_logs_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
-        await webhook.send(
-            content=f"Message deleted by {user.mention} in {message.channel.mention}\nMessage id: `{message.id}`",
-            username=self.client.user.name,
-            avatar_url=self.client.user.display_avatar.url,
-            thread=discord.Object(id=QR_LOG_THREAD_ID),
-            allowed_mentions=discord.AllowedMentions.none()
-        )
+        await self.client.send_log(QR_LOG_THREAD_ID, content=f"Message deleted by {user.mention} in {message.channel.mention}\nMessage id: `{message.id}`")
 
     def get_user_id_from_avatar(self, avatar_url: str) -> int | None:
         """Gets the user_id from a users avatar"""
