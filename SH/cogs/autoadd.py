@@ -202,5 +202,9 @@ class autoadd(commands.Cog):
     async def wait_until_ready(self):
         await self.client.wait_until_ready()
 
+    @close_abandoned_posts.error
+    async def close_abandoned_posts_error(self, error: BaseException):
+        await self.client.send_unhandled_error(error, task=self.close_abandoned_posts)
+
 async def setup(client: MyClient):
     await client.add_cog(autoadd(client))
