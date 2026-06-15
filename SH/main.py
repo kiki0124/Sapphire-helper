@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from functions import main
 import unittest, test_functions
 from pathlib import Path
+import time
 from aiocache import cached
 
 load_dotenv()
@@ -29,6 +30,7 @@ class MyClient(commands.Bot):
 
         self.alert_webhook_url: str | None = None
         self.incomplete_msg_posts: set[int] = set() # list of the post ids
+        self.uptime = time.time() # used in cogs/bot,py
 
     async def setup_hook(self):
         unittest.main(test_functions, exit=False)
