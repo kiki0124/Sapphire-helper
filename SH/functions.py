@@ -309,19 +309,18 @@ async def update_tag(pool: sql.Pool, name: str, content: str):
         await conn.execute("UPDATE tags SET content=? WHERE name=?", (content, name,))
         await conn.commit()
 
-async def add_tag_uses(pool: sql.Pool, data: list[tuple[str, int]]):
+async def add_tag_uses(pool: sql.Pool, data: dict[str, int]):
     async with pool.acquire() as conn:
         async with conn.transaction():
-            await conn.executemany("UPDATE tags SET uses=uses+? WHERE name=?", ((uses, name) for name, uses in data))
-            await conn.commit()
+            await conn.executemany("UPDATE tags SET uses=? WHERE name=?", [(uses, name) for name, uses, in data.items()])
 
-async def get_used_tags(pool: sql.Pool) -> list[str]:
+async def get_most_used_tags(pool: sql.Pool) -> dict[str, int]:
     """  
-    Returns a list of the names of most used tags, max 25
+    Returns the most used tags, max 25
     """
     async with pool.acquire() as conn:
-        result = await conn.fetchall("SELECT name FROM tags ORDER BY uses LIMIT 25")
-        return [tag['name'] for tag in result]
+        result = await conn.fetchall("SELECT name, uses FROM tags ORDER BY uses LIMIT 25")
+        return {tag['name']: tag["uses"] for tag in result}
 
 async def delete_tag(pool: sql.Pool, name: str):
     async with pool.acquire() as conn:
