@@ -1,33 +1,33 @@
 from __future__ import annotations
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from discord import app_commands, ui
-from functions import check_tag_exists, save_tag, get_tag_content, get_tag_data, add_tag_uses, delete_tag, update_tag, get_used_tags, DB_PATH
+from functions import check_tag_exists, save_tag, get_tag_content, get_tag_data, increment_tag_uses, delete_tag, update_tag_content, get_most_used_tags
 import os
-from dotenv import load_dotenv
 from difflib import get_close_matches
-import asqlite as sql
-from asyncio import Lock
+import asyncio
 from typing import TYPE_CHECKING
+
+from dotenv import load_dotenv
+load_dotenv()
 
 if TYPE_CHECKING:
     from main import MyClient
 
 
-load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 TAG_LOGGING_THREAD_ID = int(os.getenv("TAG_LOGGING_THREAD_ID"))
 
-class create_tag(ui.Modal):
-    def __init__(self, pool: sql.Pool):
+class CreateTagModal(ui.Modal):
+    def __init__(self, tag_cog: Tags):
         super().__init__(
             title="Create new tag",
             timeout=None
             )
-        self.pool = pool
+        self.tag_cog = tag_cog
 
     name = ui.Label(
         text="Name:",
@@ -47,20 +47,21 @@ class create_tag(ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction[MyClient]):
         await interaction.response.defer(ephemeral=True)
-        if not await check_tag_exists(self.pool, self.name.component.value):
-            await save_tag(self.pool, name=self.name.component.value, content=self.content.component.value, creator_id=interaction.user.id)
-            content = f"Tag `{self.name.component.value}` created by {interaction.user.mention}.\nContent: ```\n{self.content.component.value}\n```"
+        tag_name: str = self.name.component.value
+        if not await check_tag_exists(tag_name):
+            await save_tag(name=tag_name, content=self.content.component.value, creator_id=interaction.user.id)
+            content = f"Tag `{tag_name}` created by {interaction.user.mention}.\nContent: ```\n{self.content.component.value}\n```"
             await interaction.client.send_log(TAG_LOGGING_THREAD_ID, content=content)
-            await interaction.followup.send(f"Tag `{self.name.component.value}` saved successfully!\nYou can now access it with /tag use", ephemeral=True)
+            await interaction.followup.send(f"Tag `{tag_name}` saved successfully!\nYou can now access it with `/tag use`", ephemeral=True)
+
+            await self.tag_cog.update_cached_tags()
         else:
-            await interaction.followup.send("A tag with this name already exists...\n-# Use /tag delete to delete it", ephemeral=True)
+            await interaction.followup.send("A tag with this name already exists...\n-# Use `/tag delete` to delete it", ephemeral=True)
 
-class update_tag_modal(ui.Modal):
-    def __init__(self, pool: sql.Pool, tag: str):
-        super().__init__(title="Update tag", custom_id="update tag modal")
+class UpdateTagModal(ui.Modal):
+    def __init__(self, tag: str):
+        super().__init__(title="Update tag", custom_id="update_tag_modal")
         self.tag = tag
-        self.pool = pool
-
     label = ui.Label(
         text="New content:", 
         component=ui.TextInput(
@@ -73,27 +74,22 @@ class update_tag_modal(ui.Modal):
     async def on_submit(self, interaction: discord.Interaction[MyClient]):
         await interaction.response.defer(ephemeral=True)
         new_content = self.label.component.value
-        await update_tag(self.pool, self.tag, new_content)
-        content=f"Tag `{self.tag}` edited by {interaction.user.mention}. New content: ```\n{new_content}\n```"
+        await update_tag_content(self.tag, new_content)
+        content=f"Tag `{self.tag}` edited by {interaction.user.mention}. \nNew content: ```\n{new_content}\n```"
         await interaction.client.send_log(TAG_LOGGING_THREAD_ID, content=content)
-        await interaction.followup.send(f"Successfully updated `{self.tag}`'s content!")
+        await interaction.followup.send(f"Successfully updated `{self.tag}`'s content!", ephemeral=True)
 
 
 class TagConfirmRow(ui.ActionRow):
-    def __init__(self, parent: quick_replies, tag: str, tag_content: str):
-        self.__parent = parent
+    def __init__(self, tag_cog: Tags, tag: str, tag_content: str):
+        self.tag_cog = tag_cog
         self.tag = tag
         self.tag_content = tag_content
         super().__init__()
 
     @ui.button(label="Confirm", style=discord.ButtonStyle.success)
-    async def confirm(self, interaction: discord.Interaction, button):
+    async def confirm(self, interaction: discord.Interaction, _: ui.Button):
         await interaction.response.defer()
-        async with self.__parent.used_tags_lock:
-            if self.tag in self.__parent.used_tags:
-                self.__parent.used_tags[self.tag] += 1
-            else:
-                self.__parent.used_tags[self.tag] = 1
         try:
             await interaction.delete_original_response()
         except discord.HTTPException:
@@ -107,30 +103,68 @@ class TagConfirmRow(ui.ActionRow):
         tag_container.add_item(ui.Separator())
 
         tag_container.add_item(ui.TextDisplay(f"-# Recommended by {interaction.user.mention}"))
+
+        await increment_tag_uses(self.tag)
+
+        # only update the cached tags if the tag isn't already cached
+        if self.tag not in self.tag_cog.cached_tags:
+            await self.tag_cog.update_cached_tags()
         await interaction.channel.send(view=tag_view, allowed_mentions=discord.AllowedMentions.none())
 
 
-class quick_replies(commands.Cog):
+class Tags(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
-        self.used_tags: dict[str, int] = {} # saved and sent to DB every 15 minutes
-        self.recommended_tags: list[str] = [] # max 25 with highest uses from DB extracted every 15 minutes
-        self.used_tags_lock = Lock()
+        self.cached_tags: list[str] = [] # tags cached to use for autocomplete and suggesting similar tags
+        self.tags_lock = asyncio.Lock() # Lock to prevent mutating 'cached_tags' at the same time
+        
+        self.update_tags_task: asyncio.Task[None] | None = None
 
+    def get_similar_tags(self, tag_name: str) -> ui.Container:
+        container = ui.Container(ui.TextDisplay("Tag not found, sorry!"))
+        similar_tags = get_close_matches(tag_name, self.cached_tags)
+        if similar_tags:
+            container.add_item(ui.Separator())
+            content = f"**Similar Tags:**"
+            for tag in similar_tags:
+                content += f"\n- `{tag}`"
+            container.add_item(ui.TextDisplay(content))
+        return container
+    
     async def cog_load(self):
-        self.pool = await sql.create_pool(DB_PATH)
-        self.refresh_use_count.start()
+        """Cache the tags"""
+        self.cached_tags = await get_most_used_tags()
 
-    async def cog_unload(self):
-        self.refresh_use_count.cancel()
-        await self.pool.close()
+    async def cog_unload(self) -> None:
+        if self.update_tags_task is not None and not self.update_tags_task.done():
+            self.update_tags_task.cancel()
+    
+    async def _update_cached_tags(self):
+        """The actual implementation to update the cached tags"""
+        await asyncio.sleep(15 * 60) # sleep 15 minutes
+        async with self.tags_lock:
+            self.cached_tags.clear()
+            self.cached_tags = await get_most_used_tags()
+
+        self.update_tags_task = None
+
+    async def update_cached_tags(self):
+        """Handles creating the asyncio.Task if needed
+
+        NOTE: This should only be called when:
+            - A tag is created
+            - A tag is deleted (Only if the tag is cached)
+            - A tag is used (Only if the tag is not cached)
+        """
+        if self.update_tags_task is None:
+            self.update_tags_task = asyncio.create_task(self._update_cached_tags())
 
     tag_group = app_commands.Group(name="tag", description="Commands related to the tag system")
 
     @tag_group.command(name="create", description="Add a new tag with the given content")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def add(self, interaction: discord.Interaction):
-        await interaction.response.send_modal(create_tag(self.pool))
+        await interaction.response.send_modal(CreateTagModal(self))
 
     @staticmethod
     async def tag_use_dynamic_cooldown(interaction: discord.Interaction):
@@ -143,27 +177,21 @@ class quick_replies(commands.Cog):
     @app_commands.checks.dynamic_cooldown(tag_use_dynamic_cooldown, key= lambda i: (i.channel.id, i.user.id))
     async def use(self, interaction: discord.Interaction, tag: str):
         await interaction.response.defer(ephemeral=True)
+
         view = ui.LayoutView()
-        container = ui.Container()
-        view.add_item(container)
+        content = await get_tag_content(tag)
+        if content:
+            container = ui.Container()
+            view.add_item(container)
 
-        if await check_tag_exists(self.pool, tag):
-            content = await get_tag_content(self.pool, tag)
-            container.add_item(ui.TextDisplay("### Are you sure you would like to send this tag?\n-# Click *Confirm* to confirm, dismiss message to cancel"))
-            container.add_item(ui.Separator())
             container.add_item(ui.TextDisplay(content))
             container.add_item(ui.Separator())
+            container.add_item(ui.TextDisplay("-# Click *Confirm* to send, dismiss message to cancel"))
             container.add_item(TagConfirmRow(self, tag, content))
-
-            await interaction.followup.send(view=view)
         else:
-            content = "Tag not found."
-            suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
-            if suggestions:
-                content += f"\n### Similar tags:\n"
-                content += "\n".join(suggestions)
-            container.add_item(ui.TextDisplay(content))
-            await interaction.followup.send(view=view, ephemeral=True)
+            view.add_item(self.get_similar_tags(tag))
+
+        await interaction.followup.send(view=view, ephemeral=True)
 
     @tag_group.command(name="info", description="Get info about a specific tag")
     @app_commands.describe(tag="The name of the tag")
@@ -171,44 +199,23 @@ class quick_replies(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         view = ui.LayoutView()
-        container = ui.Container()
-        view.add_item(container)
 
-        tag_data = await get_tag_data(self.pool, tag)
+        tag_data = await get_tag_data(tag)
         if tag_data:
             created_ts = tag_data["created_ts"]
             creator_id = tag_data["creator_id"]
             content = tag_data["content"]
             uses = tag_data["uses"]
 
-            tag_data_textdisplay = ui.TextDisplay(f"Name: {tag}\nCreated by: <@{creator_id}>\nCreated on: <t:{created_ts}>\nUses: {uses}")
-            container.add_item(tag_data_textdisplay)
+            tag_data_textdisplay = ui.TextDisplay(f"- Name: {tag}\n- Uses: {uses}\n- Created by: <@{creator_id}>\n- Created on: <t:{created_ts}>")
+            container = ui.Container()
+            container.add_item(ui.TextDisplay(content))
             container.add_item(ui.Separator())
-            container.add_item(ui.TextDisplay(content))
-
-            await interaction.followup.send(view=view, ephemeral=True)
+            container.add_item(tag_data_textdisplay)
         else:
-            content = f"There's no tag with the name `{tag}`."
-            suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
-            if suggestions:
-                content += f"\n### Similar tags:\n"
-                content += '\n'.join(suggestions)
-            container.add_item(ui.TextDisplay(content))
-            await interaction.followup.send(view=view, ephemeral=True)
-
-    @tasks.loop(minutes=1)
-    async def refresh_use_count(self):
-        async with self.used_tags_lock:
-            await add_tag_uses(self.pool, self.used_tags.items())
-            self.used_tags.clear()
-            self.recommended_tags = await get_used_tags(self.pool)
-
-    @use.autocomplete("tag")
-    async def tag_autocomplete(self, interaction: discord.Interaction, current: str):
-        if self.recommended_tags:
-            return [app_commands.Choice(name=str(tag), value=str(tag)) for tag in self.recommended_tags[0:25]]
-        else:
-            return []
+            container = self.get_similar_tags(tag)
+        view.add_item(container)
+        await interaction.followup.send(view=view, ephemeral=True)
 
     @tag_group.command(name="delete", description="Delete the given tag")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
@@ -217,10 +224,9 @@ class quick_replies(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         view = ui.LayoutView()
-        container = ui.Container()
-        view.add_item(container)
 
-        if await check_tag_exists(self.pool, tag):
+        tag_obj = await get_tag_data(tag)
+        if tag_obj is not None:
             confirm_button = ui.Button(
                 label="Confirm",
                 style=discord.ButtonStyle.danger,
@@ -228,13 +234,7 @@ class quick_replies(commands.Cog):
             )
             async def on_confirm_click(i: discord.Interaction[MyClient]):
                 await i.response.defer(ephemeral=True)
-                await delete_tag(self.pool, tag)
-                await i.client.send_log(TAG_LOGGING_THREAD_ID, content=f"Tag `{tag}` deleted by {i.user.mention}")
-                async with self.used_tags_lock:
-                    if tag in self.recommended_tags:
-                        self.recommended_tags.remove(tag)
-                    if tag in self.used_tags:
-                        del self.used_tags[tag]
+                await delete_tag(tag)
                 try:
                     tag_deleted_view = ui.LayoutView()
                     tag_deleted_container = ui.Container(
@@ -244,39 +244,73 @@ class quick_replies(commands.Cog):
                     await interaction.edit_original_response(view=tag_deleted_view)
                 except discord.HTTPException: # message was most likely already dismissed by the user
                     pass
-            confirm_button.callback = on_confirm_click
+                await i.client.send_log(TAG_LOGGING_THREAD_ID, content=f"`{tag}` tag deleted by {i.user.mention}")
 
-            container.add_item(ui.TextDisplay(f"Are you sure you would like to delete the tag `{tag}`?\n-# Click *Confirm* to confirm, dismiss message to cancel"))
+                # only update the cached tags if the tag was cached
+                try:
+                    async with self.tags_lock:
+                        self.cached_tags.remove(tag)
+                except ValueError:
+                    pass
+                else:
+                    # Only update the cached tags if the tag was cached
+                    await self.update_cached_tags()
+
+            confirm_button.callback = on_confirm_click
+            container = ui.Container()
+            content = f"### Are you sure you would like to delete the `{tag}` tag?\nClick *Confirm* to delete, dismiss message to cancel."
+            if tag_obj['creator_id'] != interaction.user.id:
+                content += f"\n-# - Note: You do not own this tag, <@{tag_obj['creator_id']}> does!"
+            container.add_item(ui.TextDisplay(content))
             container.add_item(ui.ActionRow(confirm_button))
 
-            await interaction.followup.send(view=view)
+            view.add_item(container)
         else:
-            content = f"Couldn't delete tag `{tag}` because it doesn't exist or has already been deleted."
-            suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
-            if suggestions:
-                content += f"\n### Similar tags:\n"
-                content += '\n'.join(suggestions)
-            container.add_item(ui.TextDisplay(content))
-            await interaction.followup.send(view=view, ephemeral=True)
+            view.add_item(self.get_similar_tags(tag))
+        await interaction.followup.send(view=view, ephemeral=True)
 
     @tag_group.command(name="edit", description="edit the content for an existing tag")
-    @app_commands.describe(tag="The name of the tag that should be editted")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    @app_commands.describe(tag="The name of the tag that should be edited")
     async def update(self, interaction: discord.Interaction, tag: str):
-        if await check_tag_exists(self.pool, tag):
-            await interaction.response.send_modal(update_tag_modal(self.pool, tag))
+        if tag in self.cached_tags or await check_tag_exists(tag):
+            await interaction.response.send_modal(UpdateTagModal(tag))
         else:
-            content = f"Couldn't edit tag `{tag}` because it doesn't exist."
-            suggestions = get_close_matches(tag, [str(reco_tag) for reco_tag in self.recommended_tags])
-            if suggestions:
-                content += f"\n### Similar tags:\n"
-                content += '\n'.join(suggestions)
-
-            view = ui.LayoutView()
-            container = ui.Container()
-            view.add_item(container)
-
-            container.add_item(ui.TextDisplay(content))
+            view = ui.LayoutView().add_item(self.get_similar_tags(tag))
             await interaction.response.send_message(view=view, ephemeral=True)
 
+    @use.autocomplete("tag")
+    async def tag_use_autocomplete(self, interaction: discord.Interaction, current: str):
+        tag_choices_all = [app_commands.Choice(name=tag_name, value=tag_name) for tag_name in self.cached_tags]
+        return tag_choices_all[0:25]
+    
+    @update.autocomplete("tag")
+    async def tag_update_autocomplete(self, interaction: discord.Interaction, current: str):
+        tag_choices_all = [app_commands.Choice(name=tag_name, value=tag_name) for tag_name in self.cached_tags]
+        return tag_choices_all[0:25]
+    
+    @info.autocomplete("tag")
+    async def tag_info_autocomplete(self, interaction: discord.Interaction, current: str):
+        tag_choices_all = [app_commands.Choice(name=tag_name, value=tag_name) for tag_name in self.cached_tags]
+        return tag_choices_all[0:25]
+
+    @delete.autocomplete("tag")
+    async def tag_delete_autocomplete(self, interaction: discord.Interaction, current: str):
+        tag_choices_all = [app_commands.Choice(name=tag_name, value=tag_name) for tag_name in self.cached_tags]
+        return tag_choices_all[0:25]
+    
+
+    @tag_group.command(name="debug", description="Get debug information for cached tags")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    async def tag_debug(self, interaction: discord.Interaction):
+        view = ui.LayoutView()
+        
+        update_task_content = "`None`" if self.update_tags_task is None else "Currently executing"
+        description = f"- Update_Task: {update_task_content}\n- Tags Cached: {len(self.cached_tags)}"
+        container = ui.Container(ui.TextDisplay(description),
+                                 ui.Separator(), ui.TextDisplay(f"```json\n{self.cached_tags}```"))
+        view.add_item(container)
+        await interaction.response.send_message(view=view, ephemeral=True)
+
 async def setup(client: MyClient):
-    await client.add_cog(quick_replies(client))
+    await client.add_cog(Tags(client))
