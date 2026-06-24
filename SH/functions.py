@@ -320,7 +320,7 @@ async def get_most_used_tags() -> list[str]:
     Returns the most used tags, max 25
     """
     async with sql.connect(DB_PATH) as conn:
-        result = await conn.fetchall("SELECT name, uses FROM tags ORDER BY uses LIMIT 25")
+        result = await conn.fetchall("SELECT name FROM tags ORDER BY uses LIMIT 25")
         return [tag['name'] for tag in result]
 
 async def delete_tag(name: str):

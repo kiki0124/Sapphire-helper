@@ -47,11 +47,12 @@ class CreateTagModal(ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction[MyClient]):
         await interaction.response.defer(ephemeral=True)
-        if not await check_tag_exists(self.name.component.value):
-            await save_tag(name=self.name.component.value, content=self.content.component.value, creator_id=interaction.user.id)
-            content = f"Tag `{self.name.component.value}` created by {interaction.user.mention}.\nContent: ```\n{self.content.component.value}\n```"
+        tag_name: str = self.name.component.value
+        if not await check_tag_exists(tag_name):
+            await save_tag(name=tag_name, content=self.content.component.value, creator_id=interaction.user.id)
+            content = f"Tag `{tag_name}` created by {interaction.user.mention}.\nContent: ```\n{self.content.component.value}\n```"
             await interaction.client.send_log(TAG_LOGGING_THREAD_ID, content=content)
-            await interaction.followup.send(f"Tag `{self.name.component.value}` saved successfully!\nYou can now access it with `/tag use`", ephemeral=True)
+            await interaction.followup.send(f"Tag `{tag_name}` saved successfully!\nYou can now access it with `/tag use`", ephemeral=True)
 
             await self.tag_cog.update_cached_tags()
         else:
@@ -104,7 +105,10 @@ class TagConfirmRow(ui.ActionRow):
         tag_container.add_item(ui.TextDisplay(f"-# Recommended by {interaction.user.mention}"))
 
         await increment_tag_uses(self.tag)
-        await self.tag_cog.update_cached_tags()
+
+        # only update the cached tags if the tag isn't already cached
+        if self.tag not in self.tag_cog.cached_tags:
+            await self.tag_cog.update_cached_tags()
         await interaction.channel.send(view=tag_view, allowed_mentions=discord.AllowedMentions.none())
 
 
@@ -121,23 +125,27 @@ class Tags(commands.Cog):
         similar_tags = get_close_matches(tag_name, self.cached_tags)
         if similar_tags:
             container.add_item(ui.Separator())
-            content = f"**Similar Tags:**\n"
+            content = f"**Similar Tags:**"
             for tag in similar_tags:
-                content += f"- `{tag}`"
+                content += f"\n- `{tag}`"
             container.add_item(ui.TextDisplay(content))
         return container
     
     async def cog_load(self):
-        """Cach the tags"""
-        async with self.tags_lock:
-            self.cached_tags = await get_most_used_tags() 
+        """Cache the tags"""
+        self.cached_tags = await get_most_used_tags()
+
+    async def cog_unload(self) -> None:
+        if self.update_tags_task is not None and not self.update_tags_task.done():
+            self.update_tags_task.cancel()
     
     async def _update_cached_tags(self):
         """The actual implementation to update the cached tags"""
-        await asyncio.sleep(15 * 60) # sleep 15 minutes
+        await asyncio.sleep(15 * 1) # sleep 15 minutes
         async with self.tags_lock:
             self.cached_tags.clear()
             self.cached_tags = await get_most_used_tags()
+
         self.update_tags_task = None
 
     async def update_cached_tags(self):
@@ -145,8 +153,8 @@ class Tags(commands.Cog):
 
         NOTE: This should only be called when:
             - A tag is created
-            - A tag is deleted
-            - A tag is used
+            - A tag is deleted (Only if the tag is cached)
+            - A tag is used (Only if the tag is not cached)
         """
         if self.update_tags_task is None:
             self.update_tags_task = asyncio.create_task(self._update_cached_tags())
@@ -228,11 +236,6 @@ class Tags(commands.Cog):
                 await i.response.defer(ephemeral=True)
                 await delete_tag(tag)
                 try:
-                    async with self.tags_lock:
-                        self.cached_tags.remove(tag)
-                except ValueError:
-                    pass
-                try:
                     tag_deleted_view = ui.LayoutView()
                     tag_deleted_container = ui.Container(
                         ui.TextDisplay(f"Successfully deleted tag `{tag}`!")
@@ -242,7 +245,16 @@ class Tags(commands.Cog):
                 except discord.HTTPException: # message was most likely already dismissed by the user
                     pass
                 await i.client.send_log(TAG_LOGGING_THREAD_ID, content=f"`{tag}` tag deleted by {i.user.mention}")
-                await self.update_cached_tags()
+
+                # only update the cached tags if the tag was cached
+                try:
+                    async with self.tags_lock:
+                        self.cached_tags.remove(tag)
+                except ValueError:
+                    pass
+                else:
+                    # Only update the cached tags if the tag was cached
+                    await self.update_cached_tags()
 
             confirm_button.callback = on_confirm_click
             container = ui.Container()
