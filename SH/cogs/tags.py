@@ -141,7 +141,7 @@ class Tags(commands.Cog):
     
     async def _update_cached_tags(self):
         """The actual implementation to update the cached tags"""
-        await asyncio.sleep(15 * 1) # sleep 15 minutes
+        await asyncio.sleep(15 * 60) # sleep 15 minutes
         async with self.tags_lock:
             self.cached_tags.clear()
             self.cached_tags = await get_most_used_tags()
