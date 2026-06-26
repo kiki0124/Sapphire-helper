@@ -248,7 +248,7 @@ class epi(commands.Cog):
             return
         command_response = "Successfully enabled EPI mode!"
         self.ping_status_page.start()
-        self.epi_data[datetime.datetime.now(tz=datetime.timezone.utc).isoformat()] = {}
+        self.epi_data[datetime.datetime.now(datetime.UTC).isoformat()] = {}
         if message:
             self.epi_msg = message
             command_response += f"\nCustom message: {message}"
@@ -408,7 +408,7 @@ class epi(commands.Cog):
             await interaction.followup.send("At least one of `message`, `message_id`, `sticky` argument must be provided!")
             return
         command_response = "Successfully updated EPI mode!"
-        new_key = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+        new_key = datetime.datetime.now(datetime.UTC).isoformat()
         previous_key = list(self.epi_data.keys())[0]
         self.epi_data[new_key] = list(self.epi_data.values())[0]
         del self.epi_data[previous_key]

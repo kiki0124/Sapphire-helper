@@ -41,10 +41,8 @@ def check_time_more_than_day(timestamp: float) -> bool:
     """  
     Check if the given time is more than a day ago
     """
-    tz_info = datetime.datetime.now().astimezone().tzinfo
-    time = datetime.datetime.fromtimestamp(timestamp, tz=tz_info)
-    one_day_ago = datetime.datetime.now(tz=tz_info) - datetime.timedelta(days=1)
-    return not one_day_ago < time 
+    one_day_ago = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=1)
+    return datetime.datetime.fromtimestamp(timestamp, datetime.UTC) < one_day_ago
 
 def format_list(items: Sequence, conjunction: str = "or") -> str:
     return ", ".join(items[:-1]) + f" {conjunction} " + items[-1]
@@ -87,7 +85,7 @@ async def execute_sql(cmd: str) -> dict[str, Any] | Exception:
             return sql_to_dict(result)
         
 async def bulk_add_posts_to_pending(post_ids: list[int]) -> None:
-    now = int(datetime.datetime.now().timestamp())
+    now = int(datetime.datetime.now(datetime.UTC).timestamp())
     args = ((post_id, now) for post_id in post_ids)
 
     async with sql.connect(DB_PATH) as conn:
@@ -101,7 +99,7 @@ async def add_post_to_pending(post_id: int) -> None:
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            timestamp = int(datetime.datetime.now().timestamp())
+            timestamp = int(datetime.datetime.now(datetime.UTC).timestamp())
             await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, timestamp,))
             await conn.commit()
 
@@ -156,7 +154,7 @@ async def check_post_last_message_time(post_id: int) -> bool:
     """
     Returns if the timestamp of a post (from db) is more than one day ago (24 hours).
     """
-    timestamp = await get_post_timestamp(post_id) or datetime.datetime.now().timestamp()
+    timestamp = await get_post_timestamp(post_id) or datetime.datetime.now(datetime.UTC).timestamp()
     return check_time_more_than_day(timestamp)
 
 # readthedamnrules system related functions
@@ -230,7 +228,8 @@ async def remove_post_from_waiting(post_id: int) -> None:
             await conn.commit()
 
 async def add_post_to_waiting(post_id: int, timestamp: int | None = None) -> None:
-    if timestamp is None: timestamp = int(datetime.datetime.now().timestamp())
+    if timestamp is None: 
+        timestamp = int(datetime.datetime.now(datetime.UTC).timestamp())
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             await cu.execute("INSERT INTO reminder_waiting (post_id, timestamp) VALUES (?, ?)", (post_id, timestamp,))
@@ -281,7 +280,8 @@ async def check_tag_exists(name: str) -> bool:
 
 async def save_tag( name: str, content: str, creator_id: int):
     async with sql.connect(DB_PATH) as conn:
-        await conn.execute("INSERT INTO tags (name, content, creator_id, created_ts) VALUES (?, ?, ?, ?)", (name, content, creator_id, round(datetime.datetime.now().timestamp())))
+        await conn.execute("INSERT INTO tags (name, content, creator_id, created_ts) VALUES (?, ?, ?, ?)", 
+                           (name, content, creator_id, round(datetime.datetime.now(datetime.UTC).timestamp())))
         await conn.commit()
 
 async def get_tag_content(name: str) -> str | None:
@@ -332,7 +332,7 @@ async def delete_tag(name: str):
 
 async def save_epi_config(pool: sql.Pool ,sticky: bool, message: str = '-', message_id: int = 0, sticky_message_id: int | None = None) -> None:
     async with pool.acquire() as conn:
-        now_timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now_timestamp = datetime.datetime.now(datetime.UTC).isoformat()
         await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky, sticky_message_id) VALUES (?, ?, ?, ?, ?)", (now_timestamp, message, message_id, sticky, sticky_message_id,))
         await conn.commit()
 
