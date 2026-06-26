@@ -8,7 +8,7 @@ from functions import add_post_to_pending, \
     get_post_creator_id, remove_post_from_rtdr, generate_random_id, in_pending_posts, bulk_add_posts_to_pending, bulk_remove_posts_from_pending
 import random
 from discord import ui
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import os
 from dotenv import load_dotenv
 from typing import TYPE_CHECKING
@@ -170,7 +170,7 @@ class remind(commands.Cog):
         posts_to_add: list[int] = []
         pending_posts: list[int] = await get_pending_posts() # Cache the list to avoid DB calls every iteration of the loop
         for post in await support.guild.active_threads():
-            now_dt = time_snowflake(datetime.now(timezone.utc))
+            now_dt = time_snowflake(datetime.now(UTC))
             more_than_day = check_time_more_than_day(snowflake_time(post.last_message_id or now_dt).timestamp()) # Check time before making any further API/DB calls
             if not more_than_day or post.id in reminder_not_sent_posts or post.id in pending_posts:
                 continue

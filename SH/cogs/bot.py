@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import discord
 from discord.ext import commands
-import datetime
+from time import perf_counter
 from discord import ui
 import os
 from dotenv import load_dotenv
@@ -36,10 +36,10 @@ class bot(commands.Cog):
     @commands.guild_only()
     @commands.dynamic_cooldown(get_cooldown_key, type=commands.BucketType.member)
     async def ping(self, ctx: commands.Context):
-        now = datetime.datetime.now()
+        start = perf_counter()
         message = await ctx.reply(content=f"Pong!\nClient latency: {str(self.client.latency)[:4]}s", mention_author=False)
-        latency = datetime.datetime.now() - now
-        await message.edit(content=f"{message.content}\nDiscord latency: {str(latency.total_seconds())[:4]}s")
+        latency = perf_counter() - start
+        await message.edit(content=f"{message.content}\nDiscord latency: {latency:.2f}s")
 
     @commands.command(name="restart")
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
