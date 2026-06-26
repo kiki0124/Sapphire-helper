@@ -285,16 +285,16 @@ class utility(commands.Cog):
     @app_commands.command(name="unsolve", description="Cancel the post from being closed")
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
-    async def unsolved(self, interaction: discord.Interaction):
+    async def unsolve(self, interaction: discord.Interaction):
         if interaction.channel in self.close_tasks or SOLVED_TAG_ID in interaction.channel._applied_tags:
             if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
                 await interaction.response.send_message("Post successfully unsolved!")
-                return
-            title = "### Post Successfully Unsolved"
-            description = "Please send a message here explaining what you still need help with"
-            footer = f"-# If the issue is resolved, you may use </solved:{await self.client.get_solved_id()}> to mark it as solved."
-            view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(title), ui.Separator(visible=False), ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
-            await interaction.response.send_message(view=view)
+            else:
+                title = "### Post Successfully Unsolved"
+                description = "Please send a message here explaining what you still need help with"
+                footer = f"-# If the issue is resolved, you may use </solved:{await self.client.get_solved_id()}> to mark it as solved."
+                view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(title), ui.Separator(visible=False), ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
+                await interaction.response.send_message(view=view)
             await self.unsolve_post(interaction.channel)
         else:
             await interaction.response.send_message(content="This post isn't currently marked as solved...\nTry again later", ephemeral=True)
