@@ -26,7 +26,7 @@ SOLVED_TAG_ID = int(getenv("SOLVED_TAG_ID"))
 
 
 class DebugPostView(ui.LayoutView):
-    def __init__(self, post: discord.Thread, *, is_pending: bool, pending_post_timestamp: int = 0, owner_id: int) -> None:
+    def __init__(self, post: app_commands.AppCommandThread, *, is_pending: bool, pending_post_timestamp: int = 0, owner_id: int) -> None:
         super().__init__(timeout=None)
         container = ui.Container(ui.TextDisplay(f"## [{post.name[0:25]}]({post.jump_url})"))
         container.add_item(ui.Separator())
@@ -47,7 +47,10 @@ class DebugPostView(ui.LayoutView):
         applied_tags = post._applied_tags
         ndr = '✅' if NEED_DEV_REVIEW_TAG_ID in applied_tags else '❌'
         solved = '✅' if SOLVED_TAG_ID in applied_tags  else '❌'
-        archived = '✅' if post.archived  else '❌'
+        if post.archived:
+            archived = f"✅ ({format_dt(post.archive_timestamp, 'R')})"
+        else:
+            archived = '❌'
         locked = '✅' if post.locked else '❌'
 
         bottom_content = f"- NDR: {ndr}\n- Solved: {solved}\n- Archived: {archived}\n- Locked: {locked}"
@@ -92,7 +95,7 @@ class DebugCog(commands.Cog):
     @debug_group_cmd.command(name="post", description="Get debug information for support posts")
     @app_commands.describe(post="The post to debug")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def debug_post(self, interaction: discord.Interaction, post: discord.Thread):
+    async def debug_post(self, interaction: discord.Interaction, post: app_commands.AppCommandThread): # AppCommandThread is needed as .Thread can't resolve if the post is archived
         await interaction.response.defer()
         is_pending = await functions.in_pending_posts(post.id)
         if is_pending:

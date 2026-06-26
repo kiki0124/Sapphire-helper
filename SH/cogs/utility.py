@@ -127,7 +127,7 @@ class SolvedView(ui.LayoutView):
         title = "### Marked as Solved"
 
         one_hour_from_now = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
-        footer= f"-# Closes {discord.utils.format_dt(one_hour_from_now, 'R')}. Use </unsolve:{unsolve_id}> to cancel."
+        footer= f"-# Auto closes {discord.utils.format_dt(one_hour_from_now, 'R')}. Use </unsolve:{unsolve_id}> to cancel."
 
         container.add_item(ui.TextDisplay(title))
         container.add_item(ui.Separator())
