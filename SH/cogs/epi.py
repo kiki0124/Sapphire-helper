@@ -654,7 +654,7 @@ class epi(commands.Cog):
         }
 
         priority_num = priority_dict[priority]
-        if self.recent_page and datetime.datetime.fromtimestamp(self.recent_page["timestamp"], datetime.UTC) > fifteen_minutes_ago:
+        if self.recent_page and datetime.datetime.fromtimestamp(self.recent_page["timestamp"]) > fifteen_minutes_ago:
             await interaction.response.defer(ephemeral=True)
             button = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page-confirm")
             async def callback(i: discord.Interaction):
@@ -663,7 +663,7 @@ class epi(commands.Cog):
                 self.recent_page = {
                 "user_id": interaction.user.id,
                 "message": message,
-                "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
+                "timestamp": round(datetime.datetime.now().timestamp()),
                 "priority": priority_num,
                 "service": service,
                 "cb_affected": cb_affected
@@ -679,7 +679,7 @@ class epi(commands.Cog):
             self.recent_page = {
             "user_id": interaction.user.id,
             "message": message,
-            "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
+            "timestamp": round(datetime.datetime.now().timestamp()),
             "priority": priority_num,
             "service": service,
             "cb_affected": cb_affected
