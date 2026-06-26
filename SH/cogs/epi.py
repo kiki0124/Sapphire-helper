@@ -408,7 +408,7 @@ class epi(commands.Cog):
             await interaction.followup.send("At least one of `message`, `message_id`, `sticky` argument must be provided!")
             return
         command_response = "Successfully updated EPI mode!"
-        new_key = datetime.datetime.now(tz=datetime.UTC).isoformat()
+        new_key = datetime.datetime.now(datetime.UTC).isoformat()
         previous_key = list(self.epi_data.keys())[0]
         self.epi_data[new_key] = list(self.epi_data.values())[0]
         del self.epi_data[previous_key]
@@ -645,7 +645,7 @@ class epi(commands.Cog):
         cb_affected="Whether custom branding is affected or not (for Sapphire outages)"
     )
     async def page(self, interaction: discord.Interaction, service: Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"], message: str, priority: Literal["4 | Night", "3 | Major issue", "2 | Minor issue", "1 | Information"], cb_affected: bool):
-        fifteen_minutes_ago = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=15)
+        fifteen_minutes_ago = datetime.datetime.now() - datetime.timedelta(minutes=15)
         priority_dict : dict[str, int] = {
             "4 | Night" : 4,
             "3 | Major issue" : 3,
@@ -693,7 +693,7 @@ class epi(commands.Cog):
                 experts_channel = discord.utils.get(message.guild.text_channels, name="sapphire-experts") or self.client.get_channel(EPI_LOG_THREAD_ID).parent
                 msg = await experts_channel.send(f"Sending automated page for {message.jump_url}")
                 priority = 3
-                if datetime.datetime.now(datetime.UTC).hour > 21 or datetime.datetime.now(datetime.UTC).hour < 7: # 20 and 7 instead of 21 and 8 because it starts from 0 (0-23 rather than 1-24)
+                if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # 20 and 7 instead of 21 and 8 because it starts from 0 (0-23 rather than 1-24)
                     priority = 4
                 h_pattern = r"\[ H\d+ ]" # [ H<some number> ] e.g. [ H16 ] from the message 
                 resets_pattern = r"<t:(\d+):R>"
@@ -702,14 +702,14 @@ class epi(commands.Cog):
                 _resets_timestamp = re.findall(resets_pattern, string=message.content)
                 resets_timestamp = _resets_timestamp[0] if _resets_timestamp else None
                 if resets_timestamp:
-                    time = datetime.datetime.fromtimestamp(int(resets_timestamp), datetime.UTC)
+                    time = datetime.datetime.fromtimestamp(int(resets_timestamp))
                     page_msg = f"Resets at: {time.hour}:{time.minute}:{time.second}"
                 else:
                     page_msg = "Resets at: Unknown"
                 self.recent_page = {
                 "user_id": self.client.user.id,
                 "message": page_msg,
-                "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
+                "timestamp": round(datetime.datetime.now().timestamp()),
                 "priority": priority,
                 "service": f"{h} Ratelimited",
                 "cb_affected": False
