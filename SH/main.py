@@ -82,7 +82,8 @@ class MyClient(commands.Bot):
 
     # This is defined here so that tasks.loop errors can use this
     async def send_unhandled_error(self, error: BaseException, *, interaction: discord.Interaction | None = None, task: tasks.Loop | None = None) -> None:
-        content = f"<@1105414178937774150>\nUnhandled error: `{error}`"
+        # 1105414178937774150 - Kiki, 802167689011134474 - Sacul
+        content = f"<@1105414178937774150> <@802167689011134474>\nUnhandled error: `{error}`"
 
         if interaction:
             interaction_created_at = interaction.created_at.timestamp()
@@ -101,7 +102,8 @@ class MyClient(commands.Bot):
                 content += f"\n```json\n{interaction.data}```"
         elif task:
             content += f"\n### Tasks.Loop Error:\n>>> - {task._name}\n- Current iterations: `{task.current_loop}`"
-        await self.send_log(ALERTS_THREAD_ID, content=content, allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150)])) #1105414178937774150 is Kiki's user ID
+        await self.send_log(ALERTS_THREAD_ID, content=content, 
+                            allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150), discord.Object(802167689011134474)]))
 
     @cached()
     async def get_unsolve_id(self) -> int:

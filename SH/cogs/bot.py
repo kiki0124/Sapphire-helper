@@ -68,7 +68,7 @@ class bot(commands.Cog):
         view = ui.LayoutView()
         container = ui.Container(accent_colour=0xA06BE6)
 
-        title = ui.TextDisplay("## [Sapphire helper | Version 6.1](https://github.com/kiki0124/sapphire-helper)")
+        title = ui.TextDisplay("## [Sapphire helper | Version 6.2](https://github.com/kiki0124/sapphire-helper)")
         info_text = (f"- **CPU Count:** {os.cpu_count()}",
                      f"- **CPU Load:** {psutil.cpu_percent()}%",
                      f"- **Available memory:** {str(round(psutil.virtual_memory()[0]/1000000000))}GB",
