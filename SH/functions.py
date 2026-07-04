@@ -113,7 +113,7 @@ async def in_pending_posts(post_id: int) -> bool:
             result = await cu.fetchone()
             return bool(result)
 
-async def get_pending_posts():
+async def get_pending_posts() -> list[int]:
     """
     Get all posts in pending posts table. Returns a list of integers.
     """
@@ -121,6 +121,12 @@ async def get_pending_posts():
         async with conn.cursor() as cu:
             await cu.execute("SELECT post_id FROM pending_posts")
             return [row['post_id'] for row in await cu.fetchall()]
+        
+async def get_pending_posts_and_timestamps() -> list[tuple[int, int]]:
+    async with sql.connect(DB_PATH) as conn:
+        async with conn.cursor() as cu:
+            await cu.execute("SELECT post_id, timestamp FROM pending_posts")
+            return [(row['post_id'], row['timestamp']) for row in await cu.fetchall()]
         
 async def bulk_remove_posts_from_pending(post_ids: list[int]) -> None:
     post_ids_sql = ",".join("?" for _ in range(len(post_ids)))
@@ -150,12 +156,6 @@ async def get_post_timestamp(post_id: int) -> Optional[int]:
             else:
                 return None
 
-async def check_post_last_message_time(post_id: int) -> bool:
-    """
-    Returns if the timestamp of a post (from db) is more than one day ago (24 hours).
-    """
-    timestamp = await get_post_timestamp(post_id) or datetime.datetime.now(datetime.UTC).timestamp()
-    return check_time_more_than_day(timestamp)
 
 # readthedamnrules system related functions
 

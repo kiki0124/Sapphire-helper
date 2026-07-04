@@ -4,8 +4,9 @@ import discord
 from discord.ext import commands, tasks
 from functions import add_post_to_pending, \
     remove_post_from_pending, get_pending_posts, \
-    check_post_last_message_time, check_time_more_than_day,\
-    get_post_creator_id, remove_post_from_rtdr, generate_random_id, in_pending_posts, bulk_add_posts_to_pending, bulk_remove_posts_from_pending
+    get_pending_posts_and_timestamps, check_time_more_than_day,\
+    get_post_creator_id, remove_post_from_rtdr, generate_random_id, \
+    in_pending_posts, bulk_add_posts_to_pending, bulk_remove_posts_from_pending
 import random
 from discord import ui
 from datetime import datetime, UTC
@@ -213,9 +214,9 @@ class remind(commands.Cog):
     @tasks.loop(hours=1)
     async def close_pending_posts(self):
         posts_to_remove: list[int] = []
-        pending_posts = await get_pending_posts()
+        pending_posts = await get_pending_posts_and_timestamps()
 
-        for post_id in pending_posts:
+        for post_id, timestamp in pending_posts:
             try:
                 post = self.client.get_channel(post_id) or await self.client.fetch_channel(post_id)
             except discord.NotFound:
@@ -226,7 +227,7 @@ class remind(commands.Cog):
                 continue
 
             ndr = NEED_DEV_REVIEW_TAG_ID not in post._applied_tags
-            if ndr and await check_post_last_message_time(post_id):
+            if ndr and check_time_more_than_day(timestamp):
                 applied_tags = post.applied_tags
                 tags = [post.parent.get_tag(SOLVED_TAG_ID)]
                 cb = post.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
