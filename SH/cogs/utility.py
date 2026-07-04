@@ -108,7 +108,14 @@ class ndr_options_buttons(ui.View):
         await self.Interaction.delete_original_response()
         await interaction.response.defer(ephemeral=False)
         await self.mark_post_as_ndr(interaction.channel)
-        await interaction.channel.send(content="Post successfully marked as *needs-dev-review*.")
+
+        container = ui.Container(
+            ui.TextDisplay("### Marked as *needs-dev-review*"),
+            ui.Separator(),
+            ui.TextDisplay(f"-# Please be patient, the development team will review this when they can."),
+        )
+        view = ui.LayoutView().add_item(container)
+        await interaction.channel.send(view=view)
 
     @ui.button(label="Add tag & send questions", style=discord.ButtonStyle.grey, custom_id="ndr-tag-and-questions")
     async def on_send_questions_click(self, interaction: discord.Interaction, button: ui.Button):
@@ -123,7 +130,7 @@ class ndr_options_buttons(ui.View):
 class SolvedView(ui.LayoutView):
     def __init__(self, unsolve_id: int) -> None:
         super().__init__(timeout=None)
-        container = ui.Container()
+        container = ui.Container(accent_color=discord.Colour.green())
         title = "### Marked as Solved"
 
         one_hour_from_now = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
@@ -293,7 +300,8 @@ class utility(commands.Cog):
                 title = "### Post Successfully Unsolved"
                 description = "Please send a message here explaining what you still need help with"
                 footer = f"-# If the issue is resolved, you may use </solved:{await self.client.get_solved_id()}> to mark it as solved."
-                view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(title), ui.Separator(visible=False), ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
+                view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(title), ui.Separator(visible=False), 
+                                                             ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
                 await interaction.response.send_message(view=view)
             await self.unsolve_post(interaction.channel)
         else:
@@ -388,6 +396,7 @@ class utility(commands.Cog):
         if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != SUPPORT_CHANNEL_ID:
             await interaction.response.send_message(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
             return
+
         priority_texts = {
             "very low": "We'll get to this eventually.",
             "low": "We'll take care of this when we have time and if there are no higher-priority bugs.",
@@ -396,13 +405,16 @@ class utility(commands.Cog):
             "special issue": "User specific issue"
         }
         view = ui.LayoutView()
-        text = f"### The development team has added this bug to their tracking list\n**Priority**\n{priority}"
-        if priority.casefold() != "special issue":
-            text += f"\n**When is this issue expected to be resolved?**\n{priority_texts.get(priority.casefold())}"
+        title = f"### The development team has added this bug to their tracking list"
+
         container = ui.Container(
-            ui.TextDisplay(text),
+            ui.TextDisplay(title),
+            ui.TextDisplay(f"**Priority**\n- {priority}"),
             accent_colour=0xE88802
         )
+
+        if priority.casefold() != "special issue":
+            container.add_item(ui.TextDisplay(f"\n**When is this issue expected to be resolved?**\n- {priority_texts.get(priority.casefold())}"))
         view.add_item(container)
         await interaction.response.send_message(view=view)
 
