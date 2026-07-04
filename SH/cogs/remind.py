@@ -162,7 +162,7 @@ class remind(commands.Cog):
         for post_id in to_remove:
             reminder_not_sent_posts.pop(post_id)
 
-    @tasks.loop(seconds=10)
+    @tasks.loop(hours=1)
     async def check_for_pending_posts(self):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         if not support:
