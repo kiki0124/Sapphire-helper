@@ -127,7 +127,7 @@ class Reminders(commands.Cog):
     async def cog_unload(self):
         self.reminders_loop.cancel()
 
-    @tasks.loop(hours=1)
+    @tasks.loop(seconds=30)
     async def reminders_loop(self):
         """
         This task consists of 3 'loops':
@@ -181,8 +181,11 @@ class Reminders(commands.Cog):
         posts_to_add: list[int] = []
         pending_posts: list[int] = await get_pending_posts() # Cache the list to avoid DB calls every iteration of the loop
         for post in posts:
-            now_dt = time_snowflake(datetime.now(UTC))
-            more_than_day = check_time_more_than(snowflake_time(post.last_message_id or now_dt).timestamp(),
+            if not post.last_message_id: # no message was ever sent?? This should realistically never happen for threads
+                continue
+
+            last_msg_timestamp = snowflake_time(post.last_message_id).timestamp()
+            more_than_day = check_time_more_than(last_msg_timestamp,
                                                 timedelta(days=1)) # Check time before making any further API/DB calls
             if not more_than_day or post.id in pending_posts:
                 continue
@@ -190,25 +193,24 @@ class Reminders(commands.Cog):
                 continue
 
             post_author_id = await get_post_creator_id(post.id) or post.owner_id
+            
+            # If the last message > 3d, we send the reminder regardless of other requirements
+            if check_time_more_than(last_msg_timestamp, timedelta(days=3)):
+                await post.send(view=CloseNowView(post_author_id, time_ago="3 days"))
+                posts_to_add.append(post.id)
+                continue
+
+            # from here on, we already know last_message is (> 1d ago) but (< 3d ago)
             try:
-                last_message: discord.Message | None = post.last_message or await post.fetch_message(post.last_message_id)
+                last_message: discord.Message = post.last_message or await post.fetch_message(post.last_message_id)
             except discord.NotFound:
-                # if we can't fetch the message and it's been 3 days
-                # doesn't matter whether the last message is from the post owner or from other users
-                # we will just send this reminder
-                if not check_time_more_than(snowflake_time(post.last_message_id or now_dt).timestamp(), timedelta(days=3)):
+                continue
+            else:
+                # skip if the last message is the message author themselves
+                if last_message.author.id == post_author_id:
                     continue
 
-                time_ago = "3 days"
-            else:
-                # skip if the last message is the message author themselves and
-                # the last message was sent less than 3 days ago
-                if (not check_time_more_than(snowflake_time(last_message.id).timestamp(), timedelta(days=3))) and \
-                   last_message.author.id == post_author_id:
-                    continue
-            
-                time_ago = "24 hours"
-            await post.send(view=CloseNowView(post_author_id, time_ago=time_ago))
+            await post.send(view=CloseNowView(post_author_id, time_ago="24 hours"))
             posts_to_add.append(post.id)
 
         if not posts_to_add:
