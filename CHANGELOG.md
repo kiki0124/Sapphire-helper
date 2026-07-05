@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Better debugging UX ([#63](https://github.com/kiki0124/Sapphire-helper/pull/63))
 - Error logging for `task.loop` errors ([#64](https://github.com/kiki0124/Sapphire-helper/pull/64))
 - `uptime` and `last_restarted` stats in `sh!stats`
+- Reminders are now sent if the last message is more than 3 days ago, regardless if the last message was sent by the post owner or not.
 
 
 
@@ -24,7 +25,8 @@ All notable changes to this project will be documented in this file.
 - Optimize `pending_post` loop ([51](https://github.com/kiki0124/Sapphire-helper/pull/51))
 - Factor out log functions ([60](https://github.com/kiki0124/Sapphire-helper/pull/60))
 - Simplify and reduce nesting in code ([61](https://github.com/kiki0124/Sapphire-helper/pull/61))
-- Refactor and Improve tags  ([65](https://github.com/kiki0124/Sapphire-helper/pull/65))
-- Use UTC for all datetimes (except paging)  ([69](https://github.com/kiki0124/Sapphire-helper/pull/69))
+- Refactor and Improve tags ([65](https://github.com/kiki0124/Sapphire-helper/pull/65))
+- Use UTC for all datetimes (except paging) ([69](https://github.com/kiki0124/Sapphire-helper/pull/69))
+- Refactor reminders + close_abandoned_posts ([74](https://github.com/kiki0124/Sapphire-helper/pull/74))
 
 See [commits](https://github.com/kiki0124/Sapphire-helper/commits/main/) for all changes!
