@@ -127,7 +127,7 @@ class Reminders(commands.Cog):
     async def cog_unload(self):
         self.reminders_loop.cancel()
 
-    @tasks.loop(seconds=30)
+    @tasks.loop(hours=1)
     async def reminders_loop(self):
         """
         This task consists of 3 'loops':
