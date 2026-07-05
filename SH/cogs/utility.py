@@ -112,7 +112,7 @@ class ndr_options_buttons(ui.View):
         container = ui.Container(
             ui.TextDisplay("### Marked as *needs-dev-review*"),
             ui.Separator(),
-            ui.TextDisplay(f"-# Please be patient, the development team will review this when they can."),
+            ui.TextDisplay("-# Please be patient, the development team will review this when they can."),
         )
         view = ui.LayoutView().add_item(container)
         await interaction.channel.send(view=view)
