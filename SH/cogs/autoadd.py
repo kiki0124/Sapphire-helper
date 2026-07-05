@@ -29,6 +29,7 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 class ConfirmCloseButtons(ui.ActionRow):
     def __init__(self):
         super().__init__()
+        self.is_owner: bool = False
 
     @ui.button(label="Mark as solved", style=discord.ButtonStyle.green, custom_id="auto-close-confirm")
     async def on_confirm_click(self, interaction: discord.Interaction[MyClient], _: ui.Button):
@@ -53,14 +54,21 @@ class ConfirmCloseButtons(ui.ActionRow):
 
 
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
-    async def on_cancel_click(self, interaction: discord.Interaction, button: ui.Button):
+    async def on_cancel_click(self, interaction: discord.Interaction[MyClient], _: ui.Button):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(f"-# Cancelled by {interaction.user}")))
         await interaction.response.edit_message(view=new_view)
 
+        if self.is_owner:
+            description = "Please send a message here explaining what you still need help with."
+            footer = f"-# When the issue is resolved, you may use </solved:{await interaction.client.get_solved_id()}> to mark it as solved."
+            view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(description), ui.Separator(visible=True), 
+                                                            ui.TextDisplay(footer)))
+            await interaction.message.reply(view=view)
+
     async def interaction_check(self, interaction: discord.Interaction[MyClient]) -> bool:
-        is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
-        if not (is_owner or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)):
+        self.is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
+        if not (self.is_owner or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)):
             await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
             return False
         return True
@@ -85,14 +93,10 @@ class ConfirmCloseView(ui.LayoutView):
 class autoadd(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
-        self.close_abandoned_posts.start()
         
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):
         self.client.add_view(ConfirmCloseView())
-
-    def cog_unload(self):
-        self.close_abandoned_posts.cancel()
 
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
@@ -158,30 +162,6 @@ class autoadd(commands.Cog):
             await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
             await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
 
-    @tasks.loop(hours=1)
-    async def close_abandoned_posts(self):
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
-        if not support:
-            return
-        for post in await support.guild.active_threads():
-            if post.parent_id != SUPPORT_CHANNEL_ID or post.locked or NEED_DEV_REVIEW_TAG_ID in post._applied_tags:
-                continue
-            owner = post.guild.get_member(await get_post_creator_id(post.id)) or post.owner
-            if owner is not None: # post owner/creator will be None if they left the server
-                continue
-
-            tags = [support.get_tag(SOLVED_TAG_ID)]
-            cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
-            appeal = support.get_tag(APPEAL_GG_TAG_ID)
-            if CUSTOM_BRANDING_TAG_ID in post._applied_tags: 
-                tags.append(cb)
-            if APPEAL_GG_TAG_ID in post._applied_tags:
-                tags.append(appeal)
-            action_id = generate_random_id()
-            await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
-            await post.edit(archived=True, reason=f"ID: {action_id}. User left server, auto close post", applied_tags=tags)
-            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
-
     @commands.Cog.listener('on_raw_message_delete')
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
         message_channel = self.client.get_channel(payload.channel_id)
@@ -197,14 +177,6 @@ class autoadd(commands.Cog):
                 await message_channel.send(
                     view=ConfirmCloseView(post_author=owner_id)
                 )
-
-    @close_abandoned_posts.before_loop
-    async def wait_until_ready(self):
-        await self.client.wait_until_ready()
-
-    @close_abandoned_posts.error
-    async def close_abandoned_posts_error(self, error: BaseException):
-        await self.client.send_unhandled_error(error, task=self.close_abandoned_posts)
 
 async def setup(client: MyClient):
     await client.add_cog(autoadd(client))
