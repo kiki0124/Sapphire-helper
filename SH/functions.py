@@ -37,12 +37,13 @@ def generate_random_id() -> str:
     characters = ascii_letters + digits
     return ''.join(random.choice(characters) for _ in range(6))
 
-def check_time_more_than_day(timestamp: float) -> bool:
+def check_time_more_than(timestamp: float, to_compare: datetime.timedelta) -> bool:
     """  
-    Check if the given time is more than a day ago
+    Check if the given timestamp is more than to_compare
     """
-    one_day_ago = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=1)
-    return datetime.datetime.fromtimestamp(timestamp, datetime.UTC) < one_day_ago
+    timestamp_dt = datetime.datetime.fromtimestamp(timestamp, datetime.UTC)
+
+    return timestamp_dt + to_compare <  datetime.datetime.now(datetime.UTC)
 
 def format_list(items: Sequence, conjunction: str = "or") -> str:
     return ", ".join(items[:-1]) + f" {conjunction} " + items[-1]

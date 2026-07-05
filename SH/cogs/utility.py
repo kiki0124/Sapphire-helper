@@ -298,8 +298,8 @@ class utility(commands.Cog):
                 await interaction.response.send_message("Post successfully unsolved!")
             else:
                 title = "### Post Successfully Unsolved"
-                description = "Please send a message here explaining what you still need help with"
-                footer = f"-# If the issue is resolved, you may use </solved:{await self.client.get_solved_id()}> to mark it as solved."
+                description = "Please send a message here explaining what you still need help with."
+                footer = f"-# When the issue is resolved, you may use </solved:{await self.client.get_solved_id()}> to mark it as solved."
                 view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(title), ui.Separator(visible=False), 
                                                              ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
                 await interaction.response.send_message(view=view)
