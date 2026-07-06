@@ -8,11 +8,11 @@ from functions import remove_post_from_pending, get_pending_posts, \
     in_pending_posts, bulk_add_posts_to_pending, bulk_remove_posts_from_pending
 import random
 from discord import ui
-from datetime import datetime, timedelta, UTC
+from datetime import timedelta
 import os
 from dotenv import load_dotenv
 from typing import TYPE_CHECKING
-from discord.utils import snowflake_time, time_snowflake
+from discord.utils import snowflake_time
 
 if TYPE_CHECKING:
     from main import MyClient

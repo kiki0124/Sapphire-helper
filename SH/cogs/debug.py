@@ -112,7 +112,13 @@ class DebugCog(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def debug_eval_sql(self, interaction: discord.Interaction):
         await interaction.response.send_modal(EvalSqlModal())
-        
+
+    @debug_group_cmd.command(name="create_db_table", description="Creates the DB tables if not already created")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    async def debug_db(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        await functions.setup_db()
+        await interaction.followup.send("Success!\n", ephemeral=True)
 
 async def setup(client: MyClient):
     await client.add_cog(DebugCog(client))

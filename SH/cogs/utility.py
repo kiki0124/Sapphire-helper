@@ -294,7 +294,7 @@ class utility(commands.Cog):
     @app_commands.check(one_of_mod_expert_op)
     @app_commands.guild_only()
     async def unsolve(self, interaction: discord.Interaction):
-        if interaction.channel in self.close_tasks or SOLVED_TAG_ID in interaction.channel._applied_tags:
+        if SOLVED_TAG_ID in interaction.channel._applied_tags or interaction.channel.id in self.close_tasks:
             if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
                 await interaction.response.send_message("Post successfully unsolved!")
             else:

@@ -13,10 +13,10 @@ DB_PATH = str(Path(__file__).parent / 'database' / 'data.db')
 
 # other functions
 
-async def main():
+async def setup_db():
     """  
     Called once whenever the bot is turned on (in setup_hook)
-    Creates DB tables (pending posts and readthedamnrules)
+    Creates DB tables
     """
     async with sql.connect(DB_PATH) as conn: 
         async with conn.cursor() as cu:

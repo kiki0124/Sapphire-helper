@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 import os
 from dotenv import load_dotenv
-from functions import main
+from functions import setup_db
 import unittest, test_functions
 from pathlib import Path
 import time
@@ -34,7 +34,7 @@ class MyClient(commands.Bot):
 
     async def setup_hook(self):
         unittest.main(test_functions, exit=False)
-        await main() # function that creates the db tables if they don't already exist
+        await setup_db() # function that creates the db tables if they don't already exist
         cog_dir = Path(__file__).parent / 'cogs'
         for filename in os.listdir(cog_dir):
             if filename.endswith('.py'):
