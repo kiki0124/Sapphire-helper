@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [6.2] - ...
+## [6.2] - 10/7/26
 
 ### Added
 - Cv2 for majority of messages ([#49](https://github.com/kiki0124/Sapphire-helper/issues/49))
