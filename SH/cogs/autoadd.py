@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 import re
 import random
 import os
@@ -56,7 +56,10 @@ class ConfirmCloseButtons(ui.ActionRow):
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
     async def on_cancel_click(self, interaction: discord.Interaction[MyClient], _: ui.Button):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
-        new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(f"-# Cancelled by {interaction.user}")))
+        footer = f"-# Cancelled by {interaction.user}"
+        if SOLVED_TAG_ID in interaction.channel._applied_tags:
+            footer += f" | Use </unsolve:{await interaction.client.get_unsolve_id()}> to unsolve"
+        new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(footer)))
         await interaction.response.edit_message(view=new_view)
 
         if self.is_owner:
