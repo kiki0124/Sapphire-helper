@@ -39,7 +39,7 @@ def generate_random_id() -> str:
 
 def check_time_more_than(timestamp: float, to_compare: datetime.timedelta) -> bool:
     """  
-    Check if the given timestamp is more than to_compare
+    Check if the given timestamp is older than to_compare(e.g 1d) ago
     """
     timestamp_dt = datetime.datetime.fromtimestamp(timestamp, datetime.UTC)
 
