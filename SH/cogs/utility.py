@@ -113,7 +113,7 @@ class ndr_options_buttons(ui.View):
             ui.TextDisplay("### Marked as *needs-dev-review*"),
             ui.Separator(),
             ui.TextDisplay("-# Please be patient, the development team will review this when they can."),
-            accent_color=discord.Colour.red()
+            accent_color=discord.Colour.brand_red()
         )
         view = ui.LayoutView().add_item(container)
         await interaction.channel.send(view=view)
