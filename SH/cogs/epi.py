@@ -567,7 +567,7 @@ class epi(commands.Cog):
         # set the webhook ID and token (if needed)
         await self.set_webhook_page(followup.channel)
 
-        xge = self.client.get_user(XGE_USER_ID) or await self.client.fetch_user(XGE_USER_ID) # xge's user ID
+        xge = self.client.get_user(XGE_USER_ID) or await self.client.fetch_user(XGE_USER_ID) 
         async with aiohttp.ClientSession(trust_env=True) as session:
             data = {
                 "topic": NTFY_TOPIC_NAME,
@@ -690,7 +690,7 @@ class epi(commands.Cog):
         if experts_channel is None:
             return
         msg = await experts_channel.send(f"Sending automated page for {message.jump_url}")
-        if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # 20 and 7 instead of 21 and 8 because it starts from 0 (0-23 rather than 1-24)
+        if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # from 10 PM to 7 AM
             priority = 4
         else:
             priority = 3
