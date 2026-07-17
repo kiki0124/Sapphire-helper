@@ -155,16 +155,6 @@ class SolvedRowWithNDR(ui.ActionRow):
         await interaction.channel.send(view=SolvedView(await interaction.client.get_unsolve_id()))
         await self.mark_post_as_solved(interaction.channel)
 
-class RecloseSolvedPost(ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    @ui.button(label="Re-Archive", style=discord.ButtonStyle.red, custom_id="solved-close-now")
-    async def on_close_now_click(self, interaction: discord.Interaction[MyClient], button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True)
-        await interaction.delete_original_response()
-        await interaction.channel.edit(archived=True)
-        # TODO: add logging [Optional]
-
 # This is sent when the post has a NDR tag
 class SolvedViewWithNDR(ui.LayoutView):
     def __init__(self, mark_post_as_solved: Callable) -> None:
@@ -274,7 +264,9 @@ class utility(commands.Cog):
     async def solved(self, interaction: discord.Interaction):
         if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags and "forwarded" not in interaction.channel.name.casefold():
             if SOLVED_TAG_ID in interaction.channel._applied_tags:
-                await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True, view=RecloseSolvedPost())
+                await interaction.response.defer(ephemeral=True)
+                await interaction.delete_original_response()
+                await interaction.channel.edit(archived=True)
                 return
             await interaction.response.send_message(view=SolvedView(await self.client.get_unsolve_id()))
             await self.mark_post_as_solved(interaction.channel)
