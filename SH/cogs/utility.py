@@ -265,7 +265,7 @@ class utility(commands.Cog):
         if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags and "forwarded" not in interaction.channel.name.casefold():
             if SOLVED_TAG_ID in interaction.channel._applied_tags:
                 await interaction.response.defer(ephemeral=True)
-                await interaction.delete_original_response()
+                await interaction.followup.send("Archiving post...")
                 await interaction.channel.edit(archived=True)
                 return
             await interaction.response.send_message(view=SolvedView(await self.client.get_unsolve_id()))
