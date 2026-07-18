@@ -4,9 +4,12 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands, ui
 from dotenv import load_dotenv
-from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, update_epi_message_id, update_epi_sticky, update_epi_iso, DB_PATH
+from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, \
+    generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, \
+    clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, \
+    update_epi_message_id, update_epi_sticky, update_epi_iso, check_time_more_than, DB_PATH
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
-from typing import Literal, Optional, TYPE_CHECKING
+from typing import Literal, Optional, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from main import MyClient
@@ -21,6 +24,8 @@ EPI_LOG_THREAD_ID = int(os.getenv("EPI_LOG_THREAD_ID"))
 NTFY_TOPIC_NAME = os.getenv("NTFY_TOPIC_NAME")
 NTFY_SECOND_TOPIC = os.getenv("NTFY_SECOND_TOPIC")
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
+
+XGE_USER_ID = 265236642476982273
 
 epi_users: list[int] = []
 
@@ -156,16 +161,19 @@ class select_channels(ui.ChannelSelect):
 class epi(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
+        self.page_webhook_id: int | None = None
+        self.page_webhook_token: str | None = None
+
+        self.recent_page: dict[str, Any] = {} # {"user_id": 1234, "message": "low taper fade is still massive", "timestamp": 1234.56, "priority": 1, "service": "Sapphire - bot", "cb_affected": False, "id": "AbC123"} , used for "a page was made 3 minutes ago, are you sure you want to continue?" for pages up to 5 minutes old
+        self.sticky_message: Optional[discord.Message] = None
+        self.sticky_task: Optional[asyncio.Task] = None
+        self.is_being_executed: bool = False
+        self.epi_msg: Optional[str] = None
+        self.epi_Message: Optional[discord.Message] = None
+        self.epi_data: dict[str, dict[int, int]] = {} # {str(started_iso_format: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
+        self.status_page: bool = True # true if its working, false if its not working
 
     group = app_commands.Group(name="epi", description="Commands related to Emergency Post Information system")
-    recent_page: Optional[dict] = None # {"user_id": 1234, "message": "low taper fade is still massive", "timestamp": 1234.56, "priority": 1, "service": "Sapphire - bot", "cb_affected": False, "id": "AbC123"} , used for "a page was made 3 minutes ago, are you sure you want to continue?" for pages up to 5 minutes old
-    sticky_message: Optional[discord.Message] = None
-    sticky_task: Optional[asyncio.Task] = None
-    is_being_executed: bool = False
-    epi_msg: Optional[str] = None
-    epi_Message: Optional[discord.Message] = None
-    epi_data: dict[str, dict[int, int]] = {} # {str(started_iso_format: {int(thread_id): int(message_id)})}  would be way more efficient than saving full message objects, especially in high amounts
-    status_page: bool = True # true if its working, false if its not working
 
     def generate_epi_layout_view(self) -> GetNotifiedView:
         description: str = ""
@@ -508,64 +516,43 @@ class epi(commands.Cog):
         view.add_item(select_channels("slowmode", reason,interaction ,time))
         await interaction.followup.send(content="Select the channels where the given slowmode should be applied below.\n-# Minimum of 1, maximum of 5.", view=view)
 
-    page_websockets: dict[str, asyncio.Task] = {} # id: task
-
-    async def handle_websocket(self, message: discord.WebhookMessage|discord.Message, id: str):
-        """  
-        The way this system works is that a notification ("page") is sent to
-        another ntfy topic (NTFY_SECOND_TOPIC_ID from .env) when a button from the notification
-        is clicked while SH is listening to events in that topic
+    async def set_webhook_page(self, partial_channel: discord.PartialMessageable) -> None:
         """
-        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"Attempting to connect to WS.\nID: `{id}`")
-        async with aiohttp.ClientSession() as cs:
-            async with cs.ws_connect(f"https://ntfy.sh/{NTFY_SECOND_TOPIC}/ws") as ws:
-                await self.client.send_log(EPI_LOG_THREAD_ID, content=f"WS connected.\nID: `{id}`")
-                async for msg in ws:
-                    types = {
-                        1: "TEXT",
-                        2: "BINARY",
-                        3: "CLOSE",
-                        4: "PING",
-                        5: "PONG"
-                    }
-                    await self.client.send_log(EPI_LOG_THREAD_ID, content=f"WS event received.\nType: `{types.get(msg.type, '?')}` | ID: `{id}`")
-                    exception_types = [aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR] 
-                    if msg.type == aiohttp.WSMsgType.TEXT:
-                        data = json.loads(msg.data)
-                        if data["event"] == "message":
-                            if data["message"] == id:
-                                await self.client.send_log(EPI_LOG_THREAD_ID, content=f"WS `message` event received. response: `{data['title']}` | ID: `{data['message']}`")
-                                await ws.close(code=aiohttp.WSCloseCode.OK)
-                                await self.client.send_log(EPI_LOG_THREAD_ID, content=f"Attempted to close WS. Closed: `{ws.closed}` | ID: `{data['message']}`")
-                                response = data["title"] # the button that Xge clicked in the notification
-                                channel = self.client.get_channel(message.channel.id)
-                                webhooks = [webhook for webhook in await channel.webhooks() if webhook.token]
-                                try:
-                                    webhook = webhooks[0]
-                                except IndexError: # webhooks is an empty list - that channel has no webhooks
-                                    webhook = await channel.create_webhook(name="Created by Sapphire helper")
-                                xge = self.client.get_user(265236642476982273) or await self.client.fetch_user(265236642476982273) # xge's user id, use get to get from the cache and fetch if couldn't find in cache
-                                await webhook.send(
-                                    content=f"{response}\n-# Reply to {message.jump_url}",
-                                    username=xge.global_name or xge.name, # global name or username if global name doesn't exist (is none)
-                                    avatar_url=xge.display_avatar.url
-                                )
-                                del self.page_websockets[id]
-                                return
-                            else:
-                                await self.client.send_log(EPI_LOG_THREAD_ID, content=f"WS `message` received with another random ID (expected `{id}`, received `{data['message']}`). Ignoring.")
-                    elif msg.type in exception_types:
-                        await ws.close(code=aiohttp.WSCloseCode.INTERNAL_ERROR)
-                        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"Received invalid WSMsgType - `{msg.type}`.\n`{msg}`.\nWS closed: {ws.closed}")
+        Set the webhook used for paging
+        """
+        if self.page_webhook_id is not None:
+            try:
+                webhook = await self.client.fetch_webhook(self.page_webhook_id)
+            except discord.NotFound:
+                pass
+            else:
+                if webhook.channel_id == partial_channel.id:
+                    return
+
+        channel = self.client.get_channel(partial_channel.id)
+        if isinstance(channel, discord.Thread):
+            channel = channel.parent
+
+        for wb in await channel.webhooks():
+            if wb.token:
+                webhook = wb
+                break
+        else:
+            webhook = await channel.create_webhook(name="Created by Sapphire helper")
+
+        self.page_webhook_id = webhook.id
+        self.page_webhook_token = webhook.token
+    
 
     async def send_page(self, 
                         title: str, 
-                        message: str, 
+                        description: str, 
                         priority: int, 
-                        followup: discord.Message, 
+                        followup: discord.WebhookMessage | discord.Message,
+                        case_id: str,
                         cb_affected: bool = False,
-                        user: discord.Member = None, 
-                        ratelimit_url: str = None
+                        *,
+                        user: discord.Member | discord.User | None = None,
                         ):
         severity_emojis = {
             1: "green_circle",  # information
@@ -573,42 +560,50 @@ class epi(commands.Cog):
             3: "orange_circle",  # High
             4: "red_circle"   # Critical - night
         }
+
         tags = [severity_emojis.get(priority, "question")]
         if cb_affected:
             tags.append("moneybag") # 💰
         if not user: # an automated page for rate limits
             tags.append("robot") # 🤖
-        if user:
-            title.join(f" | Sent by @{user.name}")
-        async with aiohttp.ClientSession(trust_env=True) as cs:
-            random_id = generate_random_id() # a unique random id for when there are multiple open websockets
-            self.recent_page["id"] = random_id
+
+        # set the webhook ID and token (if needed)
+        await self.set_webhook_page(followup.channel)
+
+        xge = self.client.get_user(XGE_USER_ID) or await self.client.fetch_user(XGE_USER_ID) 
+        async with aiohttp.ClientSession(trust_env=True) as session:
             data = {
                 "topic": NTFY_TOPIC_NAME,
-                "message": message,
                 "title": title,
+                "message": description,
                 "tags": tags,
                 "click": followup.jump_url,
-                "actions": [ # the hedaers in each button is {"Title": "the message that will be sent in the channel", "message": "the unique id"}
+                "actions": [
                     {
                         "action": "http",
                         "label": "On it",
-                        "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                        "headers": {"Title": "On it", "message": random_id},
+                        "url": f"https://discord.com/api/v10/webhooks/{self.page_webhook_id}/{self.page_webhook_token}",
+                        "headers": {'content-type': 'application/json'},
+                        "method": "POST",
+                        "body": json.dumps({'content': f'On it\n-# Reply to {followup.jump_url}', 'username': xge.display_name, 'avatar_url': xge.display_avatar.url}),
                         "clear": True
                     },
                     {
                         "action": "http",
-                        "label": "Soon (Next 30mins)",
-                        "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                        "headers": {"Title": "Soon (Next 30 mins)", "message": random_id},
+                        "label": "Soon (Next 30min)",
+                        "url": f"https://discord.com/api/v10/webhooks/{self.page_webhook_id}/{self.page_webhook_token}",
+                        "headers": {'content-type': 'application/json'},
+                        "method": "POST",
+                        "body": json.dumps({'content': f'Soon (Next 30min)\n-# Reply to {followup.jump_url}', 'username': xge.display_name, 'avatar_url': xge.display_avatar.url}),
                         "clear": True
                     },
                     {
                         "action": "http",
                         "label": "Later (>1 hour)",
-                        "url": f"https://ntfy.sh/{NTFY_SECOND_TOPIC}",
-                        "headers": {"Title": "Later (> 1 hour)", "message": random_id},
+                        "url": f"https://discord.com/api/v10/webhooks/{self.page_webhook_id}/{self.page_webhook_token}",
+                        "headers": {'content-type': 'application/json'},
+                        "method": "POST",
+                        "body": json.dumps({'content': f'Later (>1 hour)\n-# Reply to {followup.jump_url}', 'username': xge.display_name, 'avatar_url': xge.display_avatar.url}),
                         "clear": True
                     }
                 ] 
@@ -617,147 +612,115 @@ class epi(commands.Cog):
                 data["priority"] = 5
             if user:
                 data["icon"] = user.display_avatar.url
-            try:
-                async with cs.post("https://ntfy.sh/", data=json.dumps(data)) as req:
-                    if req.status == 200: # OK
-                        if user:
-                            service = title.removesuffix(f" | Sent by @{user.name}")
-                            await self.client.send_log(EPI_LOG_THREAD_ID, content=f"{user.mention} used /page. Service: {service} | Message: `{message}` | Priority: {priority} | Custom Branding Affected: {cb_affected}.\n-# ID: {random_id}")
-                            await followup.edit(content=f"Notification sent successfully.\n-# Message: {message} | Priority: {priority} | Service: {service} | ID: {random_id}")
-                        else:
-                            await followup.edit(content=f"Automated page for [ratelimits]({ratelimit_url}) sent successfully.\n-# Priority: {priority} | ID: {random_id}")
-                            await self.client.send_log(EPI_LOG_THREAD_ID, content=f"Sent automated page for rate limits. Priority: {priority}.\n-# ID: {random_id}")    
-                        task = asyncio.create_task(self.handle_websocket(followup, random_id))
-                        self.page_websockets[random_id] = task
+
+            async with session.post("https://ntfy.sh/", data=json.dumps(data)) as res:
+                if res.status == 200: # OK
+                    if user:
+                        service = title.removesuffix(f" | Sent by @{user.name}")
+                        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"{user.mention} used /page. Service: {service} | Message: `{description}` | Priority: {priority} | Custom Branding Affected: {cb_affected}\n-# ID: [{case_id}]({followup.jump_url})")
                     else:
-                        response = await req.text()
-                        await followup.edit(f"An error occured while trying to send the notification...\nStatus: {req.status}, Response: {response}")
-            except Exception as e:
-                await followup.edit(content=f"An error occured while trying to send the notification... {e}")
-                raise e
+                        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"Sent automated page for ratelimits | Priority: {priority}\n-# ID: [{case_id}]({followup.jump_url})")    
+                else:
+                    raise Exception(await res.text())
 
     @app_commands.command(name="page", description="Alert the lead developer of any downtime or critical issues")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(
         service="The affected service(s) - Sapphire- bot/dashboard | appeal.gg | All",
         message="The message to send", 
-        priority="The severity, 1 = lowest, 4 = critical (highest)", 
+        priority="1 - lowest, 4 - highest (most critical)", 
         cb_affected="Whether custom branding is affected or not (for Sapphire outages)"
     )
-    async def page(self, interaction: discord.Interaction, service: Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"], message: str, priority: Literal["4 | Night", "3 | Major issue", "2 | Minor issue", "1 | Information"], cb_affected: bool):
-        fifteen_minutes_ago = datetime.datetime.now() - datetime.timedelta(minutes=15)
+    async def page(self, interaction: discord.Interaction, service: Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"], message: str, 
+                   priority: Literal["4 | Night", "3 | Major issue", "2 | Minor issue", "1 | Information"], cb_affected: bool):
         priority_dict : dict[str, int] = {
-            "4 | Night" : 4,
-            "3 | Major issue" : 3,
-            "2 | Minor issue" : 2,
-            "1 | Information" : 1
+            "4 | Night": 4,
+            "3 | Major issue": 3,
+            "2 | Minor issue": 2,
+            "1 | Information": 1
         }
 
+        case_id = generate_random_id()
         priority_num = priority_dict[priority]
-        if self.recent_page and datetime.datetime.fromtimestamp(self.recent_page["timestamp"]) > fifteen_minutes_ago:
+        new_content = f"Notification sent successfully.\n-# Message: {message} | Priority: {priority_num} | Service: {service} | CB affected: {cb_affected} | ID: {case_id}"
+
+        if self.recent_page and not check_time_more_than(self.recent_page['timestamp'], datetime.timedelta(minutes=15)):
             await interaction.response.defer(ephemeral=True)
-            button = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page-confirm")
             async def callback(i: discord.Interaction):
-                followup = await i.channel.send("Sending...")
+                followup_msg = await i.channel.send("Sending...")
                 await interaction.delete_original_response()
                 self.recent_page = {
-                "user_id": interaction.user.id,
-                "message": message,
-                "timestamp": round(datetime.datetime.now().timestamp()),
-                "priority": priority_num,
-                "service": service,
-                "cb_affected": cb_affected
+                    "user_id": interaction.user.id,
+                    "message": message,
+                    "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
+                    "priority": priority_num,
+                    "service": service,
+                    "cb_affected": cb_affected,
+                    "id": case_id
                 }
-                await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup, cb_affected, interaction.user)
+                await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup_msg, case_id, cb_affected, user=interaction.user)
+                await followup_msg.edit(content=new_content)
+
+            button = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page-confirm")
             button.callback = callback
-            view = ui.View()
-            view.add_item(button)
-            await interaction.followup.send(f"A page was sent <t:{self.recent_page['timestamp']}:R> by <@{self.recent_page['user_id']}>. Service: `{self.recent_page['service']}` | Message: `{self.recent_page['message']}` | Priority: `{self.recent_page['priority']}` | CB affected: `{self.recent_page['cb_affected']}` | ID: `{self.recent_page['id']}`.\nAre you sure you would like to send this one?\n-# Click *confirm* button to confirm, dismiss message to cancel.", ephemeral=True, view=view)
+            view = ui.View(timeout=60 * 15).add_item(button)
+            await interaction.followup.send(f"A page was sent <t:{self.recent_page['timestamp']}:R> by <@{self.recent_page['user_id']}>:"
+                                            f"\n- Service: `{self.recent_page['service']}`\n- Message: `{self.recent_page['message']}`\n- Priority: `{self.recent_page['priority']}`\n- CB affected: `{self.recent_page['cb_affected']}`\n- ID: `{self.recent_page['id']}`"
+                                            "\nAre you sure you would like to send this one?\n-# Click *confirm* to page, dismiss message to cancel.", 
+                                            ephemeral=True, view=view)
         else:
             await interaction.response.defer()
             followup = await interaction.followup.send("Sending...", wait=True)
             self.recent_page = {
-            "user_id": interaction.user.id,
-            "message": message,
-            "timestamp": round(datetime.datetime.now().timestamp()),
-            "priority": priority_num,
-            "service": service,
-            "cb_affected": cb_affected
+                "user_id": interaction.user.id,
+                "message": message,
+                "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
+                "priority": priority_num,
+                "service": service,
+                "cb_affected": cb_affected,
+                "id": case_id
             }
-            await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup, cb_affected, interaction.user)
+            await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup, case_id, cb_affected, user=interaction.user)
+            await followup.edit(content=new_content)
 
     @commands.Cog.listener("on_message")
-    async def autopage_on_ratelimit(self, message: discord.Message):
-        if message.channel.id in [1023568468206956554, 1146016865345343531] and message.author.bot: # #cluster-log and the id of the channel in testing server as I don't want to add another .env variable
-            if 265236642476982273 in [user.id for user in message.mentions]: #! IMPORTANT: please make sure that this is Xge's user ID. For testing I had to switch it with my own as messages' .mentions field only shows for users who are in the server
-                experts_channel = discord.utils.get(message.guild.text_channels, name="sapphire-experts") or self.client.get_channel(EPI_LOG_THREAD_ID).parent
-                msg = await experts_channel.send(f"Sending automated page for {message.jump_url}")
-                priority = 3
-                if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # 20 and 7 instead of 21 and 8 because it starts from 0 (0-23 rather than 1-24)
-                    priority = 4
-                h_pattern = r"\[ H\d+ ]" # [ H<some number> ] e.g. [ H16 ] from the message 
-                resets_pattern = r"<t:(\d+):R>"
-                h = re.findall(pattern=h_pattern, string=message.content)
-                h = h[0] if h else "Unknown"
-                _resets_timestamp = re.findall(resets_pattern, string=message.content)
-                resets_timestamp = _resets_timestamp[0] if _resets_timestamp else None
-                if resets_timestamp:
-                    time = datetime.datetime.fromtimestamp(int(resets_timestamp))
-                    page_msg = f"Resets at: {time.hour}:{time.minute}:{time.second}"
-                else:
-                    page_msg = "Resets at: Unknown"
-                self.recent_page = {
-                "user_id": self.client.user.id,
-                "message": page_msg,
-                "timestamp": round(datetime.datetime.now().timestamp()),
-                "priority": priority,
-                "service": f"{h} Ratelimited",
-                "cb_affected": False
-                }
-                await self.send_page(f"{h} Ratelimited", page_msg, priority, msg, False, ratelimit_url=message.jump_url)
-
-    @app_commands.command(name="page-ws-close", description="Manually close a websocket created after a /page")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    @app_commands.describe(id="The id of the websocket to close. If none is provided all currently open websockets will be closed.")
-    async def page_websockets_close(self, interaction: discord.Interaction, id: str = None):
-        await interaction.response.defer(ephemeral=True)
-        if self.page_websockets:
-            if id:
-                if id in self.page_websockets.keys():
-                    close = self.page_websockets[id].cancel()
-                    if close:
-                        await interaction.followup.send(f"Successfully closed websocket with id `{id}`.")
-                        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"{interaction.user.mention} closed page websocket with id `{id}`")
-                    else:
-                        await interaction.followup.send("Websocket could not be closed... This could be due to it already being done (Xge responded) or someone else already cancelled it.")
-                else:
-                    await interaction.followup.send(f"Invalid key provided. Received `{id}`. Available keys: `{', '.join([key for key in self.page_websockets.keys()]) or 'None'}`")
-            else:
-                confirm = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page_websocket_close_confirm")
-                async def callback(i: discord.Interaction):
-                    await i.response.defer(ephemeral=True)
-                    keys = self.page_websockets.keys()
-                    if keys:
-                        closed: list[str] = []
-                        not_closed: list[str] = []
-                        for key in keys:
-                            close = self.page_websockets[key].cancel()
-                            closed.append(key) if close else not_closed.append(key)
-                            continue
-                        closed_str = ", ".join(closed) if closed else None
-                        not_closed_str = ", ".join(not_closed) if not_closed else None
-                        await i.followup.send(
-                            content=f"{'Successfully closed: ' + closed_str if closed_str else ''}.\n{'Not closed: ' + not_closed_str if not_closed_str else ''}",
-                            ephemeral=True
-                        )
-                        await interaction.edit_original_response(view=None)
-                        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"{i.user.mention} manually closed all currently open websockets ({len(keys)})")
-                confirm.callback = callback
-                view = ui.View()
-                view.add_item(confirm)
-                await interaction.followup.send("Are you sure you would like to close all currently open page web sockets?\n**This action can't be undone**", view=view)
+    async def autopage_on_ratelimit(self, ratelimit_message: discord.Message):
+        if not ratelimit_message.channel.id in (1023568468206956554, 1146016865345343531) or not ratelimit_message.author.bot: # #cluster-log and the id of the channel in testing server as I don't want to add another .env variable
+            return
+        if XGE_USER_ID not in ratelimit_message.raw_mentions:
+            return
+        experts_channel = discord.utils.get(message.guild.text_channels, name="sapphire-experts") or self.client.get_channel(EPI_LOG_THREAD_ID).parent
+        if experts_channel is None:
+            return
+        msg = await experts_channel.send(f"Sending automated page for {ratelimit_message.jump_url}")
+        if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # from 10 PM to 7 AM
+            priority = 4
         else:
-            await interaction.followup.send(f"There aren't any websockets open right now...")
+            priority = 3
+        h_pattern = r"\[ H\d+ ]" # [ H<some number> ] e.g. [ H16 ] from the message 
+        resets_pattern = r"<t:(\d+):R>"
+        h = re.findall(pattern=h_pattern, string=ratelimit_message.content)
+        h = h[0] if h else "Unknown"
+        _resets_timestamp = re.findall(resets_pattern, string=ratelimit_message.content)
+        resets_timestamp = _resets_timestamp[0] if _resets_timestamp else None
+        if resets_timestamp:
+            time = datetime.datetime.fromtimestamp(int(resets_timestamp))
+            page_msg = f"Resets at: {time.hour}:{time.minute}:{time.second}"
+        else:
+            page_msg = "Resets at: Unknown"
+
+        case_id = generate_random_id()
+        self.recent_page = {
+            "user_id": ratelimit_message.author.id,
+            "message": page_msg,
+            "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
+            "priority": priority,
+            "service": f"{h} Ratelimited",
+            "cb_affected": False,
+            "id": case_id
+        }
+        await self.send_page(f"{h} Ratelimited", page_msg, priority, msg, case_id)
+        await msg.edit(content=f"Automated page for [ratelimits]({ratelimit_message.jump_url}) sent successfully.\n-# Priority: {priority} | ID: {case_id}")
 
     @tasks.loop(minutes=2.5)
     async def ping_status_page(self):
