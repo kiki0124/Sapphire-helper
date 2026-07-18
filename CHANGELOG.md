@@ -14,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - Reminders are now sent if the last message is more than 3 days ago, regardless if the last message was sent by the post owner or not.
 
 
-
 ### Fixed
 - Bunch of bug fixes ([57](https://github.com/kiki0124/Sapphire-helper/pull/57))
 - Fix `discord.Thread` not being able to resolve if a post is archived
@@ -28,5 +27,6 @@ All notable changes to this project will be documented in this file.
 - Refactor and Improve tags ([65](https://github.com/kiki0124/Sapphire-helper/pull/65))
 - Use UTC for all datetimes (except paging) ([69](https://github.com/kiki0124/Sapphire-helper/pull/69))
 - Refactor reminders + close_abandoned_posts ([74](https://github.com/kiki0124/Sapphire-helper/pull/74))
+- Change Backend in Paging ([78](https://github.com/kiki0124/Sapphire-helper/pull/78))
 
 See [commits](https://github.com/kiki0124/Sapphire-helper/commits/main/) for all changes!
