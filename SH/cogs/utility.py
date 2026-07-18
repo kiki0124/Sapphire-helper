@@ -155,7 +155,6 @@ class SolvedRowWithNDR(ui.ActionRow):
         await interaction.channel.send(view=SolvedView(await interaction.client.get_unsolve_id()))
         await self.mark_post_as_solved(interaction.channel)
 
-
 # This is sent when the post has a NDR tag
 class SolvedViewWithNDR(ui.LayoutView):
     def __init__(self, mark_post_as_solved: Callable) -> None:
@@ -265,7 +264,8 @@ class utility(commands.Cog):
     async def solved(self, interaction: discord.Interaction):
         if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags and "forwarded" not in interaction.channel.name.casefold():
             if SOLVED_TAG_ID in interaction.channel._applied_tags:
-                await interaction.response.send_message(content="This post is already marked as solved.", ephemeral=True)
+                await interaction.response.send_message("Archiving post...", ephemeral=True)
+                await interaction.channel.edit(archived=True)
                 return
             await interaction.response.send_message(view=SolvedView(await self.client.get_unsolve_id()))
             await self.mark_post_as_solved(interaction.channel)
