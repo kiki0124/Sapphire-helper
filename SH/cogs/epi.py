@@ -528,8 +528,11 @@ class epi(commands.Cog):
             else:
                 if webhook.channel_id == partial_channel.id:
                     return
-        
+
         channel = self.client.get_channel(partial_channel.id)
+        if isinstance(channel, discord.Thread):
+            channel = channel.parent
+
         for wb in await channel.webhooks():
             if wb.token:
                 webhook = wb
@@ -647,13 +650,13 @@ class epi(commands.Cog):
                 followup_msg = await i.channel.send("Sending...")
                 await interaction.delete_original_response()
                 self.recent_page = {
-                "user_id": interaction.user.id,
-                "message": message,
-                "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
-                "priority": priority_num,
-                "service": service,
-                "cb_affected": cb_affected,
-                "id": case_id
+                    "user_id": interaction.user.id,
+                    "message": message,
+                    "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
+                    "priority": priority_num,
+                    "service": service,
+                    "cb_affected": cb_affected,
+                    "id": case_id
                 }
                 await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup_msg, case_id, cb_affected, user=interaction.user)
                 await followup_msg.edit(content=new_content)
@@ -667,38 +670,38 @@ class epi(commands.Cog):
                                             ephemeral=True, view=view)
         else:
             await interaction.response.defer()
-            followup = await interaction.followup.send(f"Sending...", wait=True)
+            followup = await interaction.followup.send("Sending...", wait=True)
             self.recent_page = {
-            "user_id": interaction.user.id,
-            "message": message,
-            "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
-            "priority": priority_num,
-            "service": service,
-            "cb_affected": cb_affected,
-            "id": case_id
+                "user_id": interaction.user.id,
+                "message": message,
+                "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
+                "priority": priority_num,
+                "service": service,
+                "cb_affected": cb_affected,
+                "id": case_id
             }
             await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup, case_id, cb_affected, user=interaction.user)
             await followup.edit(content=new_content)
 
     @commands.Cog.listener("on_message")
-    async def autopage_on_ratelimit(self, message: discord.Message):
-        if not message.channel.id in (1023568468206956554, 1146016865345343531) or not message.author.bot: # #cluster-log and the id of the channel in testing server as I don't want to add another .env variable
+    async def autopage_on_ratelimit(self, ratelimit_message: discord.Message):
+        if not ratelimit_message.channel.id in (1023568468206956554, 1146016865345343531) or not ratelimit_message.author.bot: # #cluster-log and the id of the channel in testing server as I don't want to add another .env variable
             return
-        if XGE_USER_ID not in message.raw_mentions:
+        if XGE_USER_ID not in ratelimit_message.raw_mentions:
             return
         experts_channel = discord.utils.get(message.guild.text_channels, name="sapphire-experts") or self.client.get_channel(EPI_LOG_THREAD_ID).parent
         if experts_channel is None:
             return
-        msg = await experts_channel.send(f"Sending automated page for {message.jump_url}")
+        msg = await experts_channel.send(f"Sending automated page for {ratelimit_message.jump_url}")
         if datetime.datetime.now().hour > 21 or datetime.datetime.now().hour < 7: # from 10 PM to 7 AM
             priority = 4
         else:
             priority = 3
         h_pattern = r"\[ H\d+ ]" # [ H<some number> ] e.g. [ H16 ] from the message 
         resets_pattern = r"<t:(\d+):R>"
-        h = re.findall(pattern=h_pattern, string=message.content)
+        h = re.findall(pattern=h_pattern, string=ratelimit_message.content)
         h = h[0] if h else "Unknown"
-        _resets_timestamp = re.findall(resets_pattern, string=message.content)
+        _resets_timestamp = re.findall(resets_pattern, string=ratelimit_message.content)
         resets_timestamp = _resets_timestamp[0] if _resets_timestamp else None
         if resets_timestamp:
             time = datetime.datetime.fromtimestamp(int(resets_timestamp))
@@ -708,15 +711,16 @@ class epi(commands.Cog):
 
         case_id = generate_random_id()
         self.recent_page = {
-        "user_id": message.author.id,
-        "message": page_msg,
-        "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
-        "priority": priority,
-        "service": f"{h} Ratelimited",
-        "cb_affected": False,
-        "id": case_id
+            "user_id": ratelimit_message.author.id,
+            "message": page_msg,
+            "timestamp": round(datetime.datetime.now(datetime.UTC).timestamp()),
+            "priority": priority,
+            "service": f"{h} Ratelimited",
+            "cb_affected": False,
+            "id": case_id
         }
         await self.send_page(f"{h} Ratelimited", page_msg, priority, msg, case_id)
+        await msg.edit(content=f"Automated page for [ratelimits]({ratelimit_message.jump_url}) sent successfully.\n-# Priority: {priority} | ID: {case_id}")
 
     @tasks.loop(minutes=2.5)
     async def ping_status_page(self):
