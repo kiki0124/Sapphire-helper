@@ -467,7 +467,7 @@ class utility(commands.Cog):
                 tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
             action_id = generate_random_id()
             await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
-            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=ctx.channel.mention, tag=tags, context="/incomplete-post used")
+            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=ctx.channel.mention, tags=tags, context="/incomplete-post used")
         await ctx.channel.send(
             view=view,
             allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
