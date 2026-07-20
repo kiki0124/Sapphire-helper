@@ -245,7 +245,7 @@ class Reminders(commands.Cog):
             try:
                 post = self.client.get_channel(post_id) or await self.client.fetch_channel(post_id)
             except discord.NotFound:
-                await remove_post_from_rtdr(post.id)
+                await remove_post_from_rtdr(post_id)
                 posts_to_remove.append(post_id)
                 continue
 

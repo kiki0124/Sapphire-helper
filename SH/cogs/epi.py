@@ -689,7 +689,7 @@ class epi(commands.Cog):
             return
         if XGE_USER_ID not in ratelimit_message.raw_mentions:
             return
-        experts_channel = discord.utils.get(message.guild.text_channels, name="sapphire-experts") or self.client.get_channel(EPI_LOG_THREAD_ID).parent
+        experts_channel = discord.utils.get(ratelimit_message.guild.text_channels, name="sapphire-experts") or self.client.get_channel(EPI_LOG_THREAD_ID).parent
         if experts_channel is None:
             return
         msg = await experts_channel.send(f"Sending automated page for {ratelimit_message.jump_url}")
