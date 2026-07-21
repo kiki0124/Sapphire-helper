@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unversioned] -
+
+### Added
+- None
+
+### Fixed
+- None
+
+
 ## [6.2] - 21/7/26
 
 ### Added
