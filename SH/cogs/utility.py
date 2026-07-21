@@ -505,6 +505,14 @@ class utility(commands.Cog):
             user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
             text_prefix = f"Hey <@{user_id}>"
             await self.lock_unrelated_post(interaction.channel)
+        else:
+            tags = interaction.channel.applied_tags
+            for i in range(len(tags) -1, -1, -1):
+                if tags[i].id in (WAITING_FOR_REPLY_TAG_ID, UNANSWERED_TAG_ID):
+                    tags.pop(i)
+                    tags.append(interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID))
+                    await interaction.channel.edit(applied_tags=tags)
+                    break
 
         title = "## Unrelated question/issue"
         description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
