@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### Fixed
-- None
+- Fixed `/unrelated` command not adding `not-solved` tag. ([#82](https://github.com/kiki0124/Sapphire-helper/issues/82))
 
 
 ## [6.2] - 21/7/26
