@@ -43,14 +43,14 @@ class MyClient(commands.Bot):
             else:
                 print(f"Skipped loading {filename[:-3]}")
 
-    async def send_log(self, thread_id: int, *, content: str = "", **kwargs) -> None:
+    async def send_log(self, thread_id: int, *, content: str = "", **kwargs) -> discord.WebhookMessage | None:
         if 'action_id' in kwargs:
             content = f"ID: {kwargs['action_id']}\nPost: {kwargs['post_mention']}\nTags: {', '.join([tag.name for tag in kwargs['tags']])}\nContext: {kwargs['context']}"
     
         if thread_id == ALERTS_THREAD_ID and self.alert_webhook_url is not None:
             webhook = discord.Webhook.from_url(self.alert_webhook_url, client=self)
             try:
-                await webhook.send(
+                return await webhook.send(
                     content=content,
                     username=self.user.name,
                     avatar_url=self.user.display_avatar.url,
@@ -60,8 +60,6 @@ class MyClient(commands.Bot):
                 )
             except discord.HTTPException:
                 pass
-            else:
-                return
         log_thread = self.get_channel(thread_id) or await self.fetch_channel(thread_id)
         webhooks = [webhook for webhook in await log_thread.parent.webhooks() if webhook.token]
         if not webhooks:
@@ -71,7 +69,7 @@ class MyClient(commands.Bot):
 
         if thread_id == ALERTS_THREAD_ID:
             self.alert_webhook_url = webhook.url # Assign only if the url is None.
-        await webhook.send(
+        return await webhook.send(
             content=content,
             username=self.user.name,
             avatar_url=self.user.display_avatar.url,

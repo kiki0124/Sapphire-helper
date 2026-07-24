@@ -7,7 +7,9 @@ from functions import remove_post_from_pending, get_pending_posts, \
     get_post_creator_id, remove_post_from_rtdr, generate_random_id, \
     in_pending_posts, bulk_add_posts_to_pending, bulk_remove_posts_from_pending
 import random
+import asyncio
 from discord import ui
+from discord import app_commands
 from datetime import timedelta
 import os
 from dotenv import load_dotenv
@@ -103,6 +105,10 @@ class Reminders(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
 
+        # stores the post ids fetched in reminders_loop 'active_threads'
+        # used for debugging purposes
+        self.last_fetched_threads: list[int] = []
+
     def reminders_filter(self, thread: discord.Thread):
         """  
         Filter function for posts in reminder system, returns true if all of the following criteria are met:
@@ -130,6 +136,15 @@ class Reminders(commands.Cog):
     async def cog_unload(self):
         self.reminders_loop.cancel()
 
+    def get_reminder_next_iteration(self) -> str:
+        """
+        Returns (in formatted str) of the next iteration
+        Or 'None' if there is no next iteration.
+        """
+        if self.reminders_loop.next_iteration:
+            return discord.utils.format_dt(self.reminders_loop.next_iteration)
+        return "`None`"
+
     @tasks.loop(hours=1)
     async def reminders_loop(self):
         """
@@ -138,15 +153,33 @@ class Reminders(commands.Cog):
         - check_for_pending_posts
         - close_pending_posts
         """
+
+        log_start_content = (f"Reminders loop **starting**",
+                            f"- Current iteration: `{self.reminders_loop.current_loop}`",
+                            f"- Next iteration: {self.get_reminder_next_iteration()}")
+        start_log_msg = await self.client.send_log(ALERTS_THREAD_ID, content="\n".join(log_start_content), wait=True)
+
         await self.close_pending_posts()
         support_channel = self.client.get_channel(SUPPORT_CHANNEL_ID)
         if not support_channel:
             return
 
         posts = await support_channel.guild.active_threads()
+        self.last_fetched_threads.clear()
+        self.last_fetched_threads.extend(post.id for post in posts if post.parent_id == SUPPORT_CHANNEL_ID)
+
         if posts:
             await self.close_abandoned_posts(posts)
             await self.check_for_pending_posts(posts)
+
+
+        log_end_content = (f"Reminders loop **complete** ({start_log_msg.jump_url})",
+                            f"- Current iteration: `{self.reminders_loop.current_loop}`",
+                            f"- Next iteration: {self.get_reminder_next_iteration()}",
+                            f"- Active Posts in Support: `{len(self.last_fetched_threads)}`",
+                            f"- Posts checked for reminders: `{len(posts)}`")
+
+        await self.client.send_log(ALERTS_THREAD_ID, content="\n".join(log_end_content))
 
     async def close_abandoned_posts(self, posts: list[discord.Thread]):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
@@ -283,6 +316,59 @@ class Reminders(commands.Cog):
     async def reminders_loop_error(self, error: BaseException):
         await self.client.send_unhandled_error(error, task=self.reminders_loop)
 
+
+    reminders_cmd_group = app_commands.Group(name="reminders", description="Commands related to reminders")
+
+    @reminders_cmd_group.command(name="debug", description="Get debug information about reminders")
+    @app_commands.describe(post="The post to check whether it was last fetched by the reminders loop")
+    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    async def reminders_debug(self, interaction: discord.Interaction, post: app_commands.AppCommandThread | None = None):
+        container = ui.Container(ui.TextDisplay("### Reminders Debug Info"), ui.Separator())
+
+        description = (f"- Is running: `{self.reminders_loop.is_running()}`",
+                       f"- Failed: `{self.reminders_loop.failed()}`",
+                       f"- No. of times executed: `{self.reminders_loop.current_loop}`",
+                       f"- Next iteration: {self.get_reminder_next_iteration()}")
+        container.add_item(ui.TextDisplay("\n".join(description)))
+        container.add_item(ui.Separator())
+        if post is not None:
+            container.add_item(ui.TextDisplay(f"- Post in last feched: `{post.id in self.last_fetched_threads}`\n- Last feched: `{len(self.last_fetched_threads)}`"))
+        else:
+            container.add_item(ui.TextDisplay(f"- Last fetched: `{len(self.last_fetched_threads)}`"))
+
+        async def view_last_feched(i: discord.Interaction):
+            await i.response.send_message(f"```py\n{self.last_fetched_threads}```"[0:2000], ephemeral=True)
+        button = ui.Button(label="View Last Fetched")
+        button.callback = view_last_feched
+        container.add_item(ui.ActionRow(button))
+        await interaction.response.send_message(view=ui.LayoutView().add_item(container), ephemeral=True)
+
+
+    @reminders_cmd_group.command(name="simulate", description="Simulate sending the reminder if the criterias are met")
+    @app_commands.describe(post="The post to simulate on")
+    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    async def reminders_simulate(self, interaction: discord.Interaction, post: app_commands.AppCommandThread):
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send(f"Sleeping for 10 seconds to prevent clashes with reminders...")
+        await asyncio.sleep(10)
+        await self.check_for_pending_posts([self.client.get_channel(post.id) or await post.fetch()])
+
+        await interaction.followup.send(f"Simulation complete for {post.mention}!", ephemeral=True)
+
+    @reminders_cmd_group.command(name="get_active_threads", description="Get all the active threads in support channel")
+    @app_commands.describe(post="The post to check if it was in active threads")
+    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    async def reminders_get_active_threads(self, interaction: discord.Interaction, post: app_commands.AppCommandThread | None = None):
+        await interaction.response.defer(ephemeral=True)
+        posts = [post.id for post in await interaction.guild.active_threads() if post.parent_id == SUPPORT_CHANNEL_ID]
+
+        content = f"- Posts fetched: `{len(posts)}`"
+        if post:
+            content += f"\n- Post in fetched: `{post.id in posts}`"
+        content += f"\n```py\n{posts}```"
+
+        container = ui.Container(ui.TextDisplay(content[0:4000]))
+        await interaction.followup.send(view=ui.LayoutView().add_item(container), ephemeral=True)
 
 async def setup(client: MyClient):
     await client.add_cog(Reminders(client))
