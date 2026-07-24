@@ -176,7 +176,8 @@ class Reminders(commands.Cog):
         log_end_content = (f"Reminders loop **complete** ({start_log_msg.jump_url})",
                             f"- Current iteration: `{self.reminders_loop.current_loop}`",
                             f"- Next iteration: {self.get_reminder_next_iteration()}",
-                            f"- Posts fetched: `{len(self.last_fetched_threads)}`")
+                            f"- Active Posts in Support: `{len(self.last_fetched_threads)}`",
+                            f"- Posts checked for reminders: `{len(posts)}`")
 
         await self.client.send_log(ALERTS_THREAD_ID, content="\n".join(log_end_content))
 

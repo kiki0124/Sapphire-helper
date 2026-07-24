@@ -43,7 +43,7 @@ class MyClient(commands.Bot):
             else:
                 print(f"Skipped loading {filename[:-3]}")
 
-    async def send_log(self, thread_id: int, *, content: str = "", **kwargs) -> discord.WebhookMessage:
+    async def send_log(self, thread_id: int, *, content: str = "", **kwargs) -> discord.WebhookMessage | None:
         if 'action_id' in kwargs:
             content = f"ID: {kwargs['action_id']}\nPost: {kwargs['post_mention']}\nTags: {', '.join([tag.name for tag in kwargs['tags']])}\nContext: {kwargs['context']}"
     
