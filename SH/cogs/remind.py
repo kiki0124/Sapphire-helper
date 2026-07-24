@@ -113,18 +113,17 @@ class Reminders(commands.Cog):
         """  
         Filter function for posts in reminder system, returns true if all of the following criteria are met:
         * Not locked, not archived
-        * Doesn't have needs dev review & solved
+        * Doesn't have needs dev review & solved & unanswered (#issue 83)
         * Is in #support (parent_id==SUPPORT_CHANNEL_ID)
         """
         if thread.parent_id != SUPPORT_CHANNEL_ID:
             return False
 
         applied_tags = thread._applied_tags
-        ndr = NEED_DEV_REVIEW_TAG_ID not in applied_tags
-        solved = SOLVED_TAG_ID not in applied_tags
+        tags_filter = all(tag_id not in applied_tags for tag_id in (NEED_DEV_REVIEW_TAG_ID, SOLVED_TAG_ID, UNANSWERED_TAG_ID))
         archived = not thread.archived
         locked = not thread.locked
-        return ndr and solved and archived and locked
+        return tags_filter and archived and locked
 
     @commands.Cog.listener("on_ready")
     async def add_persistent_view(self):
