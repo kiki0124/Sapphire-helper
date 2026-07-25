@@ -124,7 +124,7 @@ class autoadd(commands.Cog):
         if (
             content_len + len(thread.name) < 25
             or start_msg.content.casefold() == thread.name.casefold()
-            and not thread.owner.bot # prevent the message from sending if it was sent via rtdr
+            and thread.owner_id != self.client.user.id # prevent the message from sending if it was sent via rtdr
         ):
             view = ui.LayoutView()
             container = ui.Container()
@@ -137,7 +137,7 @@ class autoadd(commands.Cog):
             self.client.incomplete_msg_posts.add(thread.id)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if message.author == self.client.user or (message.author != message.channel.owner and message.author.id != await get_post_creator_id(message.channel.id)):
+        if message.author.id == self.client.user.id or (message.author.id != message.channel.owner_id and message.author.id != await get_post_creator_id(message.channel.id)):
             return
         tags = message.channel._applied_tags
         if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
@@ -148,12 +148,11 @@ class autoadd(commands.Cog):
                 self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
-        if UNANSWERED_TAG_ID not in message.channel._applied_tags or message.author == self.client.user:
+        if UNANSWERED_TAG_ID not in message.channel._applied_tags or message.author.id == self.client.user.id:
             return
         applied_tags = message.channel.applied_tags
         owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
-        author_not_owner = message.author.id != owner_id
-        if author_not_owner:
+        if message.author.id != owner_id:
             tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
             cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
             appeal = message.channel.parent.get_tag(APPEAL_GG_TAG_ID)

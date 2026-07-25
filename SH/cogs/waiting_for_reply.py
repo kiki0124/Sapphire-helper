@@ -40,13 +40,13 @@ class waiting_for_reply(commands.Cog):
     @commands.Cog.listener('on_message')
     async def add_remove_waiting_for_reply(self, message: discord.Message):
         channel_id = message.channel.id
-        if message.author == self.client.user or not isinstance(message.channel, discord.Thread) or message.channel.parent_id != SUPPORT_CHANNEL_ID:
+        if message.author.id == self.client.user.id or not isinstance(message.channel, discord.Thread) or message.channel.parent_id != SUPPORT_CHANNEL_ID:
             return
 
         support = message.channel.parent
         wfr = support.get_tag(WAITING_FOR_REPLY_TAG_ID)
         applied_tags = message.channel._applied_tags
-        message_author_is_owner = message.author == message.channel.owner or message.author.id == await get_post_creator_id(message.channel.id)
+        message_author_is_owner = message.author.id == message.channel.owner_id or message.author.id == await get_post_creator_id(message.channel.id)
         has_wfr = WAITING_FOR_REPLY_TAG_ID in applied_tags
         if message.id == message.channel.id or NEED_DEV_REVIEW_TAG_ID in applied_tags or UNANSWERED_TAG_ID in applied_tags or SOLVED_TAG_ID in applied_tags:
             return
