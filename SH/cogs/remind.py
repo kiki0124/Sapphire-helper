@@ -12,7 +12,6 @@ from discord import ui
 from discord import app_commands
 from datetime import timedelta
 import os
-from time import perf_counter
 from dotenv import load_dotenv
 from typing import TYPE_CHECKING
 from discord.utils import snowflake_time
@@ -206,7 +205,7 @@ class Reminders(commands.Cog):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         if not support:
             return
-        start = perf_counter()
+
         owner_ids = await self.filter_and_get_owner_ids(posts)
         if not owner_ids:
             return
@@ -232,7 +231,6 @@ class Reminders(commands.Cog):
             await post.edit(archived=True, reason=f"ID: {action_id}. Post creator left the server, auto close post", applied_tags=tags)
             await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
             del posts[i] # remove from the post so that check_for_pending_posts won't need to check for it
-        print(f"Took: {perf_counter() - start:.5f}")
 
     async def check_for_pending_posts(self, posts: list[discord.Thread]):
         posts_to_add: list[int] = []
