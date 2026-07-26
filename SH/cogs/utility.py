@@ -12,7 +12,7 @@ from functions import remove_post_from_rtdr, get_post_creator_id, \
 from typing import Union, Literal, Callable, TYPE_CHECKING
 import re
 if TYPE_CHECKING:
-    from main import MyClient
+    from main import SHBot
 
 
 load_dotenv()
@@ -82,7 +82,7 @@ class NeedDevReviewView(ui.LayoutView):
 
 
 class ndr_options_buttons(ui.View):
-    def __init__(self, Interaction: discord.Interaction[MyClient]):
+    def __init__(self, Interaction: discord.Interaction[SHBot]):
         super().__init__(timeout=None)
         self.Interaction = Interaction
     
@@ -149,7 +149,7 @@ class SolvedRowWithNDR(ui.ActionRow):
         self.mark_post_as_solved = mark_post_as_solved
     
     @ui.button(label="Confirm", style=discord.ButtonStyle.green, custom_id="solved-confirm")
-    async def on_confirm_button_click(self, interaction: discord.Interaction[MyClient], button: discord.ui.Button):
+    async def on_confirm_button_click(self, interaction: discord.Interaction[SHBot], button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         await interaction.delete_original_response()
         await interaction.channel.send(view=SolvedView(await interaction.client.get_unsolve_id()))
@@ -167,7 +167,7 @@ class SolvedViewWithNDR(ui.LayoutView):
 
 
 class utility(commands.Cog):
-    def __init__(self, client: MyClient):
+    def __init__(self, client: SHBot):
         self.client = client
 
     close_tasks: dict[int, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
@@ -529,5 +529,5 @@ class utility(commands.Cog):
         await interaction.delete_original_response()
             
 
-async def setup(client: MyClient):
+async def setup(client: SHBot):
     await client.add_cog(utility(client))

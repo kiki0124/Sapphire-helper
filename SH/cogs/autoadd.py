@@ -10,7 +10,7 @@ from functions import get_post_creator_id, generate_random_id, remove_post_from_
 from discord import ui
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from main import MyClient
+    from main import SHBot
 
 load_dotenv()
 
@@ -32,7 +32,7 @@ class ConfirmCloseButtons(ui.ActionRow):
         self.is_owner: bool = False
 
     @ui.button(label="Mark as solved", style=discord.ButtonStyle.green, custom_id="auto-close-confirm")
-    async def on_confirm_click(self, interaction: discord.Interaction[MyClient], _: ui.Button):
+    async def on_confirm_click(self, interaction: discord.Interaction[SHBot], _: ui.Button):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(f"-# Closed by {interaction.user}")))
         await interaction.message.edit(view=new_view)
@@ -54,7 +54,7 @@ class ConfirmCloseButtons(ui.ActionRow):
 
 
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
-    async def on_cancel_click(self, interaction: discord.Interaction[MyClient], _: ui.Button):
+    async def on_cancel_click(self, interaction: discord.Interaction[SHBot], _: ui.Button):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         footer = f"-# Cancelled by {interaction.user}"
         if SOLVED_TAG_ID in interaction.channel._applied_tags:
@@ -69,7 +69,7 @@ class ConfirmCloseButtons(ui.ActionRow):
                                                             ui.TextDisplay(footer)))
             await interaction.message.reply(view=view)
 
-    async def interaction_check(self, interaction: discord.Interaction[MyClient]) -> bool:
+    async def interaction_check(self, interaction: discord.Interaction[SHBot]) -> bool:
         self.is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
         if not (self.is_owner or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)):
             await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
@@ -94,7 +94,7 @@ class ConfirmCloseView(ui.LayoutView):
 
 
 class autoadd(commands.Cog):
-    def __init__(self, client: MyClient):
+    def __init__(self, client: SHBot):
         self.client = client
         
     @commands.Cog.listener('on_ready')
@@ -180,5 +180,5 @@ class autoadd(commands.Cog):
                     view=ConfirmCloseView(post_author=owner_id)
                 )
 
-async def setup(client: MyClient):
+async def setup(client: SHBot):
     await client.add_cog(autoadd(client))

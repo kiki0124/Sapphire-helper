@@ -13,7 +13,7 @@ load_dotenv()
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from main import MyClient
+    from main import SHBot
 
 
 EXPERTS_ROLE_ID = int(getenv("EXPERTS_ROLE_ID"))
@@ -76,7 +76,7 @@ class EvalSqlModal(ui.Modal):
                                                                           required=True))
         self.add_item(self.sql_cmd)
 
-    async def on_submit(self, interaction: discord.Interaction[MyClient]) -> None:
+    async def on_submit(self, interaction: discord.Interaction[SHBot]) -> None:
         assert isinstance(self.sql_cmd.component, ui.TextInput)
         await interaction.response.defer()
 
@@ -86,7 +86,7 @@ class EvalSqlModal(ui.Modal):
 
 
 class DebugCog(commands.Cog):
-    def __init__(self, bot: MyClient) -> None:
+    def __init__(self, bot: SHBot) -> None:
         self.bot = bot
 
     debug_group_cmd = app_commands.Group(name="debug", description="Debug Commands")
@@ -120,5 +120,5 @@ class DebugCog(commands.Cog):
         await functions.setup_db()
         await interaction.followup.send("Success!\n", ephemeral=True)
 
-async def setup(client: MyClient):
+async def setup(client: SHBot):
     await client.add_cog(DebugCog(client))

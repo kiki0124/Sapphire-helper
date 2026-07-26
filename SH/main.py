@@ -15,7 +15,7 @@ TOKEN = os.getenv("BOT_TOKEN")
 PREFIX = os.getenv("PREFIX")
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 
-class MyClient(commands.Bot):
+class SHBot(commands.Bot):
     def __init__(self) -> None:
         intents = discord.Intents.none()
         intents.message_content = True
@@ -127,4 +127,4 @@ class MyClient(commands.Bot):
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")
 
-MyClient().run(TOKEN)
+SHBot().run(TOKEN)

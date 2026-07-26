@@ -9,7 +9,7 @@ from functions import add_post_to_rtdr
 from typing import Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from main import MyClient
+    from main import SHBot
 
 load_dotenv()
 GENERAL_CHANNEL_ID = int(os.getenv('GENERAL_CHANNEL_ID'))
@@ -21,7 +21,7 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 FEEDBACK_CHANNEL_ID = int(os.getenv("FEEDBACK_CHANNEL_ID"))
 
 class readthedamnrules(commands.Cog):
-    def __init__(self, client: MyClient) -> None:
+    def __init__(self, client: SHBot) -> None:
         self.client = client
 
     async def get_messages_to_move(self, reference_message: discord.Message) -> list[discord.Message]:
@@ -153,5 +153,5 @@ class readthedamnrules(commands.Cog):
         if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
             await self.handle_request(reaction.message, user=user)
 
-async def setup(client: MyClient):
+async def setup(client: SHBot):
     await client.add_cog(readthedamnrules(client))

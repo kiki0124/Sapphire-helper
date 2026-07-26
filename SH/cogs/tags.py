@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 if TYPE_CHECKING:
-    from main import MyClient
+    from main import SHBot
 
 
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
@@ -45,7 +45,7 @@ class CreateTagModal(ui.Modal):
             max_length=950
         ))
 
-    async def on_submit(self, interaction: discord.Interaction[MyClient]):
+    async def on_submit(self, interaction: discord.Interaction[SHBot]):
         await interaction.response.defer(ephemeral=True)
         tag_name: str = self.name.component.value
         if not await check_tag_exists(tag_name):
@@ -71,7 +71,7 @@ class UpdateTagModal(ui.Modal):
         )
     )
 
-    async def on_submit(self, interaction: discord.Interaction[MyClient]):
+    async def on_submit(self, interaction: discord.Interaction[SHBot]):
         await interaction.response.defer(ephemeral=True)
         new_content = self.label.component.value
         await update_tag_content(self.tag, new_content)
@@ -113,7 +113,7 @@ class TagConfirmRow(ui.ActionRow):
 
 
 class Tags(commands.Cog):
-    def __init__(self, client: MyClient):
+    def __init__(self, client: SHBot):
         self.client = client
         self.cached_tags: list[str] = [] # tags cached to use for autocomplete and suggesting similar tags
         self.tags_lock = asyncio.Lock() # Lock to prevent mutating 'cached_tags' at the same time
@@ -232,7 +232,7 @@ class Tags(commands.Cog):
                 style=discord.ButtonStyle.danger,
                 custom_id="tag-delete-confirm"
             )
-            async def on_confirm_click(i: discord.Interaction[MyClient]):
+            async def on_confirm_click(i: discord.Interaction[SHBot]):
                 await i.response.defer(ephemeral=True)
                 await delete_tag(tag)
                 try:
@@ -312,5 +312,5 @@ class Tags(commands.Cog):
         view.add_item(container)
         await interaction.response.send_message(view=view, ephemeral=True)
 
-async def setup(client: MyClient):
+async def setup(client: SHBot):
     await client.add_cog(Tags(client))

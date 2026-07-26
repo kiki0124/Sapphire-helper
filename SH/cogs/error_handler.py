@@ -18,10 +18,10 @@ SUPPORT_CHANNEL_ID = int(os.getenv("SUPPORT_CHANNEL_ID"))
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-	from main import MyClient
+	from main import SHBot
 
 class ErrorHandler(commands.Cog):
-	def __init__(self, client: MyClient):
+	def __init__(self, client: SHBot):
 		self.client = client
 	
 
@@ -104,5 +104,5 @@ class ErrorHandler(commands.Cog):
 		
 		await interaction.response.send_message(error_message, ephemeral=True)
 
-async def setup(client: MyClient):
+async def setup(client: SHBot):
 	await client.add_cog(ErrorHandler(client))

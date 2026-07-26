@@ -12,7 +12,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from main import MyClient
+    from main import SHBot
 
 load_dotenv()
 
@@ -22,7 +22,7 @@ ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class Bot(commands.Cog):
-    def __init__(self, client: MyClient):
+    def __init__(self, client: SHBot):
         self.client = client
         self.last_restarted = time.time()
 
@@ -83,5 +83,5 @@ class Bot(commands.Cog):
         view.add_item(container)
         await ctx.reply(view=view, mention_author=False)
 
-async def setup(client: MyClient):
+async def setup(client: SHBot):
     await client.add_cog(Bot(client))

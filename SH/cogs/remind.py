@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from discord.utils import snowflake_time
 
 if TYPE_CHECKING:
-    from main import MyClient
+    from main import SHBot
 load_dotenv()
 
 SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
@@ -38,7 +38,7 @@ class CloseNowRow(ui.ActionRow):
         self.is_owner: bool = False
 
     @ui.button(label="Issue Resolved? Close Post Now", style=discord.ButtonStyle.green, custom_id="remind-close-now")
-    async def on_close_now_click(self, interaction: discord.Interaction[MyClient], _: ui.Button):
+    async def on_close_now_click(self, interaction: discord.Interaction[SHBot], _: ui.Button):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(f"-# Closed by {interaction.user}")))
         await interaction.message.edit(view=new_view)
@@ -61,7 +61,7 @@ class CloseNowRow(ui.ActionRow):
 
 
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="remind-cancel")
-    async def on_cancel_click(self, interaction: discord.Interaction[MyClient], _: ui.Button):
+    async def on_cancel_click(self, interaction: discord.Interaction[SHBot], _: ui.Button):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         footer = f"-# Cancelled by {interaction.user}"
         if SOLVED_TAG_ID in interaction.channel._applied_tags:
@@ -76,7 +76,7 @@ class CloseNowRow(ui.ActionRow):
             view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
             await interaction.message.reply(view=view)
 
-    async def interaction_check(self, interaction: discord.Interaction[MyClient]) -> bool:
+    async def interaction_check(self, interaction: discord.Interaction[SHBot]) -> bool:
         self.is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
         if not (interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or self.is_owner):
             await interaction.response.send_message(content="Only Moderators, Community Experts, Developers and the post creator can use this.", ephemeral=True)
@@ -102,7 +102,7 @@ class CloseNowView(ui.LayoutView):
 
 
 class Reminders(commands.Cog):
-    def __init__(self, client: MyClient):
+    def __init__(self, client: SHBot):
         self.client = client
 
         # stores the post ids fetched in reminders_loop 'active_threads'
@@ -389,5 +389,5 @@ class Reminders(commands.Cog):
         container = ui.Container(ui.TextDisplay(content[0:4000]))
         await interaction.followup.send(view=ui.LayoutView().add_item(container), ephemeral=True)
 
-async def setup(client: MyClient):
+async def setup(client: SHBot):
     await client.add_cog(Reminders(client))

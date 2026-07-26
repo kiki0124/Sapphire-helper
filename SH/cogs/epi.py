@@ -12,7 +12,7 @@ import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
 from typing import Literal, Optional, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from main import MyClient
+    from main import SHBot
 
 load_dotenv()
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
@@ -124,7 +124,7 @@ class select_channels(ui.ChannelSelect):
         await delete_channel_permissions(channel.id)
         await interaction.followup.send(f"Successfully unlocked {channel.mention} with reason `{self.reason}`", ephemeral=True)
 
-    async def callback(self, interaction: discord.Interaction[MyClient]):
+    async def callback(self, interaction: discord.Interaction[SHBot]):
         await interaction.response.defer(ephemeral=True)
         channels = self.values # the selected channels
         fetched_channels: list[discord.TextChannel|discord.ForumChannel] = [interaction.guild.get_channel(c.id) or await c.fetch() for c in channels]
@@ -159,7 +159,7 @@ class select_channels(ui.ChannelSelect):
             await self.i.edit_original_response(view=None)
 
 class epi(commands.Cog):
-    def __init__(self, client: MyClient):
+    def __init__(self, client: SHBot):
         self.client = client
         self.page_webhook_id: int | None = None
         self.page_webhook_token: str | None = None
@@ -729,5 +729,5 @@ class epi(commands.Cog):
                 print(req.status)
                 self.status_page = req.status == 200 # true if the status is 200 - OK, else false
 
-async def setup(client: MyClient):
+async def setup(client: SHBot):
     await client.add_cog(epi(client))

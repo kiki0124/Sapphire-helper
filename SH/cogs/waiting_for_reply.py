@@ -9,7 +9,7 @@ from functions import generate_random_id, get_post_creator_id
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from main import MyClient
+    from main import SHBot
 
 load_dotenv()
 SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
@@ -20,7 +20,7 @@ UNANSWERED_TAG_ID = int(os.getenv("UNANSWERED_TAG_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 
 class waiting_for_reply(commands.Cog):
-    def __init__(self, client: MyClient):
+    def __init__(self, client: SHBot):
         self.client = client
         
     posts: dict[int, asyncio.Task] = {}
@@ -64,5 +64,5 @@ class waiting_for_reply(commands.Cog):
             await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag")
             await self.client.send_log(thread_id=ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
 
-async def setup(client: MyClient):
+async def setup(client: SHBot):
     await client.add_cog(waiting_for_reply(client))
