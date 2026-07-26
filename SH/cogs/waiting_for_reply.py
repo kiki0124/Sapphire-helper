@@ -20,27 +20,27 @@ UNANSWERED_TAG_ID = int(os.getenv("UNANSWERED_TAG_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 
 class waiting_for_reply(commands.Cog):
-    def __init__(self, client: SHBot):
-        self.client = client
+    def __init__(self, bot: SHBot):
+        self.bot = bot
         
     posts: dict[int, asyncio.Task] = {}
 
     async def add_waiting_tag(self, post: discord.Thread) -> None:
         wfr = post.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
         await asyncio.sleep(600) # wait for 10 minutes to prevent rate limits
-        refreshed_post = self.client.get_channel(post.id) or await self.client.fetch_channel(post.id)
+        refreshed_post = self.bot.get_channel(post.id) or await self.bot.fetch_channel(post.id)
         applied_tags = refreshed_post.applied_tags
         if SOLVED_TAG_ID not in refreshed_post._applied_tags and NEED_DEV_REVIEW_TAG_ID not in refreshed_post._applied_tags and not refreshed_post.archived and not refreshed_post.locked:
             action_id = generate_random_id()
             applied_tags.append(wfr)
             await post.edit(applied_tags=applied_tags, reason=f"ID: {action_id}. Waiting for reply system")
-            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=applied_tags, context="Add Waiting for reply")
+            await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=applied_tags, context="Add Waiting for reply")
             self.posts.pop(post.id)
 
     @commands.Cog.listener('on_message')
     async def add_remove_waiting_for_reply(self, message: discord.Message):
         channel_id = message.channel.id
-        if message.author.id == self.client.user.id or not isinstance(message.channel, discord.Thread) or message.channel.parent_id != SUPPORT_CHANNEL_ID:
+        if message.author.id == self.bot.user.id or not isinstance(message.channel, discord.Thread) or message.channel.parent_id != SUPPORT_CHANNEL_ID:
             return
 
         support = message.channel.parent
@@ -62,7 +62,7 @@ class waiting_for_reply(commands.Cog):
             tags = message.channel.applied_tags
             tags.remove(wfr)
             await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Remove waiting for reply tag")
-            await self.client.send_log(thread_id=ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
+            await self.bot.send_log(thread_id=ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Remove waiting for reply tag")
 
-async def setup(client: SHBot):
-    await client.add_cog(waiting_for_reply(client))
+async def setup(bot: SHBot):
+    await bot.add_cog(waiting_for_reply(bot))

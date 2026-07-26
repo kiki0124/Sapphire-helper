@@ -102,8 +102,8 @@ class CloseNowView(ui.LayoutView):
 
 
 class Reminders(commands.Cog):
-    def __init__(self, client: SHBot):
-        self.client = client
+    def __init__(self, bot: SHBot):
+        self.bot = bot
 
         # stores the post ids fetched in reminders_loop 'active_threads'
         # used for debugging purposes
@@ -127,7 +127,7 @@ class Reminders(commands.Cog):
 
     @commands.Cog.listener("on_ready")
     async def add_persistent_view(self):
-        self.client.add_view(CloseNowView())
+        self.bot.add_view(CloseNowView())
 
     async def cog_load(self):
         self.reminders_loop.start()
@@ -156,10 +156,10 @@ class Reminders(commands.Cog):
         log_start_content = (f"Reminders loop **starting**",
                             f"- Current iteration: `{self.reminders_loop.current_loop}`",
                             f"- Next iteration: {self.get_reminder_next_iteration()}")
-        start_log_msg = await self.client.send_log(ALERTS_THREAD_ID, content="\n".join(log_start_content), wait=True)
+        start_log_msg = await self.bot.send_log(ALERTS_THREAD_ID, content="\n".join(log_start_content), wait=True)
 
         await self.close_pending_posts()
-        support_channel = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        support_channel = self.bot.get_channel(SUPPORT_CHANNEL_ID)
         if not support_channel:
             return
 
@@ -178,7 +178,7 @@ class Reminders(commands.Cog):
                             f"- Active Posts in Support: `{len(self.last_fetched_threads)}`",
                             f"- Posts checked for reminders: `{len(posts)}`")
 
-        await self.client.send_log(ALERTS_THREAD_ID, content="\n".join(log_end_content))
+        await self.bot.send_log(ALERTS_THREAD_ID, content="\n".join(log_end_content))
 
     async def filter_and_get_owner_ids(self, posts: list[discord.Thread]) -> list[int]:
         """
@@ -196,13 +196,13 @@ class Reminders(commands.Cog):
                 del posts[i]
                 continue
 
-            owner_id = post.owner_id if post.owner_id != self.client.user.id else await get_post_creator_id(post.id)
+            owner_id = post.owner_id if post.owner_id != self.bot.user.id else await get_post_creator_id(post.id)
             if owner_id is not None:
                 user_ids.append(owner_id)
         return user_ids
 
     async def close_abandoned_posts(self, posts: list[discord.Thread]):
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        support = self.bot.get_channel(SUPPORT_CHANNEL_ID)
         if not support:
             return
 
@@ -215,7 +215,7 @@ class Reminders(commands.Cog):
         for i in range(len(posts) - 1, -1, -1): # we need to do this so that we don't modify the rest of the list when we remove a post
             post = posts[i]
 
-            owner_id = post.owner_id if post.owner_id != self.client.user.id else await get_post_creator_id(post.id)
+            owner_id = post.owner_id if post.owner_id != self.bot.user.id else await get_post_creator_id(post.id)
             if owner_id in valid_owner_ids:
                 continue
 
@@ -229,7 +229,7 @@ class Reminders(commands.Cog):
             action_id = generate_random_id()
             await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
             await post.edit(archived=True, reason=f"ID: {action_id}. Post creator left the server, auto close post", applied_tags=tags)
-            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
+            await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
             del posts[i] # remove from the post so that check_for_pending_posts won't need to check for it
 
     async def check_for_pending_posts(self, posts: list[discord.Thread]):
@@ -274,7 +274,7 @@ class Reminders(commands.Cog):
             
     @commands.Cog.listener('on_message')
     async def remove_pending_posts(self, message: discord.Message):
-        if message.author.id == self.client.user.id:
+        if message.author.id == self.bot.user.id:
             return
         
         if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
@@ -295,7 +295,7 @@ class Reminders(commands.Cog):
                 continue
 
             try:
-                post = self.client.get_channel(post_id) or await self.client.fetch_channel(post_id)
+                post = self.bot.get_channel(post_id) or await self.bot.fetch_channel(post_id)
             except discord.NotFound:
                 await remove_post_from_rtdr(post_id)
                 posts_to_remove.append(post_id)
@@ -317,7 +317,7 @@ class Reminders(commands.Cog):
                                     applied_tags=tags) # type: ignore
                 except discord.HTTPException:
                     continue
-                await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, 
+                await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, 
                                            context=f"Close pending post")
                 await remove_post_from_rtdr(post.id)
                 posts_to_remove.append(post.id)
@@ -329,11 +329,11 @@ class Reminders(commands.Cog):
 
     @reminders_loop.before_loop
     async def reminders_loop_before_loop(self):
-        await self.client.wait_until_ready() # only start the loop when the bot's cache is ready
+        await self.bot.wait_until_ready() # only start the loop when the bot's cache is ready
 
     @reminders_loop.error
     async def reminders_loop_error(self, error: BaseException):
-        await self.client.send_unhandled_error(error, task=self.reminders_loop)
+        await self.bot.send_unhandled_error(error, task=self.reminders_loop)
 
 
     reminders_cmd_group = app_commands.Group(name="reminders", description="Commands related to reminders")
@@ -370,7 +370,7 @@ class Reminders(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send(f"Sleeping for 10 seconds to prevent clashes with reminders...")
         await asyncio.sleep(10)
-        await self.check_for_pending_posts([self.client.get_channel(post.id) or await post.fetch()])
+        await self.check_for_pending_posts([self.bot.get_channel(post.id) or await post.fetch()])
 
         await interaction.followup.send(f"Simulation complete for {post.mention}!", ephemeral=True)
 
@@ -389,5 +389,5 @@ class Reminders(commands.Cog):
         container = ui.Container(ui.TextDisplay(content[0:4000]))
         await interaction.followup.send(view=ui.LayoutView().add_item(container), ephemeral=True)
 
-async def setup(client: SHBot):
-    await client.add_cog(Reminders(client))
+async def setup(bot: SHBot):
+    await bot.add_cog(Reminders(bot))

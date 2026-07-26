@@ -113,8 +113,8 @@ class TagConfirmRow(ui.ActionRow):
 
 
 class Tags(commands.Cog):
-    def __init__(self, client: SHBot):
-        self.client = client
+    def __init__(self, bot: SHBot):
+        self.bot = bot
         self.cached_tags: list[str] = [] # tags cached to use for autocomplete and suggesting similar tags
         self.tags_lock = asyncio.Lock() # Lock to prevent mutating 'cached_tags' at the same time
         
@@ -312,5 +312,5 @@ class Tags(commands.Cog):
         view.add_item(container)
         await interaction.response.send_message(view=view, ephemeral=True)
 
-async def setup(client: SHBot):
-    await client.add_cog(Tags(client))
+async def setup(bot: SHBot):
+    await bot.add_cog(Tags(bot))

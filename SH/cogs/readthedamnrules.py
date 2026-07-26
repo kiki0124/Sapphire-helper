@@ -20,9 +20,9 @@ ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 FEEDBACK_CHANNEL_ID = int(os.getenv("FEEDBACK_CHANNEL_ID"))
 
-class readthedamnrules(commands.Cog):
-    def __init__(self, client: SHBot) -> None:
-        self.client = client
+class RTDR(commands.Cog):
+    def __init__(self, bot: SHBot) -> None:
+        self.bot = bot
 
     async def get_messages_to_move(self, reference_message: discord.Message) -> list[discord.Message]:
         """  
@@ -98,10 +98,10 @@ class readthedamnrules(commands.Cog):
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
         gallery_items, files = await self.get_media_gallery_items(messages_to_move)
         content = await self.get_content(messages_to_move)
-        support = self.client.get_channel(SUPPORT_CHANNEL_ID)
+        support = self.clbotient.get_channel(SUPPORT_CHANNEL_ID)
         title = f"Support for {reference_message.author.name}"
-        if message and message.content.removeprefix(self.client.user.mention): # make sure the message has a content beyond @sapphire helper
-            title = message.content.removeprefix(self.client.user.mention)
+        if message and message.content.removeprefix(self.bot.user.mention): # make sure the message has a content beyond @sapphire helper
+            title = message.content.removeprefix(self.bot.user.mention)
 
         view = ui.LayoutView()
 
@@ -131,7 +131,7 @@ class readthedamnrules(commands.Cog):
     
     @commands.Cog.listener('on_message')
     async def redirect_to_support(self, message: discord.Message):
-        if not message.author.bot and message.reference and message.content.startswith(self.client.user.mention) and message.guild:
+        if not message.author.bot and message.reference and message.content.startswith(self.bot.user.mention) and message.guild:
             everyone = message.guild.default_role
             if not self.is_allowed_rtdr_channel(message.channel, everyone):
                 return
@@ -153,5 +153,5 @@ class readthedamnrules(commands.Cog):
         if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
             await self.handle_request(reaction.message, user=user)
 
-async def setup(client: SHBot):
-    await client.add_cog(readthedamnrules(client))
+async def setup(bot: SHBot):
+    await bot.add_cog(RTDR(bot))

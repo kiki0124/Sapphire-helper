@@ -120,5 +120,5 @@ class DebugCog(commands.Cog):
         await functions.setup_db()
         await interaction.followup.send("Success!\n", ephemeral=True)
 
-async def setup(client: SHBot):
-    await client.add_cog(DebugCog(client))
+async def setup(bot: SHBot):
+    await bot.add_cog(DebugCog(bot))

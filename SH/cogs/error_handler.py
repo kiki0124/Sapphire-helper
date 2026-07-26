@@ -21,12 +21,12 @@ if TYPE_CHECKING:
 	from main import SHBot
 
 class ErrorHandler(commands.Cog):
-	def __init__(self, client: SHBot):
-		self.client = client
+	def __init__(self, bot: SHBot):
+		self.bot = bot
 	
 
 	def cog_load(self):
-		self.client.tree.on_error = self.on_tree_error
+		self.bot.tree.on_error = self.on_tree_error
 
 
 	@commands.Cog.listener()
@@ -44,7 +44,7 @@ class ErrorHandler(commands.Cog):
 			error_message = f"This command is on cooldown for another **{e.retry_after:.2f} seconds**!"
 			await ctx.reply(content=error_message, mention_author=False)
 		else:
-			await self.client.send_unhandled_error(e) # send error to #sapphire-helper-alerts thread under sapphire-experts channel
+			await self.bot.send_unhandled_error(e) # send error to #sapphire-helper-alerts thread under sapphire-experts channel
 			raise e
 
 
@@ -59,7 +59,7 @@ class ErrorHandler(commands.Cog):
 		elif isinstance(e, app_commands.TransformerError) and e.transformer._error_display_name == "Member":
 			await interaction.response.send_message(f"`{e.value}` is not a member of this server!", ephemeral=True)
 		else:
-			await self.client.send_unhandled_error(e, interaction=interaction)
+			await self.bot.send_unhandled_error(e, interaction=interaction)
 			print_exception(e)
 
 
@@ -104,5 +104,5 @@ class ErrorHandler(commands.Cog):
 		
 		await interaction.response.send_message(error_message, ephemeral=True)
 
-async def setup(client: SHBot):
-	await client.add_cog(ErrorHandler(client))
+async def setup(bot: SHBot):
+	await bot.add_cog(ErrorHandler(bot))
