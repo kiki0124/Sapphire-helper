@@ -56,6 +56,8 @@ class ErrorHandler(commands.Cog):
 		"""
 		if isinstance(e, app_commands.CheckFailure):
 			await self.handle_app_command_check_failure(interaction, e)
+		elif isinstance(e, app_commands.TransformerError) and e.transformer._error_display_name == "Member":
+			await interaction.response.send_message(f"`{e.value}` is not a member of this server!", ephemeral=True)
 		else:
 			await self.client.send_unhandled_error(e, interaction=interaction)
 			print_exception(e)
