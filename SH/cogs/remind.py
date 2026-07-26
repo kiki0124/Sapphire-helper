@@ -180,28 +180,49 @@ class Reminders(commands.Cog):
 
         await self.client.send_log(ALERTS_THREAD_ID, content="\n".join(log_end_content))
 
+    async def filter_and_get_owner_ids(self, posts: list[discord.Thread]) -> list[int]:
+        """
+        Remove posts that are:
+            - Not from support
+            - Locked
+            - Have solved or NDR tag
+
+        Finally, it returns a list of owner ids
+        """
+        user_ids: list[int] = []
+        for i in range(len(posts) - 1, -1, -1): # we need to do this so that we don't modify the rest of the list when we remove a post
+            post = posts[i]
+            if post.parent_id != SUPPORT_CHANNEL_ID or post.locked or any(tag_id in post._applied_tags for tag_id in (SOLVED_TAG_ID, NEED_DEV_REVIEW_TAG_ID)):
+                del posts[i]
+                continue
+
+            owner_id = post.owner_id if post.owner_id != self.client.user.id else await get_post_creator_id(post.id)
+            if owner_id is not None:
+                user_ids.append(owner_id)
+        return user_ids
+
     async def close_abandoned_posts(self, posts: list[discord.Thread]):
         support = self.client.get_channel(SUPPORT_CHANNEL_ID)
         if not support:
             return
 
+        owner_ids = await self.filter_and_get_owner_ids(posts)
+        if not owner_ids:
+            return
+        # owner ids of which are still in the server
+        valid_owner_ids = {m.id for m in await support.guild.query_members(user_ids=owner_ids)}
+
         for i in range(len(posts) - 1, -1, -1): # we need to do this so that we don't modify the rest of the list when we remove a post
             post = posts[i]
-            if post.parent_id != SUPPORT_CHANNEL_ID or post.locked or NEED_DEV_REVIEW_TAG_ID in post._applied_tags:
-                continue
-            
-            if SOLVED_TAG_ID in post._applied_tags: # /solved could've been used as the post doesn't get archived immediately
-                del posts[i]
-                continue
 
-            owner = post.guild.get_member(await get_post_creator_id(post.id)) or post.owner
-            if owner is not None: # post owner/creator will be None if they left the server
+            owner_id = post.owner_id if post.owner_id != self.client.user.id else await get_post_creator_id(post.id)
+            if owner_id in valid_owner_ids:
                 continue
 
             tags = [support.get_tag(SOLVED_TAG_ID)]
             cb = support.get_tag(CUSTOM_BRANDING_TAG_ID)
             appeal = support.get_tag(APPEAL_GG_TAG_ID)
-            if CUSTOM_BRANDING_TAG_ID in post._applied_tags: 
+            if CUSTOM_BRANDING_TAG_ID in post._applied_tags:
                 tags.append(cb)
             if APPEAL_GG_TAG_ID in post._applied_tags:
                 tags.append(appeal)
@@ -210,7 +231,6 @@ class Reminders(commands.Cog):
             await post.edit(archived=True, reason=f"ID: {action_id}. Post creator left the server, auto close post", applied_tags=tags)
             await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
             del posts[i] # remove from the post so that check_for_pending_posts won't need to check for it
-
 
     async def check_for_pending_posts(self, posts: list[discord.Thread]):
         posts_to_add: list[int] = []
@@ -254,7 +274,7 @@ class Reminders(commands.Cog):
             
     @commands.Cog.listener('on_message')
     async def remove_pending_posts(self, message: discord.Message):
-        if message.author == self.client.user:
+        if message.author.id == self.client.user.id:
             return
         
         if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:

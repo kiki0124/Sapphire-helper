@@ -21,7 +21,7 @@ MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
-class bot(commands.Cog):
+class Bot(commands.Cog):
     def __init__(self, client: MyClient):
         self.client = client
         self.last_restarted = time.time()
@@ -84,4 +84,4 @@ class bot(commands.Cog):
         await ctx.reply(view=view, mention_author=False)
 
 async def setup(client: MyClient):
-    await client.add_cog(bot(client))
+    await client.add_cog(Bot(client))

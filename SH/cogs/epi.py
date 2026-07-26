@@ -570,7 +570,7 @@ class epi(commands.Cog):
         # set the webhook ID and token (if needed)
         await self.set_webhook_page(followup.channel)
 
-        xge = self.client.get_user(XGE_USER_ID) or await self.client.fetch_user(XGE_USER_ID) 
+        xge = await self.client.fetch_user(XGE_USER_ID) 
         async with aiohttp.ClientSession(trust_env=True) as session:
             data = {
                 "topic": NTFY_TOPIC_NAME,

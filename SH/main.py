@@ -21,7 +21,6 @@ class MyClient(commands.Bot):
         intents.message_content = True
         intents.guild_messages = True
         intents.guilds = True
-        intents.members = True
         intents.guild_reactions = True
         super().__init__(PREFIX, help_command=None, intents=intents, strip_after_prefix=True, 
                         allowed_contexts=app_commands.AppCommandContext(guild=True),
