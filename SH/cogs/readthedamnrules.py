@@ -98,7 +98,7 @@ class RTDR(commands.Cog):
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
         gallery_items, files = await self.get_media_gallery_items(messages_to_move)
         content = await self.get_content(messages_to_move)
-        support = self.clbotient.get_channel(SUPPORT_CHANNEL_ID)
+        support = self.bot.get_channel(SUPPORT_CHANNEL_ID)
         title = f"Support for {reference_message.author.name}"
         if message and message.content.removeprefix(self.bot.user.mention): # make sure the message has a content beyond @sapphire helper
             title = message.content.removeprefix(self.bot.user.mention)
