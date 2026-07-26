@@ -166,9 +166,9 @@ class SolvedViewWithNDR(ui.LayoutView):
         self.add_item(container)
 
 
-class utility(commands.Cog):
-    def __init__(self, client: SHBot):
-        self.client = client
+class Utility(commands.Cog):
+    def __init__(self, bot: SHBot):
+        self.bot = bot
 
     close_tasks: dict[int, asyncio.Task] = {} # posts that are waiting to be closed with their respective asyncio.Task
 
@@ -184,8 +184,8 @@ class utility(commands.Cog):
         self.close_tasks.pop(post.id)
         await remove_post_from_rtdr(post.id)
         await remove_post_from_pending(post.id)
-        if post.id in self.client.incomplete_msg_posts:
-            self.client.incomplete_msg_posts.remove(post.id)
+        if post.id in self.bot.incomplete_msg_posts:
+            self.bot.incomplete_msg_posts.remove(post.id)
 
     async def mark_post_as_solved(self, post: discord.Thread) -> None:
         """  
@@ -202,7 +202,7 @@ class utility(commands.Cog):
             tags.append(appeal)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post marked as solved with /solved")
-        await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
+        await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/solved used")
         task = asyncio.create_task(self.close_post(post=post))
         self.close_tasks[post.id] = task
 
@@ -213,7 +213,7 @@ class utility(commands.Cog):
         solved = [post.parent.get_tag(SOLVED_TAG_ID)]
         action_id = generate_random_id()
         await post.edit(locked=True, applied_tags=solved, reason=f'ID: {action_id}. Post locked as it was not sapphire related')
-        await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=solved, context="/unrelated used")
+        await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=solved, context="/unrelated used")
         asyncio.create_task(self.close_post(post=post, close_delay=600))
 
     async def unsolve_post(self, post: discord.Thread) -> None:
@@ -233,7 +233,7 @@ class utility(commands.Cog):
             tags.append(appeal)
         action_id = generate_random_id()
         await post.edit(applied_tags=tags, reason=f"ID: {action_id}. Post unsolved with /unsolve")
-        await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/unsolve used")
+        await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/unsolve used")
 
     @staticmethod
     async def one_of_mod_expert_op(interaction: discord.Interaction):
@@ -256,7 +256,7 @@ class utility(commands.Cog):
 
     @commands.Cog.listener("on_ready")
     async def add_persistent_view(self):
-        self.client.add_view(NeedDevReviewView())
+        self.bot.add_view(NeedDevReviewView())
 
     @app_commands.command(name="solved", description="Mark the current post as solved")
     @app_commands.check(one_of_mod_expert_op)
@@ -267,7 +267,7 @@ class utility(commands.Cog):
                 await interaction.response.send_message("Archiving post...", ephemeral=True)
                 await interaction.channel.edit(archived=True)
                 return
-            await interaction.response.send_message(view=SolvedView(await self.client.get_unsolve_id()))
+            await interaction.response.send_message(view=SolvedView(await self.bot.get_unsolve_id()))
             await self.mark_post_as_solved(interaction.channel)
         else:
             await interaction.response.send_message(view=SolvedViewWithNDR(self.mark_post_as_solved), ephemeral=True)
@@ -287,7 +287,7 @@ class utility(commands.Cog):
         await interaction.channel.remove_user(user)
         await interaction.response.send_message(content=f"Successfully removed {user.mention} from this post.", ephemeral=True)
 
-        alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+        alerts_thread = self.bot.get_channel(ALERTS_THREAD_ID) or await self.bot.fetch_channel(ALERTS_THREAD_ID)
         await alerts_thread.send(f"{interaction.user.mention} removed {user.mention} from {interaction.channel.mention}.\nReason: {reason}", allowed_mentions=discord.AllowedMentions.none())
 
     @app_commands.command(name="unsolve", description="Cancel the post from being closed")
@@ -300,7 +300,7 @@ class utility(commands.Cog):
             else:
                 title = "### Post Successfully Unsolved"
                 description = "Please send a message here explaining what you still need help with."
-                footer = f"-# When the issue is resolved, you may use </solved:{await self.client.get_solved_id()}> to mark it as solved."
+                footer = f"-# When the issue is resolved, you may use </solved:{await self.bot.get_solved_id()}> to mark it as solved."
                 view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(title), ui.Separator(visible=False), 
                                                              ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
                 await interaction.response.send_message(view=view)
@@ -321,7 +321,7 @@ class utility(commands.Cog):
             await interaction.response.send_message(f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
 
     async def send_qr_log(self, message: discord.Message, user: discord.Member):
-        await self.client.send_log(QR_LOG_THREAD_ID, content=f"Message deleted by {user.mention} in {message.channel.mention}\nMessage id: `{message.id}`")
+        await self.bot.send_log(QR_LOG_THREAD_ID, content=f"Message deleted by {user.mention} in {message.channel.mention}\nMessage id: `{message.id}`")
 
     def get_user_id_from_avatar(self, avatar_url: str) -> int | None:
         """Gets the user_id from a users avatar"""
@@ -341,7 +341,7 @@ class utility(commands.Cog):
         in_support = isinstance(reaction.message.channel, discord.Thread) \
             and reaction.message.channel.parent_id == SUPPORT_CHANNEL_ID
         from_sapphire_or_helper = reaction.message.author.id == 678344927997853742 or \
-                                reaction.message.author.id == self.client.user.id
+                                reaction.message.author.id == self.bot.user.id
         reaction_allowed = reaction.emoji in ("🗑️", "❌")
         if not in_support or not from_sapphire_or_helper or not reaction_allowed:
             return
@@ -441,7 +441,7 @@ class utility(commands.Cog):
             await ctx.reply("You cannot use this command as this post has the *Solved* or *Needs dev review* tag.", ephemeral=True, delete_after=3)
             return
         
-        if ctx.channel.id in self.client.incomplete_msg_posts:
+        if ctx.channel.id in self.bot.incomplete_msg_posts:
             await ctx.reply("You cannot use this command as an automatic message was already sent.", ephemeral=True, delete_after=5)
             return
         user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
@@ -467,7 +467,7 @@ class utility(commands.Cog):
                 tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
             action_id = generate_random_id()
             await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
-            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=ctx.channel.mention, tags=tags, context="/incomplete-post used")
+            await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=ctx.channel.mention, tags=tags, context="/incomplete-post used")
         await ctx.channel.send(
             view=view,
             allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
@@ -529,5 +529,5 @@ class utility(commands.Cog):
         await interaction.delete_original_response()
             
 
-async def setup(client: SHBot):
-    await client.add_cog(utility(client))
+async def setup(bot: SHBot):
+    await bot.add_cog(Utility(bot))

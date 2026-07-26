@@ -93,13 +93,13 @@ class ConfirmCloseView(ui.LayoutView):
         self.add_item(self.container)
 
 
-class autoadd(commands.Cog):
-    def __init__(self, client: SHBot):
-        self.client = client
+class AutoAdd(commands.Cog):
+    def __init__(self, bot: SHBot):
+        self.bot = bot
         
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):
-        self.client.add_view(ConfirmCloseView())
+        self.bot.add_view(ConfirmCloseView())
 
     sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
@@ -118,13 +118,13 @@ class autoadd(commands.Cog):
         tags.append(thread.parent.get_tag(UNANSWERED_TAG_ID))
         action_id = generate_random_id()
         await thread.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-add unanswered tag to a new post.")
-        await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=thread.mention, tags=tags, context="Auto add unanswered tag")
+        await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=thread.mention, tags=tags, context="Auto add unanswered tag")
         start_msg = thread.starter_message
         content_len = len(start_msg.content) if start_msg.content else 0
         if (
             content_len + len(thread.name) < 25
             or start_msg.content.casefold() == thread.name.casefold()
-            and thread.owner_id != self.client.user.id # prevent the message from sending if it was sent via rtdr
+            and thread.owner_id != self.bot.user.id # prevent the message from sending if it was sent via rtdr
         ):
             view = ui.LayoutView()
             container = ui.Container()
@@ -134,21 +134,21 @@ class autoadd(commands.Cog):
                 ui.TextDisplay(f"{random.choice(greets)}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.")
             )
             await thread.starter_message.reply(view=view, mention_author=True)
-            self.client.incomplete_msg_posts.add(thread.id)
+            self.bot.incomplete_msg_posts.add(thread.id)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if message.author.id == self.client.user.id or (message.author.id != message.channel.owner_id and message.author.id != await get_post_creator_id(message.channel.id)):
+        if message.author.id == self.bot.user.id or (message.author.id != message.channel.owner_id and message.author.id != await get_post_creator_id(message.channel.id)):
             return
         tags = message.channel._applied_tags
         if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
             pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
             negative_pattern = r"doe?s?n.?t|hasn.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t|advance\b|ahead o?f? time"
             if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
-                await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.client.get_solved_id()}>")
+                await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.bot.get_solved_id()}>")
                 self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
-        if UNANSWERED_TAG_ID not in message.channel._applied_tags or message.author.id == self.client.user.id:
+        if UNANSWERED_TAG_ID not in message.channel._applied_tags or message.author.id == self.bot.user.id:
             return
         applied_tags = message.channel.applied_tags
         owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
@@ -162,11 +162,11 @@ class autoadd(commands.Cog):
                 tags.append(appeal)
             action_id = generate_random_id()
             await message.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-remove unanswered tag and replace with not solved tag")
-            await self.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
+            await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
 
     @commands.Cog.listener('on_raw_message_delete')
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
-        message_channel = self.client.get_channel(payload.channel_id)
+        message_channel = self.bot.get_channel(payload.channel_id)
         is_in_support = isinstance(message_channel, discord.Thread) \
                     and message_channel.parent_id == SUPPORT_CHANNEL_ID
         is_starter_message = payload.message_id == payload.channel_id
@@ -180,5 +180,5 @@ class autoadd(commands.Cog):
                     view=ConfirmCloseView(post_author=owner_id)
                 )
 
-async def setup(client: SHBot):
-    await client.add_cog(autoadd(client))
+async def setup(bot: SHBot):
+    await bot.add_cog(AutoAdd(bot))

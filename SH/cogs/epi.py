@@ -158,9 +158,9 @@ class select_channels(ui.ChannelSelect):
             await interaction.client.send_log(EPI_LOG_THREAD_ID, content=f"{interaction.user.mention} {action_str} in {', '.join([f'<#{c}>' for c in successful])}. Reason: {self.reason}")
             await self.i.edit_original_response(view=None)
 
-class epi(commands.Cog):
-    def __init__(self, client: SHBot):
-        self.client = client
+class EPI(commands.Cog):
+    def __init__(self, bot: SHBot):
+        self.bot = bot
         self.page_webhook_id: int | None = None
         self.page_webhook_token: str | None = None
 
@@ -208,7 +208,7 @@ class epi(commands.Cog):
 
     @commands.Cog.listener("on_ready")
     async def add_persistent_view(self):
-        self.client.add_view(GetNotifiedView())
+        self.bot.add_view(GetNotifiedView())
 
     async def cog_unload(self):
         await self.pool.close()
@@ -225,14 +225,14 @@ class epi(commands.Cog):
             msg = epi_config["message"]
             self.epi_msg = msg if msg != "-" else None
             if epi_config["message_id"] and epi_config["message_id"] != 0:
-                status = discord.utils.get(self.client.get_all_channels(), name="status", type=discord.ChannelType.news)
+                status = discord.utils.get(self.bot.get_all_channels(), name="status", type=discord.ChannelType.news)
                 if status:
                     try:
                         Message = await status.fetch_message(epi_config["message_id"])
                     except discord.NotFound as e:
                         await update_epi_message_id(self.pool, 0) # remove the message id from the db
                         try:
-                            alerts_thread = self.client.get_channel(ALERTS_THREAD_ID) or await self.client.fetch_channel(ALERTS_THREAD_ID)
+                            alerts_thread = self.bot.get_channel(ALERTS_THREAD_ID) or await self.bot.fetch_channel(ALERTS_THREAD_ID)
                         except discord.NotFound as e2:
                             raise ExceptionGroup('Tried to fetch message and Alerts Thread', [e, e2])
                         await alerts_thread.send(f"Tried to fetch epi Message from {status.mention} with id {epi_config['message_id']}.\n{e.status} {e.text}")
@@ -241,7 +241,7 @@ class epi(commands.Cog):
             for user_id in await get_epi_users(self.pool):
                 epi_users.append(user_id)
             if epi_config["sticky"]:
-                general = self.client.get_partial_messageable(GENERAL_CHANNEL_ID)
+                general = self.bot.get_partial_messageable(GENERAL_CHANNEL_ID)
                 if epi_config["sticky_message_id"]:
                     self.sticky_message = general.get_partial_message(epi_config["sticky_message_id"])
                 await self.handle_sticky_message(general, delay=0)
@@ -285,12 +285,12 @@ class epi(commands.Cog):
         command_response += f"\nSticky: {sticky}"
 
         content = f"EPI mode enabled by {interaction.user.mention}.\nCustom message: {message or 'not set'} | Status message: {_message.jump_url if _message else 'Not set'} | Sticky: {sticky}"
-        await self.client.send_log(EPI_LOG_THREAD_ID, content=content)
+        await self.bot.send_log(EPI_LOG_THREAD_ID, content=content)
         await interaction.followup.send(command_response, ephemeral=True)
 
     def find_message(self, message_id: int) -> Optional[discord.Message]:
-        if self.client.cached_messages:
-            for message in reversed(self.client.cached_messages):
+        if self.bot.cached_messages:
+            for message in reversed(self.bot.cached_messages):
                 if message.id == message_id:
                     return message
 
@@ -319,7 +319,7 @@ class epi(commands.Cog):
             if message:
                 content += f"\n> {message}"
             for thread_id, message_id in list(self.epi_data.values())[0].items():
-                thread = self.client.get_channel(thread_id)
+                thread = self.bot.get_channel(thread_id)
                 if not thread:
                     continue
                 try:
@@ -378,7 +378,7 @@ class epi(commands.Cog):
                     pass
                 self.sticky_message = None
             await interaction.channel.send(content=f"EPI mode successfully disabled by {interaction.user.name}.\nMentioned users: {mentioned}")
-            await self.client.send_log(EPI_LOG_THREAD_ID, content=f"EPI mode disabled by {interaction.user.mention}\nCustom message: {message or 'not set'}")
+            await self.bot.send_log(EPI_LOG_THREAD_ID, content=f"EPI mode disabled by {interaction.user.mention}\nCustom message: {message or 'not set'}")
 
         button.callback = on_button_click
         view = discord.ui.View()
@@ -522,14 +522,14 @@ class epi(commands.Cog):
         """
         if self.page_webhook_id is not None:
             try:
-                webhook = await self.client.fetch_webhook(self.page_webhook_id)
+                webhook = await self.bot.fetch_webhook(self.page_webhook_id)
             except discord.NotFound:
                 pass
             else:
                 if webhook.channel_id == partial_channel.id:
                     return
 
-        channel = self.client.get_channel(partial_channel.id)
+        channel = self.bot.get_channel(partial_channel.id)
         if isinstance(channel, discord.Thread):
             channel = channel.parent
 
@@ -570,7 +570,7 @@ class epi(commands.Cog):
         # set the webhook ID and token (if needed)
         await self.set_webhook_page(followup.channel)
 
-        xge = await self.client.fetch_user(XGE_USER_ID) 
+        xge = await self.bot.fetch_user(XGE_USER_ID) 
         async with aiohttp.ClientSession(trust_env=True) as session:
             data = {
                 "topic": NTFY_TOPIC_NAME,
@@ -617,9 +617,9 @@ class epi(commands.Cog):
                 if res.status == 200: # OK
                     if user:
                         service = title.removesuffix(f" | Sent by @{user.name}")
-                        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"{user.mention} used /page. Service: {service} | Message: `{description}` | Priority: {priority} | Custom Branding Affected: {cb_affected}\n-# ID: [{case_id}]({followup.jump_url})")
+                        await self.bot.send_log(EPI_LOG_THREAD_ID, content=f"{user.mention} used /page. Service: {service} | Message: `{description}` | Priority: {priority} | Custom Branding Affected: {cb_affected}\n-# ID: [{case_id}]({followup.jump_url})")
                     else:
-                        await self.client.send_log(EPI_LOG_THREAD_ID, content=f"Sent automated page for ratelimits | Priority: {priority}\n-# ID: [{case_id}]({followup.jump_url})")    
+                        await self.bot.send_log(EPI_LOG_THREAD_ID, content=f"Sent automated page for ratelimits | Priority: {priority}\n-# ID: [{case_id}]({followup.jump_url})")    
                 else:
                     raise Exception(await res.text())
 
@@ -689,7 +689,7 @@ class epi(commands.Cog):
             return
         if XGE_USER_ID not in ratelimit_message.raw_mentions:
             return
-        experts_channel = discord.utils.get(ratelimit_message.guild.text_channels, name="sapphire-experts") or self.client.get_channel(EPI_LOG_THREAD_ID).parent
+        experts_channel = discord.utils.get(ratelimit_message.guild.text_channels, name="sapphire-experts") or self.bot.get_channel(EPI_LOG_THREAD_ID).parent
         if experts_channel is None:
             return
         msg = await experts_channel.send(f"Sending automated page for {ratelimit_message.jump_url}")
@@ -729,5 +729,5 @@ class epi(commands.Cog):
                 print(req.status)
                 self.status_page = req.status == 200 # true if the status is 200 - OK, else false
 
-async def setup(client: SHBot):
-    await client.add_cog(epi(client))
+async def setup(bot: SHBot):
+    await bot.add_cog(EPI(bot))

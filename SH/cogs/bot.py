@@ -22,8 +22,8 @@ ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class Bot(commands.Cog):
-    def __init__(self, client: SHBot):
-        self.client = client
+    def __init__(self, bot: SHBot):
+        self.bot = bot
         self.last_restarted = time.time()
 
     @staticmethod
@@ -37,7 +37,7 @@ class Bot(commands.Cog):
     @commands.dynamic_cooldown(get_cooldown_key, type=commands.BucketType.member)
     async def ping(self, ctx: commands.Context):
         start = perf_counter()
-        message = await ctx.reply(content=f"Pong!\nClient latency: {str(self.client.latency)[:4]}s", mention_author=False)
+        message = await ctx.reply(content=f"Pong!\nClient latency: {str(self.bot.latency)[:4]}s", mention_author=False)
         latency = perf_counter() - start
         await message.edit(content=f"{message.content}\nDiscord latency: {latency:.2f}s")
 
@@ -48,7 +48,7 @@ class Bot(commands.Cog):
         extensions = os.listdir(cogs_dir)
         for filename in extensions:
             if filename.endswith(".py"):
-                await self.client.reload_extension(f"cogs.{filename[:-3]}")
+                await self.bot.reload_extension(f"cogs.{filename[:-3]}")
 
         await ctx.reply(content=f"Reloaded {len(extensions)} extension(s)", mention_author=False)
 
@@ -56,7 +56,7 @@ class Bot(commands.Cog):
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def sync(self, ctx: commands.Context):
         try:
-            synced = await self.client.tree.sync()
+            synced = await self.bot.tree.sync()
         except discord.app_commands.CommandSyncFailure as error:
             await ctx.reply(content=f"Command Sync Failure.\n`{error.text}`", mention_author=False)
             return
@@ -73,7 +73,7 @@ class Bot(commands.Cog):
                      f"- **CPU Load:** {psutil.cpu_percent()}%",
                      f"- **Available memory:** {str(round(psutil.virtual_memory()[0]/1000000000))}GB",
                      f"- **Memory Usage:** {psutil.virtual_memory()[2]}%",
-                     f"- **Uptime (since)**: <t:{int(self.client.uptime)}:R>",
+                     f"- **Uptime (since)**: <t:{int(self.bot.uptime)}:R>",
                      f"- **Last Restarted**: <t:{int(self.last_restarted)}:R>",
                      f"-# discord.py version {discord.__version__}")
         
@@ -83,5 +83,5 @@ class Bot(commands.Cog):
         view.add_item(container)
         await ctx.reply(view=view, mention_author=False)
 
-async def setup(client: SHBot):
-    await client.add_cog(Bot(client))
+async def setup(bot: SHBot):
+    await bot.add_cog(Bot(bot))
