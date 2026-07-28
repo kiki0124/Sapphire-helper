@@ -1,5 +1,5 @@
 from __future__ import annotations
-import datetime
+from datetime import datetime, UTC, timedelta
 import asqlite as sql
 from string import ascii_letters, digits
 import random
@@ -37,13 +37,13 @@ def generate_random_id() -> str:
     characters = ascii_letters + digits
     return ''.join(random.choice(characters) for _ in range(6))
 
-def check_time_more_than(timestamp: float, to_compare: datetime.timedelta) -> bool:
+def check_time_more_than(timestamp: float, to_compare: timedelta) -> bool:
     """  
     Check if the given timestamp is older than to_compare(e.g 1d) ago
     """
-    timestamp_dt = datetime.datetime.fromtimestamp(timestamp, datetime.UTC)
+    timestamp_dt = datetime.fromtimestamp(timestamp, UTC)
 
-    return timestamp_dt + to_compare <  datetime.datetime.now(datetime.UTC)
+    return timestamp_dt + to_compare <  datetime.now(UTC)
 
 def format_list(items: Sequence, conjunction: str = "or") -> str:
     return ", ".join(items[:-1]) + f" {conjunction} " + items[-1]
@@ -86,7 +86,7 @@ async def execute_sql(cmd: str) -> dict[str, Any] | Exception:
             return sql_to_dict(result)
         
 async def bulk_add_posts_to_pending(post_ids: list[int]) -> None:
-    now = int(datetime.datetime.now(datetime.UTC).timestamp())
+    now = int(datetime.now(UTC).timestamp())
     args = ((post_id, now) for post_id in post_ids)
 
     async with sql.connect(DB_PATH) as conn:
@@ -100,7 +100,7 @@ async def add_post_to_pending(post_id: int) -> None:
     """
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
-            timestamp = int(datetime.datetime.now(datetime.UTC).timestamp())
+            timestamp = int(datetime.now(UTC).timestamp())
             await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, timestamp,))
             await conn.commit()
 
@@ -230,7 +230,7 @@ async def remove_post_from_waiting(post_id: int) -> None:
 
 async def add_post_to_waiting(post_id: int, timestamp: int | None = None) -> None:
     if timestamp is None: 
-        timestamp = int(datetime.datetime.now(datetime.UTC).timestamp())
+        timestamp = int(datetime.now(UTC).timestamp())
     async with sql.connect(DB_PATH) as conn:
         async with conn.cursor() as cu:
             await cu.execute("INSERT INTO reminder_waiting (post_id, timestamp) VALUES (?, ?)", (post_id, timestamp,))
@@ -282,7 +282,7 @@ async def check_tag_exists(name: str) -> bool:
 async def save_tag( name: str, content: str, creator_id: int):
     async with sql.connect(DB_PATH) as conn:
         await conn.execute("INSERT INTO tags (name, content, creator_id, created_ts) VALUES (?, ?, ?, ?)", 
-                           (name, content, creator_id, round(datetime.datetime.now(datetime.UTC).timestamp())))
+                           (name, content, creator_id, round(datetime.now(UTC).timestamp())))
         await conn.commit()
 
 async def get_tag_content(name: str) -> str | None:
@@ -331,10 +331,9 @@ async def delete_tag(name: str):
 
 # EPI
 
-async def save_epi_config(pool: sql.Pool ,sticky: bool, message: str = '-', message_id: int = 0, sticky_message_id: int | None = None) -> None:
+async def save_epi_config(pool: sql.Pool, started_at: str, sticky: bool, message: str = '-', message_id: int = 0, sticky_message_id: int | None = None) -> None:
     async with pool.acquire() as conn:
-        now_timestamp = datetime.datetime.now(datetime.UTC).isoformat()
-        await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky, sticky_message_id) VALUES (?, ?, ?, ?, ?)", (now_timestamp, message, message_id, sticky, sticky_message_id,))
+        await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky, sticky_message_id) VALUES (?, ?, ?, ?, ?)", (started_at, message, message_id, sticky, sticky_message_id,))
         await conn.commit()
 
 async def add_epi_user(user_id: int) -> None:
@@ -347,19 +346,18 @@ async def delete_epi_user(user_id: int) -> None:
         await conn.execute("DELETE FROM epi_users WHERE user_id=?", (user_id,))
         await conn.commit()
 
-async def get_epi_users(pool: sql.Pool) -> list[Optional[int]]:
+async def get_epi_users(pool: sql.Pool) -> list[int]:
     async with pool.acquire() as conn:
         result = await conn.fetchall("SELECT user_id FROM epi_users")
         if result: 
             return [row['user_id'] for row in result] # the first (and only) item in the user's id as an integer
-        else: 
-            return []
+        return []
 
-async def get_epi_config(pool: sql.Pool) -> dict[str, Any]: # {"started_ts": 123, "message": "low taper fade is still massive", "message_id": 123, sticky: True}
+async def get_epi_config(pool: sql.Pool) -> dict[str, Any]: # {"started_at": 123, "message": "low taper fade is still massive", "message_id": 123, sticky: True}
     """  
     Returns a dict of the saved config in this format
     {
-        "started_iso": int(123),
+        "started_at": 123,
         "message": str("low taper fade is still massive") | None,
         "message_id": int(123456) | None,
         "sticky": bool(False),
@@ -370,7 +368,7 @@ async def get_epi_config(pool: sql.Pool) -> dict[str, Any]: # {"started_ts": 123
         result = await conn.fetchone("SELECT * FROM epi_config")
         if result:
             return {
-                "started_iso": result['started_iso'],
+                "started_at": int(datetime.fromisoformat(result['started_iso']).timestamp()),
                 "message": result['message'],
                 "message_id": result['message_id'],
                 "sticky": result['sticky'],
@@ -442,10 +440,7 @@ async def update_epi_sticky(pool: sql.Pool, value: bool) -> None:
         await conn.execute("UPDATE epi_config SET sticky=?", (value,))
         await conn.commit()
 
-async def update_epi_iso(pool: sql.Pool, value: str) -> None:
-    """  
-    Takes the value as a string of utcnow.isoformat
-    """
+async def update_epi_started_at(pool: sql.Pool, timestamp: int) -> None:
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE epi_config SET started_iso=?", (value,))
+        await conn.execute("UPDATE epi_config SET started_iso=?", (datetime.fromtimestamp(timestamp, UTC).isoformat(),))
         await conn.commit()
