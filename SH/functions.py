@@ -331,9 +331,9 @@ async def delete_tag(name: str):
 
 # EPI
 
-async def save_epi_config(pool: sql.Pool, started_at: str, sticky: bool, message: str = '-', message_id: int = 0, sticky_message_id: int | None = None) -> None:
+async def save_epi_config(pool: sql.Pool, started_at: str, sticky: bool, message: str = '-', status_message_id: int = 0, sticky_message_id: int | None = None) -> None:
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky, sticky_message_id) VALUES (?, ?, ?, ?, ?)", (started_at, message, message_id, sticky, sticky_message_id,))
+        await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky, sticky_message_id) VALUES (?, ?, ?, ?, ?)", (started_at, message, status_message_id, sticky, sticky_message_id,))
         await conn.commit()
 
 async def add_epi_user(user_id: int) -> None:
