@@ -303,7 +303,7 @@ class EPI(commands.Cog):
 
     async def disable_sticky_message(self):
         while self.epi_data.is_being_executed:
-            await asyncio.sleep(1) # self.is_being_executed is true at lines 196-197 - async handle_sticky_message, when the previous sticky message is deleted and the new one is being sent. 0.1 should probably be enough for these things to happen
+            await asyncio.sleep(1) # self.is_being_executed is true at lines 196-197 - async handle_sticky_message, when the previous sticky message is deleted and the new one is being sent. 1 should probably be enough for these things to happen
 
         if self.epi_data.sticky_message is not None:
             try:
@@ -487,7 +487,7 @@ class EPI(commands.Cog):
 
     @group.command(name="edit", description="Edit current EPI information")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    @app_commands.describe(message="A custom text message to be displayed. Leave empty to not edit or '-' to remove.", status_message_id="ID of a message from #status to be displayed. Leave empty to not edit or '- to remove", sticky="Should a sticky message be created in #general? Leave empty to not edit.")
+    @app_commands.describe(message="A custom text message to be displayed. Leave empty to not edit or '-' to remove.", status_message_id="ID of a message from #status to be displayed. Leave empty to not edit or '-' to remove", sticky="Should a sticky message be created in #general? Leave empty to not edit.")
     async def edit(self, interaction: discord.Interaction, message: str | None = None, status_message_id: str | None = None, sticky: bool | None = None):
         await interaction.response.defer(ephemeral=True)
         if not self.epi_data:
