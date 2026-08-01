@@ -11,9 +11,12 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Fixed `/unrelated` command not adding `not-solved` tag. ([#82](https://github.com/kiki0124/Sapphire-helper/issues/82))
+- Fixed posts getting archived even though they should only be archived in an hour when using `/solved`
+- Updated required discord.py version to `2.7.1` in `requirements.txt`
 
 ### Notable Internal Changes
 - Removal of `members` (privileged) Intent ([#84](https://github.com/kiki0124/Sapphire-helper/issues/84))
+- Simplifying and Optimising EPI ([#91](https://github.com/kiki0124/Sapphire-helper/issues/91))
 
 
 ## [6.2] - 21/7/26
