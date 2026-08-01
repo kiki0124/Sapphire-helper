@@ -264,8 +264,12 @@ class Utility(commands.Cog):
     async def solved(self, interaction: discord.Interaction):
         if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags and "forwarded" not in interaction.channel.name.casefold():
             if SOLVED_TAG_ID in interaction.channel._applied_tags:
-                await interaction.response.send_message("Archiving post...", ephemeral=True)
-                await interaction.channel.edit(archived=True)
+                if interaction.channel_id not in self.close_tasks:
+                    # Only archive if it was already archived a long time ago
+                    await interaction.response.send_message("Post already solved, re-archiving post...", ephemeral=True)
+                    await interaction.channel.edit(archived=True)
+                else:
+                    await interaction.response.send_message("Post already solved...", ephemeral=True)
                 return
             await interaction.response.send_message(view=SolvedView(await self.bot.get_unsolve_id()))
             await self.mark_post_as_solved(interaction.channel)
