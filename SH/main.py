@@ -116,5 +116,7 @@ class SHBot(commands.Bot):
             elif command.name == "unsolve":
                 self.unsolve_cmd_id = command.id
 
+    async def on_ready(self):
+        print(f"Bot is ready. Logged in as {self.user.name}")
 
 SHBot().run(TOKEN)
