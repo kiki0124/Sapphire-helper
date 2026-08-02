@@ -7,8 +7,6 @@ from functions import setup_db
 import unittest, test_functions
 from pathlib import Path
 import time
-from aiocache import cached
-
 load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -31,6 +29,9 @@ class SHBot(commands.Bot):
         self.incomplete_msg_posts: set[int] = set() # list of the post ids
         self.uptime = time.time() # used in cogs/bot,py
 
+        self.solved_cmd_id: int = 1274997472162349079
+        self.unsolve_cmd_id: int = 1281211280618950708
+
     async def setup_hook(self):
         unittest.main(test_functions, exit=False)
         await setup_db() # function that creates the db tables if they don't already exist
@@ -41,6 +42,8 @@ class SHBot(commands.Bot):
                 print(f"Loaded extension {filename[:-3]}")
             else:
                 print(f"Skipped loading {filename[:-3]}")
+
+        await self.set_solved_unsolve_ids()
 
     async def send_log(self, thread_id: int, *, content: str = "", **kwargs) -> discord.WebhookMessage | None:
         if 'action_id' in kwargs:
@@ -102,29 +105,16 @@ class SHBot(commands.Bot):
         await self.send_log(ALERTS_THREAD_ID, content=content, 
                             allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150), discord.Object(802167689011134474)]))
 
-    @cached()
-    async def get_unsolve_id(self) -> int:
-        """  
-        Get the id of /unsolve command.
-        This fetches the command from discord and caches the result
+
+    async def set_solved_unsolve_ids(self):
         """
-        unsolve_id = 1281211280618950708
+        Sets the `solved_cmd_id` and `unsolve_cmd_id` attributes.
+        """
         for command in await self.tree.fetch_commands():
-            if command.name == "unsolve": 
-                unsolve_id=command.id
-                break
-        return unsolve_id
+            if command.name == "solved":
+                self.solved_cmd_id = command.id
+            elif command.name == "unsolve":
+                self.unsolve_cmd_id = command.id
 
-    @cached()
-    async def get_solved_id(self):
-        solved_id = 1274997472162349079
-        for command in await self.tree.fetch_commands():
-            if command.name == "solved": 
-                solved_id=command.id
-                break
-        return solved_id
-
-    async def on_ready(self):
-        print(f"Bot is ready. Logged in as {self.user.name}")
 
 SHBot().run(TOKEN)

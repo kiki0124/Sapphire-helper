@@ -60,6 +60,7 @@ class Bot(commands.Cog):
         except discord.app_commands.CommandSyncFailure as error:
             await ctx.reply(content=f"Command Sync Failure.\n`{error.text}`", mention_author=False)
             return
+        await self.bot.set_solved_unsolve_ids()
         await ctx.reply(content=f"Successfully synced {len(synced)} slash command(s)", mention_author=False)
 
     @commands.command()
