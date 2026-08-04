@@ -9,7 +9,7 @@ from functions import save_channel_permissions, get_channel_permissions, delete_
     clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, \
     update_epi_message_id, update_epi_sticky, check_time_more_than, DB_PATH
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
-from typing import Literal, Optional, Any, TYPE_CHECKING, TypedDict, NotRequired
+from typing import Literal, Optional, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from main import SHBot
@@ -393,7 +393,7 @@ class EPI(commands.Cog):
         async def on_button_click(i: discord.Interaction):
             await i.response.defer(ephemeral=True)
             if not self.epi_data:
-                await interaction.followup.send("EPI is not currently enabled...", ephemeral=True)
+                await interaction.followup.send("EPI is already disabled...", ephemeral=True)
                 return
 
             self.epi_data._enabled = False
@@ -466,7 +466,7 @@ class EPI(commands.Cog):
         )
         button.callback = on_button_click
         view = ui.View().add_item(button)
-        await interaction.followup.send(f"Are you sure you want to disable EPI mode? This will ping `{len(self.epi_data.users)}` user(s) that clicked the 'Get notified when this issue is resolved' button.\n-# Dismiss this message to cancel.",
+        await interaction.followup.send(f"Are you sure you want to disable EPI mode? This will ping `{len(self.epi_data.users)}` user(s) that clicked the 'Notify me when this issue is resolved' button.\n-# Dismiss this message to cancel.",
                                         view=view, ephemeral=True)
 
     @group.command(name="view", description="View the current EPI mode status")
