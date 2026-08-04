@@ -9,7 +9,7 @@ from functions import save_channel_permissions, get_channel_permissions, delete_
     clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, \
     update_epi_message_id, update_epi_sticky, check_time_more_than, DB_PATH
 import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
-from typing import Literal, Optional, Any, TYPE_CHECKING
+from typing import Literal, Optional, Any, TYPE_CHECKING, TypedDict, NotRequired
 
 if TYPE_CHECKING:
     from main import SHBot
@@ -266,7 +266,6 @@ class EpiData:
 
     def __bool__(self):
         return self._enabled
-
 
 class EPI(commands.Cog):
     def __init__(self, bot: SHBot):
@@ -804,6 +803,30 @@ class EPI(commands.Cog):
             async with cs.get("https://sapph.xyz/status", timeout=aiohttp.ClientTimeout(total=15)) as req:
                 print(req.status)
                 self.epi_data.status_page = req.status == 200 # true if the status is 200 - OK, else false
+
+
+    @group.command(name="debug", description="Get debug information on EPI and paging")
+    async def epi_debug(self, interaction: discord.Interaction):
+        container = ui.Container()
+
+        epi_info = (f"- Enabled: `{self.epi_data._enabled}`",
+                    f"- *Sticky* Msg: {self.epi_data.sticky_message.jump_url}" if self.epi_data.sticky_message else f"- *Sticky* Msg: `None`",
+                    f"- *Status* Msg: {self.epi_data.status_message.jump_url}" if self.epi_data.status_message else f"- *Status* Msg: `None`",
+                    f"- Message: *{self.epi_data.message}*",
+                    f"- No. of users: `{len(self.epi_data.users)}`",
+                    f"- Status Page: `{self.epi_data.status_page}`",
+                    f"- No. of thread_msg_mapping: `{len(self.epi_data.thread_to_msgs_map)}`")
+
+        container.add_item(ui.TextDisplay("### EPI Info"))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay("\n".join(epi_info)))
+
+        container.add_item(ui.Separator(visible=False))
+
+        container.add_item(ui.TextDisplay("### Last Recent Page"))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(f"```py\n{self.recent_page}```"))
+        await interaction.response.send_message(view=ui.LayoutView().add_item(container), ephemeral=True)
 
 async def setup(bot: SHBot):
     await bot.add_cog(EPI(bot))
