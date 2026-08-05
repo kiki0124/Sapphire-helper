@@ -103,7 +103,7 @@ class DebugCog(commands.Cog):
         else:
             pending_post_timestamp = 0
         
-        owner_id = await functions.get_post_creator_id(post.id) or post.owner_id
+        owner_id = await self.bot.get_owner_id(post)
         await interaction.followup.send(view=DebugPostView(post, is_pending=is_pending, pending_post_timestamp=pending_post_timestamp,
                                                            owner_id=owner_id),
                                                            allowed_mentions=discord.AllowedMentions.none())

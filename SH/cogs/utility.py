@@ -7,7 +7,7 @@ import asyncio
 import datetime
 import os
 from dotenv import load_dotenv
-from functions import remove_post_from_rtdr, get_post_creator_id, \
+from functions import remove_post_from_rtdr, \
                     generate_random_id, remove_post_from_pending
 from typing import Union, Literal, Callable, TYPE_CHECKING
 import re
@@ -236,13 +236,13 @@ class Utility(commands.Cog):
         await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/unsolve used")
 
     @staticmethod
-    async def one_of_mod_expert_op(interaction: discord.Interaction):
+    async def one_of_mod_expert_op(interaction: discord.Interaction[SHBot]):
         """  
         Checks if the interaction user is a Moderator or Community Expert or the creator of the post\n
         --Integrated with rtdr system
         """
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+            owner_id = await interaction.client.get_owner_id(interaction.channel)
             return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)) or interaction.user.id == owner_id
         else:
             return False
@@ -284,7 +284,7 @@ class Utility(commands.Cog):
         if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != SUPPORT_CHANNEL_ID:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
             return
-        is_owner = user.id == interaction.channel.owner_id or user.id == await get_post_creator_id(interaction.channel_id)
+        is_owner = interaction.user.id == await self.bot.get_owner_id(interaction.channel)
         if is_owner:
             await interaction.response.send_message(f"{user.mention} is the owner of this post. Therefore they cannot be removed.", ephemeral=True)
             return
@@ -448,7 +448,7 @@ class Utility(commands.Cog):
         if ctx.channel.id in self.bot.incomplete_msg_posts:
             await ctx.reply("You cannot use this command as an automatic message was already sent.", ephemeral=True, delete_after=5)
             return
-        user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
+        user_id = await self.bot.get_owner_id(ctx.channel)
         text_prefix = "## Incomplete support post\nHey"
         if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
             text_prefix = f"## Incomplete support post\nHey <@{user_id}>"
@@ -506,7 +506,7 @@ class Utility(commands.Cog):
 
         text_prefix = "Hey"
         if await self.is_mod_or_expert_or_dev(interaction=interaction):
-            user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+            user_id = await self.bot.get_owner_id(interaction.channel)
             text_prefix = f"Hey <@{user_id}>"
             await self.lock_unrelated_post(interaction.channel)
         else:

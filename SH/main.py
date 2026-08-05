@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 import os
 from dotenv import load_dotenv
-from functions import setup_db
+from functions import setup_db, _get_post_creator_id
 import unittest, test_functions
 from pathlib import Path
 import time
@@ -123,6 +123,28 @@ class SHBot(commands.Bot):
                 solved_id=command.id
                 break
         return solved_id
+
+
+    async def get_owner_id(self, post: discord.Thread | app_commands.AppCommandThread) -> int:
+        """
+        Helper function to get the owner ID for the post. Returns `0` if not found.
+        """
+        if post.owner_id != self.user.id:
+            return post.owner_id
+
+        # Created by RTDR
+        owner_id = await _get_post_creator_id(post.id)
+        if owner_id is None:
+            left_paren_index = post.name.rfind("(")
+            if left_paren_index == -1:
+                return 0
+
+            # Example title: Support for @username (USER_ID)
+            try:
+                return int(post.name[left_paren_index + 1:len(post.name) - 1])
+            except (ValueError, IndexError):
+                return 0
+        return owner_id
 
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")

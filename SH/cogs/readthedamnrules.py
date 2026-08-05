@@ -116,7 +116,7 @@ class RTDR(commands.Cog):
         view.add_item(container)
 
         post = await support.create_thread(
-            name=title,
+            name=f"{title[0:75]} ({reference_message.author.id})", # (USER_ID) adds about 20-24 chars, max is 100 chars
             view=view,
             files=files
         )
