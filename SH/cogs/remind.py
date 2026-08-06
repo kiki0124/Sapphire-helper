@@ -65,14 +65,14 @@ class CloseNowRow(ui.ActionRow):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         footer = f"-# Cancelled by {interaction.user}"
         if SOLVED_TAG_ID in interaction.channel._applied_tags:
-            footer += f" | Use </unsolve:{await interaction.client.get_unsolve_id()}> to unsolve"
+            footer += f" | Use </unsolve:{interaction.client.unsolve_cmd_id}> to unsolve"
         new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(footer)))
         await interaction.response.edit_message(view=new_view)
         await remove_post_from_pending(interaction.channel_id)
 
         if self.is_owner:
             description = "Please send a message here explaining what you still need help with."
-            footer = f"-# When the issue is resolved, you may use </solved:{await interaction.client.get_solved_id()}> to mark it as solved."
+            footer = f"-# When the issue is resolved, you may use </solved:{interaction.client.solved_cmd_id}> to mark it as solved."
             view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
             await interaction.message.reply(view=view)
 

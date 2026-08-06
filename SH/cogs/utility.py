@@ -152,7 +152,7 @@ class SolvedRowWithNDR(ui.ActionRow):
     async def on_confirm_button_click(self, interaction: discord.Interaction[SHBot], button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         await interaction.delete_original_response()
-        await interaction.channel.send(view=SolvedView(await interaction.client.get_unsolve_id()))
+        await interaction.channel.send(view=SolvedView(interaction.client.unsolve_cmd_id))
         await self.mark_post_as_solved(interaction.channel)
 
 # This is sent when the post has a NDR tag
@@ -271,7 +271,7 @@ class Utility(commands.Cog):
                 else:
                     await interaction.response.send_message("Post already solved...", ephemeral=True)
                 return
-            await interaction.response.send_message(view=SolvedView(await self.bot.get_unsolve_id()))
+            await interaction.response.send_message(view=SolvedView(self.bot.unsolve_cmd_id))
             await self.mark_post_as_solved(interaction.channel)
         else:
             await interaction.response.send_message(view=SolvedViewWithNDR(self.mark_post_as_solved), ephemeral=True)
@@ -304,7 +304,7 @@ class Utility(commands.Cog):
             else:
                 title = "### Post Successfully Unsolved"
                 description = "Please send a message here explaining what you still need help with."
-                footer = f"-# When the issue is resolved, you may use </solved:{await self.bot.get_solved_id()}> to mark it as solved."
+                footer = f"-# When the issue is resolved, you may use </solved:{self.bot.solved_cmd_id}> to mark it as solved."
                 view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(title), ui.Separator(visible=False), 
                                                              ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
                 await interaction.response.send_message(view=view)

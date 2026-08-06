@@ -15,8 +15,7 @@ RUN mkdir -p /database
 # Copy the requirements file first for caching
 COPY requirements.txt .
 
-# Install only the required packages (aiocache is not in requirements.txt and witout it the bot will not work)
-RUN pip install --no-cache-dir -r requirements.txt aiocache
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the bot code
 COPY . .
