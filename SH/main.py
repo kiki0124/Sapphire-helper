@@ -125,9 +125,9 @@ class SHBot(commands.Bot):
         return solved_id
 
 
-    async def get_owner_id(self, post: discord.Thread | app_commands.AppCommandThread) -> int:
+    async def get_post_owner_id(self, post: discord.Thread | app_commands.AppCommandThread) -> int:
         """
-        Helper function to get the owner ID for the post. Returns `0` if not found.
+        Helper function to get the owner ID for a support post. Returns `0` if not found.
         """
         if post.owner_id != self.user.id:
             return post.owner_id

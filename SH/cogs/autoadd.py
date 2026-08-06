@@ -70,7 +70,7 @@ class ConfirmCloseButtons(ui.ActionRow):
             await interaction.message.reply(view=view)
 
     async def interaction_check(self, interaction: discord.Interaction[SHBot]) -> bool:
-        self.is_owner = interaction.user.id == await interaction.client.get_owner_id(interaction.channel)
+        self.is_owner = interaction.user.id == await interaction.client.get_post_owner_id(interaction.channel)
         if not (self.is_owner or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)):
             await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
             return False
@@ -137,7 +137,7 @@ class AutoAdd(commands.Cog):
             self.bot.incomplete_msg_posts.add(thread.id)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if message.author.id == self.bot.user.id or message.author.id != await self.bot.get_owner_id(message.channel):
+        if message.author.id == self.bot.user.id or message.author.id != await self.bot.get_post_owner_id(message.channel):
             return
         tags = message.channel._applied_tags
         if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
@@ -151,7 +151,7 @@ class AutoAdd(commands.Cog):
         if UNANSWERED_TAG_ID not in message.channel._applied_tags or message.author.id == self.bot.user.id:
             return
         applied_tags = message.channel.applied_tags
-        owner_id = await self.bot.get_owner_id(message.channel)
+        owner_id = await self.bot.get_post_owner_id(message.channel)
         if message.author.id != owner_id:
             tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
             cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
@@ -174,7 +174,7 @@ class AutoAdd(commands.Cog):
             tag_filters = NEED_DEV_REVIEW_TAG_ID not in tags and SOLVED_TAG_ID not in tags
             other_filters = not message_channel.locked and not message_channel.archived
             if tag_filters and other_filters:
-                owner_id = await self.bot.get_owner_id(message_channel)
+                owner_id = await self.bot.get_post_owner_id(message_channel)
                 await message_channel.send(
                     view=ConfirmCloseView(post_author=owner_id)
                 )
