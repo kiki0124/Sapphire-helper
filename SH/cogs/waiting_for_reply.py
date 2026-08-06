@@ -5,7 +5,7 @@ from discord.ext import commands
 import asyncio
 import os
 from dotenv import load_dotenv
-from functions import generate_random_id, get_post_creator_id
+from functions import generate_random_id
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ class waiting_for_reply(commands.Cog):
         support = message.channel.parent
         wfr = support.get_tag(WAITING_FOR_REPLY_TAG_ID)
         applied_tags = message.channel._applied_tags
-        message_author_is_owner = message.author.id == message.channel.owner_id or message.author.id == await get_post_creator_id(message.channel.id)
+        message_author_is_owner = message.author.id == await self.bot.get_post_owner_id(message.channel)
         has_wfr = WAITING_FOR_REPLY_TAG_ID in applied_tags
         if message.id == message.channel.id or NEED_DEV_REVIEW_TAG_ID in applied_tags or UNANSWERED_TAG_ID in applied_tags or SOLVED_TAG_ID in applied_tags:
             return

@@ -169,7 +169,7 @@ async def add_post_to_rtdr(post_id: int, user_id: int) -> None:
             await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, user_id,))
             await conn.commit()
 
-async def get_post_creator_id(post_id: int) -> Optional[int]:
+async def _get_post_creator_id(post_id: int) -> Optional[int]:
     """  
     Get the id of whoever the post was created for if its part of readthedamnrules system
     """
