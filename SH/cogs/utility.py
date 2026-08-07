@@ -7,8 +7,7 @@ import asyncio
 import datetime
 import os
 from dotenv import load_dotenv
-from functions import remove_post_from_rtdr, \
-                    generate_random_id, remove_post_from_pending
+from functions import generate_random_id
 from typing import Union, Literal, Callable, TYPE_CHECKING
 import re
 if TYPE_CHECKING:
@@ -101,7 +100,7 @@ class ndr_options_buttons(ui.View):
         await self.Interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/needs-dev-review command used")
         channel = post.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {post.mention}')
-        await remove_post_from_pending(post.id)
+        self.Interaction.client.remove_post_from_pending(post.id)
 
     @ui.button(label="Only add tag", style=discord.ButtonStyle.grey, custom_id="ndr-only-add-tag")
     async def on_only_add_tag_click(self, interaction: discord.Interaction, button: ui.Button):
@@ -182,8 +181,8 @@ class Utility(commands.Cog):
             reason=f"Auto archive {'solved' if close_delay == 3600 else 'unrelated'} post after {close_delay} seconds"
         )
         self.close_tasks.pop(post.id)
-        await remove_post_from_rtdr(post.id)
-        await remove_post_from_pending(post.id)
+        self.bot.remove_post_from_rtdr(post.id)
+        self.bot.remove_post_from_pending(post.id)
         if post.id in self.bot.incomplete_msg_posts:
             self.bot.incomplete_msg_posts.remove(post.id)
 

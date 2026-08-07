@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import discord
 from discord.ext import commands, tasks
-from functions import remove_post_from_pending, get_pending_posts, \
-    get_pending_posts_and_timestamps, check_time_more_than,\
-    remove_post_from_rtdr, generate_random_id, \
-    in_pending_posts, bulk_add_posts_to_pending, bulk_remove_posts_from_pending
+from functions import check_time_more_than, generate_random_id
 import random
 import asyncio
 from discord import ui
@@ -56,8 +53,8 @@ class CloseNowRow(ui.ActionRow):
 
         await interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=interaction.channel.mention, tags=tags, context=f"Close now button clicked")
         await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
-        await remove_post_from_pending(interaction.channel_id)
-        await remove_post_from_rtdr(interaction.channel_id)
+        interaction.client.remove_post_from_pending(interaction.channel_id)
+        interaction.client.remove_post_from_rtdr(interaction.channel_id)
 
 
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="remind-cancel")
@@ -68,7 +65,7 @@ class CloseNowRow(ui.ActionRow):
             footer += f" | Use </unsolve:{await interaction.client.get_unsolve_id()}> to unsolve"
         new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(footer)))
         await interaction.response.edit_message(view=new_view)
-        await remove_post_from_pending(interaction.channel_id)
+        interaction.client.remove_post_from_pending(interaction.channel_id)
 
         if self.is_owner:
             description = "Please send a message here explaining what you still need help with."
@@ -233,8 +230,7 @@ class Reminders(commands.Cog):
             del posts[i] # remove from the post so that check_for_pending_posts won't need to check for it
 
     async def check_for_pending_posts(self, posts: list[discord.Thread]):
-        posts_to_add: list[int] = []
-        pending_posts: list[int] = await get_pending_posts() # Cache the list to avoid DB calls every iteration of the loop
+        pending_posts: list[int] = self.bot.get_pending_posts() # Cache the list to avoid DB calls every iteration of the loop
         for post in posts:
             if not post.last_message_id: # no message was ever sent?? This should realistically never happen for threads
                 continue
@@ -252,7 +248,7 @@ class Reminders(commands.Cog):
             # If the last message > 3d, we send the reminder regardless of other requirements
             if check_time_more_than(last_msg_timestamp, timedelta(days=3)):
                 await post.send(view=CloseNowView(post_author_id, time_ago="3 days"))
-                posts_to_add.append(post.id)
+                self.bot.add_post_to_pending(post.id)
                 continue
 
             # from here on, we already know last_message is (> 1d ago) but (< 3d ago)
@@ -266,11 +262,7 @@ class Reminders(commands.Cog):
                     continue
 
             await post.send(view=CloseNowView(post_author_id, time_ago="24 hours"))
-            posts_to_add.append(post.id)
-
-        if not posts_to_add:
-            return
-        await bulk_add_posts_to_pending(posts_to_add)
+            self.bot.add_post_to_pending(post.id)
             
     @commands.Cog.listener('on_message')
     async def remove_pending_posts(self, message: discord.Message):
@@ -281,24 +273,21 @@ class Reminders(commands.Cog):
             others_filter = not message.channel.locked and NEED_DEV_REVIEW_TAG_ID not in message.channel._applied_tags
             owner_id = await self.bot.get_post_owner_id(message.channel)
             message_author = message.author.id == owner_id
-            if message_author and others_filter and await in_pending_posts(message.channel.id):
-                await remove_post_from_pending(message.channel.id)
+            if message_author and others_filter and message.channel.id in self.bot.pending_posts:
+                self.bot.remove_post_from_pending(message.channel.id)
 
 
     async def close_pending_posts(self):
-        posts_to_remove: list[int] = []
-        pending_posts = await get_pending_posts_and_timestamps()
-
-        for post_id, timestamp in pending_posts:
+        for post_id, inserted_at in self.bot.pending_posts.items():
             # only close posts that have been pending for > 1 day
-            if not check_time_more_than(timestamp, timedelta(days=1)):
+            if not check_time_more_than(inserted_at.timestamp(), timedelta(days=1)):
                 continue
 
             try:
                 post = self.bot.get_channel(post_id) or await self.bot.fetch_channel(post_id)
             except discord.NotFound:
-                await remove_post_from_rtdr(post_id)
-                posts_to_remove.append(post_id)
+                self.bot.remove_post_from_rtdr(post_id)
+                self.bot.remove_post_from_pending(post.id)
                 continue
 
             if NEED_DEV_REVIEW_TAG_ID not in post._applied_tags:
@@ -319,12 +308,8 @@ class Reminders(commands.Cog):
                     continue
                 await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, 
                                            context=f"Close pending post")
-                await remove_post_from_rtdr(post.id)
-                posts_to_remove.append(post.id)
-
-        if not posts_to_remove:
-            return
-        await bulk_remove_posts_from_pending(posts_to_remove)
+                self.bot.remove_post_from_rtdr(post.id)
+                self.bot.remove_post_from_pending(post.id)
 
 
     @reminders_loop.before_loop

@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import os
 from dotenv import load_dotenv
-from functions import setup_db, _get_post_creator_id
+from functions import setup_db
 import unittest, test_functions
 from pathlib import Path
 import time
 from aiocache import cached
+from datetime import datetime, UTC
 
 load_dotenv()
 
@@ -30,6 +33,9 @@ class SHBot(commands.Bot):
         self.alert_webhook_url: str | None = None
         self.incomplete_msg_posts: set[int] = set() # list of the post ids
         self.uptime = time.time() # used in cogs/bot,py
+
+        self.rtdr_posts: dict[int, int] = {} # posts for RTDR
+        self.pending_posts: dict[int, datetime] = {}
 
     async def setup_hook(self):
         unittest.main(test_functions, exit=False)
@@ -133,7 +139,7 @@ class SHBot(commands.Bot):
             return post.owner_id
 
         # Created by RTDR
-        owner_id = await _get_post_creator_id(post.id)
+        owner_id = self.rtdr_posts.get(post.id)
         if owner_id is None:
             left_paren_index = post.name.rfind("(")
             if left_paren_index == -1:
@@ -145,6 +151,25 @@ class SHBot(commands.Bot):
             except (ValueError, IndexError):
                 return 0
         return owner_id
+
+
+    # CACHE HELPER FUNCTIONS
+    def add_post_to_rtdr(self, thread_id: int, owner_id: int) -> None:
+        self.rtdr_posts[thread_id] = owner_id
+
+    def remove_post_from_rtdr(self, thread_id: int) -> None:
+        self.rtdr_posts.pop(thread_id, None)
+
+
+    def get_pending_posts(self) -> list[int]:
+        return list(self.pending_posts)
+
+    def add_post_to_pending(self, thread_id: int) -> None:
+        now = datetime.now(UTC)
+        self.pending_posts[thread_id] = now
+
+    def remove_post_from_pending(self, thread_id: int) -> None:
+        self.pending_posts.pop(thread_id, None)
 
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")

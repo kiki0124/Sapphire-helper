@@ -5,10 +5,8 @@ from discord.ext import commands, tasks
 from discord import app_commands, ui
 from dotenv import load_dotenv
 from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, \
-    generate_random_id, get_epi_users, save_epi_config, get_epi_config, get_epi_messages, add_epi_message, clear_epi_users, \
-    clear_epi_config, add_epi_user, delete_epi_user, clear_epi_messages, update_sticky_message_id, update_epi_message, \
-    update_epi_message_id, update_epi_sticky, check_time_more_than, DB_PATH
-import aiohttp, json, os, asyncio, re, datetime, asqlite as sql
+    generate_random_id, check_time_more_than
+import aiohttp, json, os, asyncio, re, datetime
 from typing import Literal, Optional, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -28,7 +26,6 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 XGE_USER_ID = 265236642476982273
 
 
-
 class GetNotifiedButton(ui.ActionRow):
     def __init__(self, epi_users: set[int]):
         super().__init__()
@@ -36,11 +33,9 @@ class GetNotifiedButton(ui.ActionRow):
     @ui.button(label="Notify me when this issue is resolved", custom_id="epi-get-notified", style=discord.ButtonStyle.grey)
     async def on_get_notified_click(self, interaction: discord.Interaction, button: ui.Button):
         if interaction.user.id not in self.epi_users:
-            await add_epi_user(interaction.user.id)
             self.epi_users.add(interaction.user.id)
             await interaction.response.send_message(content="You will now be notified when this issue is fixed!", ephemeral=True)
         else:
-            await delete_epi_user(interaction.user.id)
             self.epi_users.remove(interaction.user.id)
             await interaction.response.send_message(content="You will no longer be notified for this issue!", ephemeral=True)
 
@@ -212,39 +207,6 @@ class EpiData:
         self._enabled: bool = False
 
 
-    async def update_from_epi_config(self, epi_config: dict[str, Any], cog: EPI) -> None:
-        self._enabled = True
-
-        self.started_at = epi_config['started_at']
-        self.thread_to_msgs_map = await get_epi_messages(cog.pool)
-
-        message: str = epi_config["message"]
-        self.message = message if message != "-" else None
-
-        status_message_id: int = epi_config["message_id"]
-        if status_message_id != 0:
-            status = discord.utils.get(cog.bot.get_all_channels(), name="status", type=discord.ChannelType.news)
-            if status is not None:
-                try:
-                    status_message = await status.fetch_message(status_message_id)
-                except discord.NotFound as e:
-                    await update_epi_message_id(cog.pool, 0) # remove the message id from the db
-                    await cog.bot.send_log(ALERTS_THREAD_ID,
-                                            content=f"Tried to fetch status message from {status.mention} with id {epi_config['message_id']}.\n{e.status} {e.text}")
-                else:
-                    self.status_message = status_message
-
-        for user_id in await get_epi_users(cog.pool):
-            self.users.add(user_id)
-
-        if epi_config["sticky"]:
-            general = cog.bot.get_partial_messageable(GENERAL_CHANNEL_ID)
-            sticky_message_id = epi_config["sticky_message_id"]
-            if sticky_message_id:
-                self.sticky_message = general.get_partial_message(epi_config["sticky_message_id"])
-            await cog.handle_sticky_message(general, delay=0)
-
-
     def clear(self) -> None:
         """
         Clears the state of the data
@@ -296,7 +258,6 @@ class EPI(commands.Cog):
             except discord.NotFound:
                 pass
         self.epi_data.sticky_message = await channel.send(view=view)
-        await update_sticky_message_id(self.pool, self.epi_data.sticky_message.id)
         self.epi_data.sticky_task = None
         self.epi_data.is_being_executed = False
 
@@ -314,17 +275,9 @@ class EPI(commands.Cog):
 
 
     async def cog_unload(self):
-        await self.pool.close()
         self.ping_status_page.cancel()
 
     async def cog_load(self):
-        self.pool = await sql.create_pool(DB_PATH)
-        epi_config = await get_epi_config(self.pool)
-        if not epi_config:
-            return
-
-        await self.epi_data.update_from_epi_config(epi_config, self)
-
         self.bot.add_view(GetNotifiedView(epi_users=self.epi_data.users))
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
@@ -361,9 +314,6 @@ class EPI(commands.Cog):
                 command_response += "\n- Status message: Failed - message_id is not a valid ID."
 
 
-        await save_epi_config(self.pool, datetime.datetime.now(datetime.UTC).isoformat(),
-                              sticky=sticky, message=message or "-", 
-                              status_message_id=status_message.id if status_message else 0) # message arg defaults to '-' if its None (not provided) and message id to 0
         if sticky:
             general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
             await self.handle_sticky_message(general)
@@ -435,8 +385,6 @@ class EPI(commands.Cog):
                         except discord.HTTPException:
                             pass
 
-            await clear_epi_messages(self.pool)
-
             general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
             main_message = await general.send(content=content)
             if self.epi_data.users:
@@ -449,7 +397,6 @@ class EPI(commands.Cog):
                         mentions = [] # reset list for another pinging message with other users
                 if mentions:
                     await main_message.reply(content=", ".join(mentions), mention_author=False)
-            await clear_epi_users(self.pool)
 
             await interaction.channel.send(f"EPI mode successfully disabled by {interaction.user.name}.\nUsers mentioned: {len(self.epi_data.users)}")
             await self.bot.send_log(EPI_LOG_THREAD_ID, content=f"EPI mode disabled by {interaction.user.mention}\nCustom message: {message or 'not set'}")
@@ -457,7 +404,6 @@ class EPI(commands.Cog):
 
             await self.disable_sticky_message()
             self.epi_data.clear()
-            await clear_epi_config(self.pool)
 
         button = ui.Button(
             style=discord.ButtonStyle.danger,
@@ -499,7 +445,6 @@ class EPI(commands.Cog):
 
         command_response = "Successfully updated EPI mode!"
         if message:
-            await update_epi_message(self.pool, message)
             if message == "-":
                 self.epi_data.message = None
                 command_response += "\n- Custom message: Disabled"
@@ -510,7 +455,6 @@ class EPI(commands.Cog):
             if status_message_id == '-':
                 command_response += "\n- Status message: Disabled"
                 self.epi_data.status_message = None
-                await update_epi_message_id(self.pool, 0)
             elif status_message_id.isdigit():
                 status_message_id_int = int(status_message_id)
                 status_channel = discord.utils.get(interaction.guild.text_channels, name="status")
@@ -520,7 +464,6 @@ class EPI(commands.Cog):
                     except discord.NotFound:
                         command_response += f"\n- Couldn't fetch message from {status_channel.mention} with id `{status_message_id_int}`."
                     else: # the message was fetched successfully
-                        await update_epi_message_id(self.pool, status_message_id_int)
                         self.epi_data.status_message = status_message
                         command_response += f"\n- Status message: {status_message.jump_url}"
                 else:
@@ -529,7 +472,6 @@ class EPI(commands.Cog):
                 command_response += f"\n- Couldn't fetch status message: `message_id` is invalid (received `{status_message_id_int}`)"
         if sticky:
             if not self.epi_data.sticky_message or not self.epi_data.sticky_task:
-                await update_epi_sticky(self.pool, sticky)
                 general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
                 await self.handle_sticky_message(general)
                 command_response += "\n- Enabled sticky message"
@@ -537,7 +479,6 @@ class EPI(commands.Cog):
                 command_response += "\n- Couldn't enable sticky message: Already enabled."
         elif sticky is False:
             if self.epi_data.sticky_message or self.epi_data.sticky_task:
-                await update_epi_sticky(self.pool, sticky)
                 await self.disable_sticky_message()
                 command_response += "\n- Sticky Message: Disabled"
             else:
@@ -550,7 +491,6 @@ class EPI(commands.Cog):
             await asyncio.sleep(3) # make sure that epi messages will be sent last (after more info message)
             view = self.generate_epi_layout_view()
             message = await thread.send(view=view)
-            await add_epi_message(self.pool, message.id, thread.id)
             self.epi_data.thread_to_msgs_map[thread.id] = message.id
 
     @commands.Cog.listener('on_message')

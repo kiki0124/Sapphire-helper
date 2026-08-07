@@ -6,7 +6,7 @@ import re
 import random
 import os
 from dotenv import load_dotenv
-from functions import generate_random_id, remove_post_from_rtdr
+from functions import generate_random_id
 from discord import ui
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ class ConfirmCloseButtons(ui.ActionRow):
 
         await interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=interaction.channel.mention, tags=tags, context="Post starter message delete and confirm button clicked- mark post as solved")
         await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
-        await remove_post_from_rtdr(interaction.channel_id)
+        interaction.client.remove_post_from_rtdr(interaction.channel_id)
 
 
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
@@ -96,12 +96,11 @@ class ConfirmCloseView(ui.LayoutView):
 class AutoAdd(commands.Cog):
     def __init__(self, bot: SHBot):
         self.bot = bot
-        
+        self.sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
+
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):
         self.bot.add_view(ConfirmCloseView())
-
-    sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
     @commands.Cog.listener('on_message')
     async def message(self, message: discord.Message):

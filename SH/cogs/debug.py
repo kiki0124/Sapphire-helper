@@ -4,14 +4,15 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import functions
-from discord import ui
+from discord import ui, CheckboxGroupOption
 from discord.utils import snowflake_time, format_dt
+from datetime import datetime, UTC
 
 from os import getenv
 from dotenv import load_dotenv
 load_dotenv()
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from main import SHBot
 
@@ -62,14 +63,9 @@ class EvalSqlModal(ui.Modal):
     def __init__(self) -> None:
         super().__init__(title="Eval Sql")
         tables_and_queries = ("Table Name: Possible query names:",
-                              "- pending_posts: (`post_id`, `timestamp`)",
-                              "- readthedamnrules: (`post_id`, `user_id`)",
                               "- reminder_waiting: (`post_id`, `timestamp`)",
                               "- locked_channels_permissions: (`channel_id`, `allow`, `deny`)",
-                              "- tags: (`name`, `content`, `creator_id`, `created_ts`, `uses`)",
-                              "- epi_config: (`started_iso`, `message`, `message_id`, `sticky`, `sticky_message_id`)",
-                              "- epi_users: (`user_id`)",
-                              "- epi_messages: (`thread_id`, `message_id`)",)
+                              "- tags: (`name`, `content`, `creator_id`, `created_ts`, `uses`)")
         self.add_item(ui.TextDisplay('\n'.join(tables_and_queries)))
 
         self.sql_cmd = ui.Label(text="SQL Command", component=ui.TextInput(style=discord.TextStyle.long,
@@ -84,6 +80,91 @@ class EvalSqlModal(ui.Modal):
         sql_result = str(await functions.execute_sql(sql_cmd_input.strip()))
         await interaction.followup.send(f"```json\n{sql_result[0:1950]}```")
 
+class GlobalCacheModal(ui.Modal):
+    def __init__(self, cache_type: Literal['PENDING_POSTS', 'RTDR']):
+        super().__init__(title=f"{cache_type} Debug", custom_id="global_cache_modal")
+        self.cache_type: Literal['PENDING_POSTS', 'RTDR'] = cache_type
+
+        self.post_to_debug = ui.Label(text="Post ID", description="The ID of the post you want to debug, if applicable",
+                                 component=ui.TextInput(required=False, max_length=25))
+        self.owner_input = ui.Label(text="RTDR Owner ID", description="This is only needed if you want add a post to RTDR",
+                                 component=ui.UserSelect(max_values=1, min_values=1, required=False))
+
+        options = [CheckboxGroupOption(label="Check in cache", value="check"), CheckboxGroupOption(label="Add to cache", value="add"),
+                   CheckboxGroupOption(label="Remove from cache", value="remove"), CheckboxGroupOption(label="Clear cache", value="clear"),
+                   CheckboxGroupOption(label="View all", value="view")]
+        check_box = ui.CheckboxGroup(required=True, min_values=1, max_values=1,
+                                     options=options)
+        self.debug_type = ui.Label(text="Debug Type", component=check_box)
+
+        self.add_item(self.post_to_debug)
+        if self.cache_type == "RTDR":
+            self.add_item(self.owner_input)
+        self.add_item(self.debug_type)
+
+    async def on_submit(self, interaction: discord.Interaction[SHBot]):
+        await interaction.response.defer(ephemeral=True)
+        assert(isinstance(self.post_to_debug.component, ui.TextInput))
+        assert(isinstance(self.owner_input.component, ui.UserSelect))
+        assert(isinstance(self.debug_type.component, ui.CheckboxGroup))
+
+        debug_type: Literal['clear', 'view', 'add', 'remove', 'check'] = self.debug_type.component.values[0]
+
+        if self.cache_type == 'PENDING_POSTS':
+            cache = interaction.client.pending_posts
+        else:
+            cache = interaction.client.rtdr_posts
+
+        if debug_type == "clear":
+            cache.clear()
+            await interaction.client.send_log(ALERTS_THREAD_ID, content=f"{self.cache_type} cache has been cleared by {interaction.user.mention}")
+            await interaction.followup.send(f"{self.cache_type} cache has been cleared!", ephemeral=True)
+            return
+        elif debug_type == "view":
+            content = f"Posts Cached: `{len(cache)}`\n```py\n{cache}```"[0:4000]
+            container = ui.Container(ui.TextDisplay(content))
+            await interaction.followup.send(view=ui.LayoutView().add_item(container), ephemeral=True)
+            return
+
+        try:
+            post_id: int = int(self.post_to_debug.component.value)
+        except ValueError:
+            await interaction.followup.send(f"Expected a thread ID, got `{self.post_to_debug.component.value}` instead", ephemeral=True)
+            return
+        else:
+            # validate post
+            try:
+                post = interaction.guild.get_thread(post_id) or await interaction.guild.fetch_channel(post_id)
+                if not isinstance(post, discord.Thread):
+                    await interaction.followup.send(f"{post.mention} ({post.id}) is not a thread!")
+                    return
+            except discord.NotFound:
+                await interaction.followup.send(f"Could not fetch <#{post_id}> ({post_id}).", ephemeral=True)
+                return
+
+        if debug_type == "add":
+            if self.cache_type == 'RTDR':
+                if not self.owner_input.component.values:
+                    await interaction.followup.send(f"A user is needed in order to add a post to RTDR!", ephemeral=True)
+                    return
+                owner = self.owner_input.component.values[0]
+                cache[post_id] = owner.id
+                await interaction.followup.send(f"Successfully added <#{post_id}> to RTDR cache with {owner.mention} ({owner.id}) as owner.", ephemeral=True)
+                return
+            else:
+                cache[post_id] = datetime.now(UTC)
+                await interaction.followup.send(f"Successfully added <#{post_id}> to PENDING_POSTS cache", ephemeral=True)
+                return
+        elif debug_type == "remove":
+            try:
+                del cache[post_id]
+            except KeyError:
+                await interaction.followup.send(f"<#{post_id}> ({post_id}) is not in {self.cache_type} cache.", ephemeral=True)
+                return
+            await interaction.followup.send(f"Successfully removed <#{post_id}> ({post_id}) from {self.cache_type} cache.", ephemeral=True)
+        else:
+            in_cache = "is" if post_id in cache else "is not"
+            await interaction.followup.send(f"<#{post_id}> ({post_id}) {in_cache} in {self.cache_type} cache", ephemeral=True)
 
 class DebugCog(commands.Cog):
     def __init__(self, bot: SHBot) -> None:
@@ -97,9 +178,9 @@ class DebugCog(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def debug_post(self, interaction: discord.Interaction, post: app_commands.AppCommandThread): # AppCommandThread is needed as .Thread can't resolve if the post is archived
         await interaction.response.defer()
-        is_pending = await functions.in_pending_posts(post.id)
+        is_pending = post.id in self.bot.pending_posts
         if is_pending:
-            pending_post_timestamp = await functions.get_post_timestamp(post.id) or 0
+            pending_post_timestamp = int(self.bot.pending_posts[post.id].timestamp())
         else:
             pending_post_timestamp = 0
         
@@ -119,6 +200,13 @@ class DebugCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         await functions.setup_db()
         await interaction.followup.send("Success!\n", ephemeral=True)
+
+
+    @debug_group_cmd.command(name="global_cache", description="Get debug info and actions regarding the global cache")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    @app_commands.describe(cache_type="The cache type to debug")
+    async def debug_global_cache(self, interaction: discord.Interaction, cache_type: Literal['RTDR', 'PENDING_POSTS']):
+        await interaction.response.send_modal(GlobalCacheModal(cache_type))
 
 async def setup(bot: SHBot):
     await bot.add_cog(DebugCog(bot))
