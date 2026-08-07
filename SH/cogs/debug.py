@@ -152,7 +152,7 @@ class GlobalCacheModal(ui.Modal):
                 await interaction.followup.send(f"Successfully added <#{post_id}> to RTDR cache with {owner.mention} ({owner.id}) as owner.", ephemeral=True)
                 return
             else:
-                cache[post_id] = datetime.now(UTC)
+                cache[post_id] = int(datetime.now(UTC).timestamp())
                 await interaction.followup.send(f"Successfully added <#{post_id}> to PENDING_POSTS cache", ephemeral=True)
                 return
         elif debug_type == "remove":
@@ -180,7 +180,7 @@ class DebugCog(commands.Cog):
         await interaction.response.defer()
         is_pending = post.id in self.bot.pending_posts
         if is_pending:
-            pending_post_timestamp = int(self.bot.pending_posts[post.id].timestamp())
+            pending_post_timestamp = self.bot.pending_posts[post.id]
         else:
             pending_post_timestamp = 0
         

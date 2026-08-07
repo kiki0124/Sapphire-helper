@@ -35,7 +35,7 @@ class SHBot(commands.Bot):
         self.uptime = time.time() # used in cogs/bot,py
 
         self.rtdr_posts: dict[int, int] = {} # posts for RTDR
-        self.pending_posts: dict[int, datetime] = {}
+        self.pending_posts: dict[int, int] = {} # posts for pending
 
     async def setup_hook(self):
         unittest.main(test_functions, exit=False)
@@ -162,7 +162,7 @@ class SHBot(commands.Bot):
 
 
     def add_post_to_pending(self, thread_id: int) -> None:
-        now = datetime.now(UTC)
+        now = int(datetime.now(UTC).timestamp())
         self.pending_posts[thread_id] = now
 
     def remove_post_from_pending(self, thread_id: int) -> None:

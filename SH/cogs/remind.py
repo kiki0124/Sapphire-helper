@@ -279,7 +279,7 @@ class Reminders(commands.Cog):
     async def close_pending_posts(self):
         for post_id, inserted_at in self.bot.pending_posts.items():
             # only close posts that have been pending for > 1 day
-            if not check_time_more_than(inserted_at.timestamp(), timedelta(days=1)):
+            if not check_time_more_than(inserted_at, timedelta(days=1)):
                 continue
 
             try:
@@ -352,8 +352,8 @@ class Reminders(commands.Cog):
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def reminders_simulate(self, interaction: discord.Interaction, post: app_commands.AppCommandThread):
         await interaction.response.defer(ephemeral=True)
-        await interaction.followup.send(f"Sleeping for 10 seconds to prevent clashes with reminders...")
-        await asyncio.sleep(10)
+        await interaction.followup.send(f"Sleeping for 5 seconds to prevent clashes with reminders...")
+        await asyncio.sleep(5)
         await self.check_for_pending_posts([self.bot.get_channel(post.id) or await post.fetch()])
 
         await interaction.followup.send(f"Simulation complete for {post.mention}!", ephemeral=True)
