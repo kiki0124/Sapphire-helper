@@ -155,17 +155,29 @@ class SHBot(commands.Bot):
 
     # CACHE HELPER FUNCTIONS
     def add_post_to_rtdr(self, thread_id: int, owner_id: int) -> None:
+        """
+        Adds a post to the `RTDR` cache.
+        """
         self.rtdr_posts[thread_id] = owner_id
 
     def remove_post_from_rtdr(self, thread_id: int) -> None:
+        """
+        Removes a post from the `RTDR` cache.
+        """
         self.rtdr_posts.pop(thread_id, None)
 
 
     def add_post_to_pending(self, thread_id: int) -> None:
+        """
+        Adds a post to the `pending_posts` cache and store the time it was inserted at.
+        """
         now = int(datetime.now(UTC).timestamp())
         self.pending_posts[thread_id] = now
 
     def remove_post_from_pending(self, thread_id: int) -> None:
+        """
+        Removes a post from the `pending_posts` cache
+        """
         self.pending_posts.pop(thread_id, None)
 
 
