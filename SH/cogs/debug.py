@@ -136,7 +136,7 @@ class GlobalCacheModal(ui.Modal):
             try:
                 post = interaction.guild.get_thread(post_id) or await interaction.guild.fetch_channel(post_id)
                 if not isinstance(post, discord.Thread):
-                    await interaction.followup.send(f"{post.mention} ({post.id}) is not a thread!")
+                    await interaction.followup.send(f"{post.mention} ({post.id}) is not a thread!", ephemeral=True)
                     return
             except discord.NotFound:
                 await interaction.followup.send(f"Could not fetch <#{post_id}> ({post_id}).", ephemeral=True)

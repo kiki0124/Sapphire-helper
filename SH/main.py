@@ -161,15 +161,13 @@ class SHBot(commands.Bot):
         self.rtdr_posts.pop(thread_id, None)
 
 
-    def get_pending_posts(self) -> list[int]:
-        return list(self.pending_posts)
-
     def add_post_to_pending(self, thread_id: int) -> None:
         now = datetime.now(UTC)
         self.pending_posts[thread_id] = now
 
     def remove_post_from_pending(self, thread_id: int) -> None:
         self.pending_posts.pop(thread_id, None)
+
 
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")

@@ -230,7 +230,6 @@ class Reminders(commands.Cog):
             del posts[i] # remove from the post so that check_for_pending_posts won't need to check for it
 
     async def check_for_pending_posts(self, posts: list[discord.Thread]):
-        pending_posts: list[int] = self.bot.get_pending_posts() # Cache the list to avoid DB calls every iteration of the loop
         for post in posts:
             if not post.last_message_id: # no message was ever sent?? This should realistically never happen for threads
                 continue
@@ -238,7 +237,7 @@ class Reminders(commands.Cog):
             last_msg_timestamp = snowflake_time(post.last_message_id).timestamp()
             more_than_day = check_time_more_than(last_msg_timestamp,
                                                 timedelta(days=1)) # Check time before making any further API/DB calls
-            if not more_than_day or post.id in pending_posts:
+            if not more_than_day or post.id in self.bot.pending_posts:
                 continue
             if not self.reminders_filter(post):
                 continue
