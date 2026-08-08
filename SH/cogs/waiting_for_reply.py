@@ -23,7 +23,7 @@ class waiting_for_reply(commands.Cog):
     def __init__(self, bot: SHBot):
         self.bot = bot
         
-    posts: dict[int, asyncio.Task] = {}
+        self.posts: dict[int, asyncio.Task] = {}
 
     async def add_waiting_tag(self, post: discord.Thread) -> None:
         wfr = post.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
