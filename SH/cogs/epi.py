@@ -277,9 +277,6 @@ class EPI(commands.Cog):
     async def cog_unload(self):
         self.ping_status_page.cancel()
 
-    async def cog_load(self):
-        self.bot.add_view(GetNotifiedView(epi_users=self.epi_data.users))
-
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(message="[Optional] A custom text message to be displayed", message_id="[Optional] ID of a message from #status to be displayed", sticky="Should a sticky message be created in #general?")

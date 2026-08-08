@@ -82,7 +82,7 @@ class EvalSqlModal(ui.Modal):
 
 class GlobalCacheModal(ui.Modal):
     def __init__(self, cache_type: Literal['PENDING_POSTS', 'RTDR']):
-        super().__init__(title=f"{cache_type} Debug", custom_id="global_cache_modal")
+        super().__init__(title=f"{cache_type}", custom_id="global_cache_modal")
         self.cache_type: Literal['PENDING_POSTS', 'RTDR'] = cache_type
 
         self.post_to_debug = ui.Label(text="Post ID", description="The ID of the post you want to debug, if applicable",
@@ -129,7 +129,7 @@ class GlobalCacheModal(ui.Modal):
         try:
             post_id: int = int(self.post_to_debug.component.value)
         except ValueError:
-            await interaction.followup.send(f"Expected a thread ID, got `{self.post_to_debug.component.value}` instead", ephemeral=True)
+            await interaction.followup.send(f"Expected a thread ID, got `{self.post_to_debug.component.value}` instead.", ephemeral=True)
             return
         else:
             # validate post
@@ -153,7 +153,7 @@ class GlobalCacheModal(ui.Modal):
                 return
             else:
                 cache[post_id] = int(datetime.now(UTC).timestamp())
-                await interaction.followup.send(f"Successfully added <#{post_id}> to PENDING_POSTS cache", ephemeral=True)
+                await interaction.followup.send(f"Successfully added <#{post_id}> to PENDING_POSTS cache.", ephemeral=True)
                 return
         elif debug_type == "remove":
             try:
@@ -164,7 +164,7 @@ class GlobalCacheModal(ui.Modal):
             await interaction.followup.send(f"Successfully removed <#{post_id}> ({post_id}) from {self.cache_type} cache.", ephemeral=True)
         else:
             in_cache = "is" if post_id in cache else "is not"
-            await interaction.followup.send(f"<#{post_id}> ({post_id}) {in_cache} in {self.cache_type} cache", ephemeral=True)
+            await interaction.followup.send(f"<#{post_id}> ({post_id}) {in_cache} in {self.cache_type} cache.", ephemeral=True)
 
 class DebugCog(commands.Cog):
     def __init__(self, bot: SHBot) -> None:
