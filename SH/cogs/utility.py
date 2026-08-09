@@ -249,7 +249,7 @@ class Utility(commands.Cog):
             return False
 
     @staticmethod
-    async def is_mod_or_expert_or_dev(interaction: discord.Interaction):
+    def is_mod_or_expert_or_dev(interaction: discord.Interaction):
         """  
         Checks if the interaction user is a Moderator or Community Expert
         """
@@ -316,7 +316,7 @@ class Utility(commands.Cog):
     @app_commands.command(name="needs-dev-review", description="This post needs to be reviewed by the developer")
     @app_commands.guild_only()
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def need_dev_review(self, interaction: discord.Interaction):
+    async def need_dev_review(self, interaction: discord.Interaction[SHBot]):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags:
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
@@ -513,7 +513,7 @@ class Utility(commands.Cog):
         view.add_item(container)
 
         text_prefix = "Hey"
-        if await self.is_mod_or_expert_or_dev(interaction=interaction):
+        if self.is_mod_or_expert_or_dev(interaction=interaction):
             user_id = await self.bot.get_post_owner_id(interaction.channel)
             text_prefix = f"Hey <@{user_id}>"
             await self.lock_unrelated_post(interaction.channel)
