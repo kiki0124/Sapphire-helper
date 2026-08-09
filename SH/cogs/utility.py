@@ -7,7 +7,7 @@ import asyncio
 import datetime
 import os
 from dotenv import load_dotenv
-from functions import generate_random_id
+from functions import generate_random_id, format_recommended_by
 from typing import Union, Literal, Callable, TYPE_CHECKING
 import re
 if TYPE_CHECKING:
@@ -30,6 +30,8 @@ APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
 UNANSWERED_TAG_ID = int(os.getenv("UNANSWERED_TAG_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv('DEVELOPERS_ROLE_ID'))
+
+CV2_RECOMMENDED_PATTERN = re.compile(r'-# Recommended by \[@.*?\]\(https://discord\.com/users/(\d+)\)$') # Used to delete msgs that are CV2
 
 class NeedDevReviewButtons(ui.ActionRow):
     @ui.button(label="Show an example of the questions answered", style=discord.ButtonStyle.grey, custom_id="need-dev-review-example")
@@ -375,10 +377,16 @@ class Utility(commands.Cog):
                         await self.send_qr_log(message=reaction.message, user=user)
                         return
         elif reaction.message.flags.components_v2:
-            patterns =  (f'-# Recommended by {user.mention}', f"-# Sent by {user.mention}")
             view = ui.LayoutView.from_message(reaction.message)
             for child in view.walk_children():
-                if isinstance(child, ui.TextDisplay) and any(child.content.endswith(pattern) for pattern in patterns):
+                if not isinstance(child, ui.TextDisplay):
+                    continue
+
+                # issue #96
+                re_match = CV2_RECOMMENDED_PATTERN.search(child.content)
+
+                # Example: -# Recommended by [@username](https://discord.com/users/USER_ID)
+                if re_match and int(re_match.group(1)) == user.id:
                     await reaction.message.delete()
                     await self.send_qr_log(reaction.message, user)
                     return
@@ -453,7 +461,8 @@ class Utility(commands.Cog):
             text_prefix = f"## Incomplete support post\nHey <@{user_id}>"
         view = ui.LayoutView()
         container = ui.Container(
-            ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible\n-# Recommended by {ctx.author.mention}"),
+            ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible."),
+            ui.TextDisplay(format_recommended_by(ctx.author)),
             accent_colour=0xFFA800
         )
         view.add_item(container)
@@ -517,13 +526,12 @@ class Utility(commands.Cog):
                     await interaction.channel.edit(applied_tags=tags)
                     break
 
-        title = "## Unrelated question/issue"
         description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
-        footer = f"-# Recommended by {interaction.user.mention}"
 
-        container.add_item(
-            ui.TextDisplay(f"{title}\n{description}\n{footer}")
-        )
+        container.add_item(ui.TextDisplay("## Unrelated question/issue"))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(description))
+        container.add_item(ui.TextDisplay(format_recommended_by(interaction.user)))
 
         await interaction.channel.send(
             view=view,

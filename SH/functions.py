@@ -9,6 +9,7 @@ from pathlib import Path
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from discord import User, Member
 
 DB_PATH = str(Path(__file__).parent / 'database' / 'data.db')
 
@@ -44,7 +45,12 @@ def check_time_more_than(timestamp: float, to_compare: timedelta) -> bool:
 def format_list(items: Sequence, conjunction: str = "or") -> str:
     return ", ".join(items[:-1]) + f" {conjunction} " + items[-1]
 
-# reminder system related functions
+def format_recommended_by(user: User | Member) -> str:
+    """
+    Formats the 'recommended by' footer used by messages with cv2.
+    """
+    return f"-# Recommended by [@{user.name}](https://discord.com/users/{user.id})"
+
 
 def sql_to_dict(sql_results: list[tuple]) -> dict[str, Any]:
     """Formats a sql.Row into dict"""

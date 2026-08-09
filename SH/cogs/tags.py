@@ -3,7 +3,8 @@ from __future__ import annotations
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
-from functions import check_tag_exists, save_tag, get_tag_content, get_tag_data, increment_tag_uses, delete_tag, update_tag_content, get_most_used_tags
+from functions import check_tag_exists, save_tag, get_tag_content, get_tag_data, increment_tag_uses, delete_tag, update_tag_content, \
+    get_most_used_tags, format_recommended_by
 import os
 from difflib import get_close_matches
 import asyncio
@@ -101,8 +102,7 @@ class TagConfirmRow(ui.ActionRow):
 
         tag_container.add_item(ui.TextDisplay(self.tag_content))
         tag_container.add_item(ui.Separator())
-
-        tag_container.add_item(ui.TextDisplay(f"-# Recommended by {interaction.user.mention}"))
+        tag_container.add_item(ui.TextDisplay(format_recommended_by(interaction.user)))
 
         await increment_tag_uses(self.tag)
 
