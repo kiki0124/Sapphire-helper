@@ -6,7 +6,7 @@ import re
 import random
 import os
 from dotenv import load_dotenv
-from functions import get_post_creator_id, generate_random_id, remove_post_from_rtdr
+from functions import generate_random_id
 from discord import ui
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ class ConfirmCloseButtons(ui.ActionRow):
 
         await interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=interaction.channel.mention, tags=tags, context="Post starter message delete and confirm button clicked- mark post as solved")
         await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
-        await remove_post_from_rtdr(interaction.channel_id)
+        interaction.client.remove_post_from_rtdr(interaction.channel_id)
 
 
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
@@ -70,7 +70,7 @@ class ConfirmCloseButtons(ui.ActionRow):
             await interaction.message.reply(view=view)
 
     async def interaction_check(self, interaction: discord.Interaction[SHBot]) -> bool:
-        self.is_owner = interaction.user.id == interaction.channel.owner_id or interaction.user.id == await get_post_creator_id(interaction.channel_id)
+        self.is_owner = interaction.user.id == await interaction.client.get_post_owner_id(interaction.channel)
         if not (self.is_owner or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)):
             await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
             return False
@@ -96,12 +96,11 @@ class ConfirmCloseView(ui.LayoutView):
 class AutoAdd(commands.Cog):
     def __init__(self, bot: SHBot):
         self.bot = bot
-        
+        self.sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
+
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):
         self.bot.add_view(ConfirmCloseView())
-
-    sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
 
     @commands.Cog.listener('on_message')
     async def message(self, message: discord.Message):
@@ -137,7 +136,7 @@ class AutoAdd(commands.Cog):
             self.bot.incomplete_msg_posts.add(thread.id)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if message.author.id == self.bot.user.id or (message.author.id != message.channel.owner_id and message.author.id != await get_post_creator_id(message.channel.id)):
+        if message.author.id == self.bot.user.id or message.author.id != await self.bot.get_post_owner_id(message.channel):
             return
         tags = message.channel._applied_tags
         if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
@@ -151,7 +150,7 @@ class AutoAdd(commands.Cog):
         if UNANSWERED_TAG_ID not in message.channel._applied_tags or message.author.id == self.bot.user.id:
             return
         applied_tags = message.channel.applied_tags
-        owner_id = await get_post_creator_id(message.channel.id) or message.channel.owner_id
+        owner_id = await self.bot.get_post_owner_id(message.channel)
         if message.author.id != owner_id:
             tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
             cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
@@ -167,15 +166,14 @@ class AutoAdd(commands.Cog):
     @commands.Cog.listener('on_raw_message_delete')
     async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
         message_channel = self.bot.get_channel(payload.channel_id)
-        is_in_support = isinstance(message_channel, discord.Thread) \
-                    and message_channel.parent_id == SUPPORT_CHANNEL_ID
+        is_in_support = isinstance(message_channel, discord.Thread) and message_channel.parent_id == SUPPORT_CHANNEL_ID
         is_starter_message = payload.message_id == payload.channel_id
         if is_in_support and is_starter_message:
             tags = message_channel._applied_tags
             tag_filters = NEED_DEV_REVIEW_TAG_ID not in tags and SOLVED_TAG_ID not in tags
             other_filters = not message_channel.locked and not message_channel.archived
             if tag_filters and other_filters:
-                owner_id = await get_post_creator_id(payload.channel_id) or message_channel.owner_id
+                owner_id = await self.bot.get_post_owner_id(message_channel)
                 await message_channel.send(
                     view=ConfirmCloseView(post_author=owner_id)
                 )

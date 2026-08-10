@@ -5,7 +5,6 @@ from discord import ui
 from discord.ext import commands
 from dotenv import load_dotenv
 import os
-from functions import add_post_to_rtdr
 from typing import Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -116,11 +115,11 @@ class RTDR(commands.Cog):
         view.add_item(container)
 
         post = await support.create_thread(
-            name=title,
+            name=f"{title[0:75]} ({reference_message.author.id})", # (USER_ID) adds about 20-24 chars, max is 100 chars
             view=view,
             files=files
         )
-        await add_post_to_rtdr(post_id=post[0].id, user_id=reference_message.author.id)
+        self.bot.add_post_to_rtdr(thread_id=post[0].id, owner_id=reference_message.author.id)
         await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire or appeal.gg. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire or appeal.gg related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300, allowed_mentions=discord.AllowedMentions.none())
         await reference_message.channel.delete_messages(messages_to_move, reason=f"rtdr system used by {user.name}")
         return post[0]

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
@@ -7,6 +9,7 @@ from functions import setup_db
 import unittest, test_functions
 from pathlib import Path
 import time
+from datetime import datetime, UTC
 load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -31,6 +34,9 @@ class SHBot(commands.Bot):
 
         self.solved_cmd_id: int = 1274997472162349079
         self.unsolve_cmd_id: int = 1281211280618950708
+
+        self.rtdr_posts: dict[int, int] = {} # posts for RTDR
+        self.pending_posts: dict[int, int] = {} # posts for pending
 
     async def setup_hook(self):
         unittest.main(test_functions, exit=False)
@@ -115,6 +121,57 @@ class SHBot(commands.Bot):
                 self.solved_cmd_id = command.id
             elif command.name == "unsolve":
                 self.unsolve_cmd_id = command.id
+
+
+    async def get_post_owner_id(self, post: discord.Thread | app_commands.AppCommandThread) -> int:
+        """
+        Helper function to get the owner ID for a support post. Returns `0` if not found.
+        """
+        if post.owner_id != self.user.id:
+            return post.owner_id
+
+        # Created by RTDR
+        owner_id = self.rtdr_posts.get(post.id)
+        if owner_id is None:
+            left_paren_index = post.name.rfind("(")
+            if left_paren_index == -1:
+                return 0
+
+            # Example title: Support for @username (USER_ID)
+            try:
+                return int(post.name[left_paren_index + 1:len(post.name) - 1])
+            except (ValueError, IndexError):
+                return 0
+        return owner_id
+
+
+    # CACHE HELPER FUNCTIONS
+    def add_post_to_rtdr(self, thread_id: int, owner_id: int) -> None:
+        """
+        Adds a post to the `RTDR` cache.
+        """
+        self.rtdr_posts[thread_id] = owner_id
+
+    def remove_post_from_rtdr(self, thread_id: int) -> None:
+        """
+        Removes a post from the `RTDR` cache.
+        """
+        self.rtdr_posts.pop(thread_id, None)
+
+
+    def add_post_to_pending(self, thread_id: int) -> None:
+        """
+        Adds a post to the `pending_posts` cache and store the time it was inserted at.
+        """
+        now = int(datetime.now(UTC).timestamp())
+        self.pending_posts[thread_id] = now
+
+    def remove_post_from_pending(self, thread_id: int) -> None:
+        """
+        Removes a post from the `pending_posts` cache
+        """
+        self.pending_posts.pop(thread_id, None)
+
 
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")

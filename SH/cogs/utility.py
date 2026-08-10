@@ -7,8 +7,7 @@ import asyncio
 import datetime
 import os
 from dotenv import load_dotenv
-from functions import remove_post_from_rtdr, get_post_creator_id, \
-                    generate_random_id, remove_post_from_pending
+from functions import generate_random_id, format_recommended_by
 from typing import Union, Literal, Callable, TYPE_CHECKING
 import re
 if TYPE_CHECKING:
@@ -31,6 +30,8 @@ APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 WAITING_FOR_REPLY_TAG_ID = int(os.getenv("WAITING_FOR_REPLY_TAG_ID"))
 UNANSWERED_TAG_ID = int(os.getenv("UNANSWERED_TAG_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv('DEVELOPERS_ROLE_ID'))
+
+CV2_RECOMMENDED_PATTERN = re.compile(r'-# Recommended by \[@.*?\]\(https://discord\.com/users/(\d+)\)$') # Used to delete msgs that are CV2
 
 class NeedDevReviewButtons(ui.ActionRow):
     @ui.button(label="Show an example of the questions answered", style=discord.ButtonStyle.grey, custom_id="need-dev-review-example")
@@ -101,7 +102,7 @@ class ndr_options_buttons(ui.View):
         await self.Interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/needs-dev-review command used")
         channel = post.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {post.mention}')
-        await remove_post_from_pending(post.id)
+        self.Interaction.client.remove_post_from_pending(post.id)
 
     @ui.button(label="Only add tag", style=discord.ButtonStyle.grey, custom_id="ndr-only-add-tag")
     async def on_only_add_tag_click(self, interaction: discord.Interaction, button: ui.Button):
@@ -182,8 +183,8 @@ class Utility(commands.Cog):
             reason=f"Auto archive {'solved' if close_delay == 3600 else 'unrelated'} post after {close_delay} seconds"
         )
         self.close_tasks.pop(post.id)
-        await remove_post_from_rtdr(post.id)
-        await remove_post_from_pending(post.id)
+        self.bot.remove_post_from_rtdr(post.id)
+        self.bot.remove_post_from_pending(post.id)
         if post.id in self.bot.incomplete_msg_posts:
             self.bot.incomplete_msg_posts.remove(post.id)
 
@@ -236,19 +237,19 @@ class Utility(commands.Cog):
         await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/unsolve used")
 
     @staticmethod
-    async def one_of_mod_expert_op(interaction: discord.Interaction):
+    async def one_of_mod_expert_op(interaction: discord.Interaction[SHBot]):
         """  
         Checks if the interaction user is a Moderator or Community Expert or the creator of the post\n
         --Integrated with rtdr system
         """
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            owner_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+            owner_id = await interaction.client.get_post_owner_id(interaction.channel)
             return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)) or interaction.user.id == owner_id
         else:
             return False
 
     @staticmethod
-    async def is_mod_or_expert_or_dev(interaction: discord.Interaction):
+    def is_mod_or_expert_or_dev(interaction: discord.Interaction):
         """  
         Checks if the interaction user is a Moderator or Community Expert
         """
@@ -284,7 +285,7 @@ class Utility(commands.Cog):
         if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != SUPPORT_CHANNEL_ID:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
             return
-        is_owner = user.id == interaction.channel.owner_id or user.id == await get_post_creator_id(interaction.channel_id)
+        is_owner = interaction.user.id == await self.bot.get_post_owner_id(interaction.channel)
         if is_owner:
             await interaction.response.send_message(f"{user.mention} is the owner of this post. Therefore they cannot be removed.", ephemeral=True)
             return
@@ -315,7 +316,7 @@ class Utility(commands.Cog):
     @app_commands.command(name="needs-dev-review", description="This post needs to be reviewed by the developer")
     @app_commands.guild_only()
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def need_dev_review(self, interaction: discord.Interaction):
+    async def need_dev_review(self, interaction: discord.Interaction[SHBot]):
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
             if NEED_DEV_REVIEW_TAG_ID not in interaction.channel._applied_tags:
                 await interaction.response.send_message(ephemeral=True, view=ndr_options_buttons(interaction), content="Select one of the options below or dismiss message to cancel.")
@@ -376,10 +377,16 @@ class Utility(commands.Cog):
                         await self.send_qr_log(message=reaction.message, user=user)
                         return
         elif reaction.message.flags.components_v2:
-            patterns =  (f'-# Recommended by {user.mention}', f"-# Sent by {user.mention}")
             view = ui.LayoutView.from_message(reaction.message)
             for child in view.walk_children():
-                if isinstance(child, ui.TextDisplay) and any(child.content.endswith(pattern) for pattern in patterns):
+                if not isinstance(child, ui.TextDisplay):
+                    continue
+
+                # issue #96
+                re_match = CV2_RECOMMENDED_PATTERN.search(child.content)
+
+                # Example: -# Recommended by [@username](https://discord.com/users/USER_ID)
+                if re_match and int(re_match.group(1)) == user.id:
                     await reaction.message.delete()
                     await self.send_qr_log(reaction.message, user)
                     return
@@ -448,13 +455,14 @@ class Utility(commands.Cog):
         if ctx.channel.id in self.bot.incomplete_msg_posts:
             await ctx.reply("You cannot use this command as an automatic message was already sent.", ephemeral=True, delete_after=5)
             return
-        user_id = await get_post_creator_id(ctx.channel.id) or ctx.channel.owner_id
+        user_id = await self.bot.get_post_owner_id(ctx.channel)
         text_prefix = "## Incomplete support post\nHey"
         if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
             text_prefix = f"## Incomplete support post\nHey <@{user_id}>"
         view = ui.LayoutView()
         container = ui.Container(
-            ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible\n-# Recommended by {ctx.author.mention}"),
+            ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible."),
+            ui.TextDisplay(format_recommended_by(ctx.author)),
             accent_colour=0xFFA800
         )
         view.add_item(container)
@@ -505,8 +513,8 @@ class Utility(commands.Cog):
         view.add_item(container)
 
         text_prefix = "Hey"
-        if await self.is_mod_or_expert_or_dev(interaction=interaction):
-            user_id = await get_post_creator_id(interaction.channel_id) or interaction.channel.owner_id
+        if self.is_mod_or_expert_or_dev(interaction=interaction):
+            user_id = await self.bot.get_post_owner_id(interaction.channel)
             text_prefix = f"Hey <@{user_id}>"
             await self.lock_unrelated_post(interaction.channel)
         else:
@@ -518,13 +526,12 @@ class Utility(commands.Cog):
                     await interaction.channel.edit(applied_tags=tags)
                     break
 
-        title = "## Unrelated question/issue"
         description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
-        footer = f"-# Recommended by {interaction.user.mention}"
 
-        container.add_item(
-            ui.TextDisplay(f"{title}\n{description}\n{footer}")
-        )
+        container.add_item(ui.TextDisplay("## Unrelated question/issue"))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(description))
+        container.add_item(ui.TextDisplay(format_recommended_by(interaction.user)))
 
         await interaction.channel.send(
             view=view,

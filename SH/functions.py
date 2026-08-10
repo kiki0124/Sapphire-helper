@@ -1,13 +1,15 @@
 from __future__ import annotations
+
 from datetime import datetime, UTC, timedelta
 import asqlite as sql
 from string import ascii_letters, digits
 import random
-from typing import Optional, Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 from pathlib import Path
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from discord import User, Member
 
 DB_PATH = str(Path(__file__).parent / 'database' / 'data.db')
 
@@ -20,14 +22,9 @@ async def setup_db():
     """
     async with sql.connect(DB_PATH) as conn: 
         async with conn.cursor() as cu:
-            await cu.execute("CREATE TABLE IF NOT EXISTS pending_posts(post_id INTEGER NOT NULL PRIMARY KEY, timestamp INTEGER NOT NULL)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS readthedamnrules(post_id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
             await cu.execute("CREATE TABLE IF NOT EXISTS tags(name STRING UNIQUE NOT NULL, content STRING NULL, creator_id INTEGER NOT NULL, created_ts INTEGER, uses INTEGER NOT NULL DEFAULT 0)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS epi_config(started_iso STRING NOT NULL, message STRING NOT NULL, message_id INTEGER NOT NULL, sticky BOOL NOT NULL, sticky_message_id INTEGER NULL)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS epi_users(user_id INTEGER UNIQUE NOT NULL)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS epi_messages(thread_id INTEGER UNIQUE NOT NULL, message_id INTEGER UNIQUE NOT NULL)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -48,13 +45,17 @@ def check_time_more_than(timestamp: float, to_compare: timedelta) -> bool:
 def format_list(items: Sequence, conjunction: str = "or") -> str:
     return ", ".join(items[:-1]) + f" {conjunction} " + items[-1]
 
-# reminder system related functions
+def format_recommended_by(user: User | Member) -> str:
+    """
+    Formats the 'recommended by' footer used by messages with cv2.
+    """
+    return f"-# Recommended by [@{user.name}](https://discord.com/users/{user.id})"
+
 
 def sql_to_dict(sql_results: list[tuple]) -> dict[str, Any]:
     """Formats a sql.Row into dict"""
 
-    possible_queries = ('post_id', 'timestamp', 'user_id', 'channel_id', 'allow', 'deny', 'started_iso', 'message', 'message_id', 'sticky', 'sticky_message_id',
-                        'thread_id', 'name', 'content', 'uses', 'creator_id', 'created_ts') #All the possible queries in all the tables
+    possible_queries = ('post_id', 'timestamp', 'user_id', 'channel_id', 'allow', 'deny', 'name', 'content', 'uses', 'creator_id', 'created_ts') #All the possible queries in all the tables
     data: dict[str, Any] = {}
     for row in sql_results: # fetchall() returns a list of tuples, so we loop through the list
         for query in possible_queries: 
@@ -84,110 +85,7 @@ async def execute_sql(cmd: str) -> dict[str, Any] | Exception:
             await conn.commit()
             result = await cu.fetchall()
             return sql_to_dict(result)
-        
-async def bulk_add_posts_to_pending(post_ids: list[int]) -> None:
-    now = int(datetime.now(UTC).timestamp())
-    args = ((post_id, now) for post_id in post_ids)
 
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.transaction():
-            await conn.executemany(f"INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING",
-                               args)
-
-async def add_post_to_pending(post_id: int) -> None:
-    """
-    Add the post with the given id and timestamp to pending db
-    """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            timestamp = int(datetime.now(UTC).timestamp())
-            await cu.execute(f"INSERT INTO pending_posts (post_id, timestamp) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, timestamp,))
-            await conn.commit()
-
-async def in_pending_posts(post_id: int) -> bool:
-    """
-    Check if a post is in pending posts table.
-    """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("SELECT NULL FROM pending_posts WHERE post_id=?", (post_id)) # Returns a Sqlite.Row object if inside else None
-            result = await cu.fetchone()
-            return bool(result)
-
-async def get_pending_posts() -> list[int]:
-    """
-    Get all posts in pending posts table. Returns a list of integers.
-    """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("SELECT post_id FROM pending_posts")
-            return [row['post_id'] for row in await cu.fetchall()]
-        
-async def get_pending_posts_and_timestamps() -> list[tuple[int, int]]:
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute("SELECT post_id, timestamp FROM pending_posts")
-            return [(row['post_id'], row['timestamp']) for row in await cu.fetchall()]
-        
-async def bulk_remove_posts_from_pending(post_ids: list[int]) -> None:
-    post_ids_sql = ",".join("?" for _ in range(len(post_ids)))
-    async with sql.connect(DB_PATH) as conn:
-        await conn.execute(f'DELETE FROM pending_posts WHERE post_id in ({post_ids_sql})', tuple(post_ids))
-        await conn.commit()
-
-async def remove_post_from_pending(post_id: int) -> None:
-    """  
-    Remove a post from closing pending db
-    """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute(f"DELETE FROM pending_posts WHERE post_id=?", (post_id,))
-            await conn.commit()
-
-async def get_post_timestamp(post_id: int) -> Optional[int]:
-    """  
-    Returns the saved timestamp for the post with given id or None if its not in the db
-    """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute(f"SELECT timestamp FROM pending_posts WHERE post_id=?", (post_id,))
-            result = await cu.fetchone()
-            if result:
-                return result['timestamp']
-            else:
-                return None
-
-
-# readthedamnrules system related functions
-
-async def add_post_to_rtdr(post_id: int, user_id: int) -> None:
-    """  
-    Add post with given id to readthedamnrules table/system
-    """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute(f"INSERT INTO readthedamnrules (post_id, user_id) VALUES (?, ?) ON CONFLICT (post_id) DO NOTHING", (post_id, user_id,))
-            await conn.commit()
-
-async def get_post_creator_id(post_id: int) -> Optional[int]:
-    """  
-    Get the id of whoever the post was created for if its part of readthedamnrules system
-    """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute(f"SELECT user_id FROM readthedamnrules WHERE post_id=?", (post_id,))
-            result = None
-            result = await cu.fetchone()
-            return result['user_id'] if result else None
-
-async def remove_post_from_rtdr(post_id: int) -> None:
-    """  
-    Remove post with given id from readthedamnrules system
-    """
-    async with sql.connect(DB_PATH) as conn:
-        async with conn.cursor() as cu:
-            await cu.execute(f"DELETE FROM readthedamnrules WHERE post_id=?", (post_id,))
-            await conn.commit()
 
 # reminders-redone
 
@@ -327,120 +225,4 @@ async def get_most_used_tags() -> list[str]:
 async def delete_tag(name: str):
     async with sql.connect(DB_PATH) as conn:
         await conn.execute("DELETE FROM tags WHERE name=?", (name,))
-        await conn.commit()
-
-# EPI
-
-async def save_epi_config(pool: sql.Pool, started_at: str, sticky: bool, message: str = '-', status_message_id: int = 0, sticky_message_id: int | None = None) -> None:
-    async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO epi_config (started_iso, message, message_id, sticky, sticky_message_id) VALUES (?, ?, ?, ?, ?)", (started_at, message, status_message_id, sticky, sticky_message_id,))
-        await conn.commit()
-
-async def add_epi_user(user_id: int) -> None:
-    async with sql.connect(DB_PATH) as conn:
-        await conn.execute("INSERT INTO epi_users (user_id) VALUES (?)", (user_id,))
-        await conn.commit()
-
-async def delete_epi_user(user_id: int) -> None:
-    async with sql.connect(DB_PATH) as conn:
-        await conn.execute("DELETE FROM epi_users WHERE user_id=?", (user_id,))
-        await conn.commit()
-
-async def get_epi_users(pool: sql.Pool) -> list[int]:
-    async with pool.acquire() as conn:
-        result = await conn.fetchall("SELECT user_id FROM epi_users")
-        if result: 
-            return [row['user_id'] for row in result] # the first (and only) item in the user's id as an integer
-        return []
-
-async def get_epi_config(pool: sql.Pool) -> dict[str, Any]: # {"started_at": 123, "message": "low taper fade is still massive", "message_id": 123, sticky: True}
-    """  
-    Returns a dict of the saved config in this format
-    {
-        "started_at": 123,
-        "message": str("low taper fade is still massive") | None,
-        "message_id": int(123456) | None,
-        "sticky": bool(False),
-        "sticky_message_id": int(123456) | None
-        }
-    """
-    async with pool.acquire() as conn:
-        result = await conn.fetchone("SELECT * FROM epi_config")
-        if result:
-            return {
-                "started_at": int(datetime.fromisoformat(result['started_iso']).timestamp()),
-                "message": result['message'],
-                "message_id": result['message_id'],
-                "sticky": result['sticky'],
-                "sticky_message_id": result['sticky_message_id']
-            }
-        else:
-            return {}
-							
-async def add_epi_message(pool: sql.Pool, message_id: int, thread_id: int) -> None:
-    async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO epi_messages (thread_id, message_id) VALUES (?, ?)", (thread_id, message_id,))
-        await conn.commit()
-
-async def get_epi_messages(pool: sql.Pool) -> dict[int, int]: # {thread_id: message_id}
-    """  
-    Get a dict of {int(thread_id): int(message_id)} of all saved epi messages
-    """
-    async with pool.acquire() as conn:
-        result = await conn.fetchall("SELECT * FROM epi_messages")
-        data = {}
-        for row in result:
-            data[row['thread_id']] = row['message_id']
-        return data
-
-async def clear_epi_messages(pool: sql.Pool) -> None:
-    """  
-    Delete all epi messages from the DB
-    """
-    async with pool.acquire() as conn:
-        await conn.execute("DELETE FROM epi_messages")
-        await conn.commit()
-
-async def clear_epi_users(pool: sql.Pool) -> None:
-    """  
-    Delete all epi user ids from the DB
-    """
-    async with pool.acquire() as conn:
-        await conn.execute("DELETE FROM epi_users")
-        await conn.commit()
-
-async def clear_epi_config(pool: sql.Pool) -> None:
-    """ 
-    Delete all data from epi_config table
-    """
-    async with pool.acquire() as conn:
-        await conn.execute("DELETE FROM epi_config")
-        await conn.commit()
-
-async def update_sticky_message_id(pool: sql.Pool, id: int) -> None:
-    """  
-    Insert the sticky message id to epi config table if there isn't a message id there and update if there is one
-    """
-    async with pool.acquire() as conn:
-        await conn.execute("UPDATE epi_config SET sticky_message_id=?", (id,))
-        await conn.commit()
-
-async def update_epi_message_id(pool: sql.Pool, id: int) -> None:
-    async with pool.acquire() as conn:
-        await conn.execute('UPDATE epi_config SET message_id=?', (id,))
-        await conn.commit()
-
-async def update_epi_message(pool: sql.Pool, message: str) -> None:
-    async with pool.acquire() as conn:
-        await conn.execute("UPDATE epi_config SET message=?", (message,))
-        await conn.commit()
-
-async def update_epi_sticky(pool: sql.Pool, value: bool) -> None:
-    async with pool.acquire() as conn:
-        await conn.execute("UPDATE epi_config SET sticky=?", (value,))
-        await conn.commit()
-
-async def update_epi_started_at(pool: sql.Pool, timestamp: int) -> None:
-    async with pool.acquire() as conn:
-        await conn.execute("UPDATE epi_config SET started_iso=?", (datetime.fromtimestamp(timestamp, UTC).isoformat(),))
         await conn.commit()
