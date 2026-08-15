@@ -58,13 +58,13 @@ class ConfirmCloseButtons(ui.ActionRow):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         footer = f"-# Cancelled by {interaction.user}"
         if SOLVED_TAG_ID in interaction.channel._applied_tags:
-            footer += f" | Use </unsolve:{await interaction.client.get_unsolve_id()}> to unsolve"
+            footer += f" | Use </unsolve:{interaction.client.unsolve_cmd_id}> to unsolve"
         new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(footer)))
         await interaction.response.edit_message(view=new_view)
 
         if self.is_owner:
             description = "Please send a message here explaining what you still need help with."
-            footer = f"-# When the issue is resolved, you may use </solved:{await interaction.client.get_solved_id()}> to mark it as solved."
+            footer = f"-# When the issue is resolved, you may use </solved:{interaction.client.solved_cmd_id}> to mark it as solved."
             view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(description), ui.Separator(visible=True), 
                                                             ui.TextDisplay(footer)))
             await interaction.message.reply(view=view)
@@ -143,7 +143,7 @@ class AutoAdd(commands.Cog):
             pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
             negative_pattern = r"doe?s?n.?t|hasn.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t|advance\b|ahead o?f? time"
             if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
-                await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.bot.get_solved_id()}>")
+                await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{self.bot.solved_cmd_id}>")
                 self.sent_post_ids.append(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
