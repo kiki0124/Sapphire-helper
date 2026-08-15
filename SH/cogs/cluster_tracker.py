@@ -457,8 +457,6 @@ class ClusterTracker(commands.Cog):
         container.add_item(ui.TextDisplay(f"### {len(clusters)}/{len(self.cluster_tracker.clusters)} clusters"))
         container.add_item(ui.Separator())
         container.add_item(ui.TextDisplay(fmt))
-        if clusters[0].ping >= 500:
-            container.accent_colour = discord.Color.orange()
 
         view = ui.LayoutView()
         view.add_item(container)
