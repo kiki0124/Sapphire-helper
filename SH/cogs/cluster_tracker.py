@@ -25,9 +25,6 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv('ALERTS_THREAD_ID'))
 
 
-STATUS_WS_URL = "wss://user-ws.sapph.xyz/socket.io/?EIO=4&transport=websocket"
-
-
 class Cluster(NamedTuple):
     number: int
     ping: int
@@ -156,20 +153,34 @@ class StatusPage:
         self.notified_message = None
 
 
-class ClusterTracker(commands.Cog):
-    def __init__(self, bot: SHBot) -> None:
-        self.bot = bot
-        self.cluster_tracker = StatusPage(timedelta(minutes=16))
+class Websocket:
+    STATUS_WS_URL = "wss://user-ws.sapph.xyz/socket.io/?EIO=4&transport=websocket"
+
+    """
+    Handles the connection to websocket at sapph.xyz
+    """
+
+    __slots__= ('cog', '_connected', '_ws', '_task')
+
+    def __init__(self, cog: ClusterTracker) -> None:
+        self.cog = cog
 
         self._connected = asyncio.Event()
         self._ws = None
         self._task: asyncio.Task | None = None
 
-    async def cog_load(self) -> None:
-        self._task = asyncio.create_task(self.connect_to_ws())
+    @property
+    def connected(self):
+        return self._connected.is_set()
 
-    async def cog_unload(self) -> None:
-        await self.disconnect_ws()
+    def start_connection(self) -> None:
+        """
+        Cancels previously running _task, and creates a new one.
+        """
+        if self._task is not None:
+            self._task.cancel()
+
+        self._task = asyncio.create_task(self.connect_to_ws())
 
     async def disconnect_ws(self):
         if self._ws is not None:
@@ -186,41 +197,52 @@ class ClusterTracker(commands.Cog):
 
             self._task = None
 
-    @property
-    def connected(self):
-        return self._connected.is_set()
-
     async def connect_to_ws(self):
         delay = 1 # delay for exponential backoff
         
         async with aiohttp.ClientSession() as session:
             while True:
                 try:
-                    async with session.ws_connect(STATUS_WS_URL) as ws:
+                    async with session.ws_connect(self.STATUS_WS_URL) as ws:
                         self._ws = ws
                         self._connected.set()
                         delay = 1
 
-                        await self.bot.send_log(ALERTS_THREAD_ID, content="Successfully connected to sapph.xzy websocket")
-
-                        await self.receive_ws(ws)
+                        await self.cog.receive_ws(ws)
 
                 except asyncio.CancelledError:
                     raise
 
                 except Exception as e:
-                    await self.bot.send_log(ALERTS_THREAD_ID, content=f"An error occcured (WS): {e}")
+                    await self.cog.bot.send_unhandled_error(e)
 
                 finally:
                     self._ws = None
                     self._connected.clear()
 
-                await self.bot.send_log(ALERTS_THREAD_ID, content=f"Reconnecting (sapph.xyz websocket) in `{delay}s`...")
+                if delay >= 4:
+                    await self.cog.bot.send_log(ALERTS_THREAD_ID, content=f"Reconnecting (sapph.xyz websocket) in `{delay}s`...")
                 await asyncio.sleep(delay)
                 delay = min(delay * 2, 45)
 
 
+class ClusterTracker(commands.Cog):
+    def __init__(self, bot: SHBot) -> None:
+        self.bot = bot
+        self.cluster_tracker = StatusPage(timedelta(minutes=16))
+
+        self.websocket = Websocket(self)
+
+    async def cog_load(self) -> None:
+        self.websocket.start_connection()
+
+    async def cog_unload(self) -> None:
+        await self.websocket.disconnect_ws()
+
     async def receive_ws(self, ws: aiohttp.ClientWebSocketResponse):
+        """
+        Called in :meth:`Websocket.connect_to_ws`
+        """
         async for msg in ws:
             if msg.type != aiohttp.WSMsgType.TEXT:
                 continue
@@ -254,10 +276,10 @@ class ClusterTracker(commands.Cog):
     def format_timedelta(td: timedelta) -> str:
         hours = td.seconds // 3600 # (60s - 1m, 60m - 1h: 60 * 60 = 3600)
         if hours == 0:
-            return f"{td.seconds / 60:.2f}min"
+            return f"{td.seconds / 60:.1f}min"
 
         remaining_mins = (td.seconds - (hours * 3600)) / 60
-        return f"{hours}h, {remaining_mins:.2f}min"
+        return f"{hours}h, {remaining_mins:.1f}min"
 
     def get_expert_channel(self) -> discord.TextChannel | None:
         return discord.utils.get(self.bot.get_all_channels(), name="sapphire-experts") # type: ignore
@@ -449,36 +471,36 @@ class ClusterTracker(commands.Cog):
     async def cluster_tracking_websocket(self, interaction: discord.Interaction, action: Literal['connect', 'disconnect', 'force_disconnect', 'view'] = 'view'):
         await interaction.response.defer(ephemeral=True)
         if action == 'view':
-            content = f"- Is connected: `{self.connected}`\n- WS: {self._ws}"
-            if self._task is not None:
-                content += f"\n- Internal Task: `{self._task.done()}` (done) | `{self._task.cancelled()}` (cancelled)"
+            content = f"- Is connected: `{self.websocket.connected}`\n- WS: {self.websocket._ws}"
+            if self.websocket._task is not None:
+                content += f"\n- Internal Task: `{self.websocket._task.done()}` (done) | `{self.websocket._task.cancelled()}` (cancelled)"
             else:
                 content += f"\n- Internal Task: `None`"
             await interaction.followup.send(content=content, ephemeral=True)
             return
 
         if action == 'connect':
-            if self.connected:
+            if self.websocket.connected:
                 await interaction.followup.send("Already connected!", ephemeral=True)
                 return
-            if self._task is not None and not self._task.done():
+            if self.websocket._task is not None and not self.websocket._task.done():
                 await interaction.followup.send("WS not connected but `_task` is still running!", ephemeral=True)
                 return
-            self._task = asyncio.create_task(self.connect_to_ws())
+            self.websocket.start_connection()
             await interaction.followup.send("Successfully connected!", ephemeral=True)
         elif action == 'disconnect':           
-            if not self.connected:
+            if not self.websocket.connected:
                 await interaction.followup.send("Already disconnected (or the ws is currently sleeping, try again or `force_disconnect`)!",
                                                 ephemeral=True)
                 return
 
-            if self._task is not None and self._task.done():
+            if self.websocket._task is not None and self.websocket._task.done():
                 await interaction.followup.send("WS connected but `_task` is stopped! Try `force_cancel`", ephemeral=True)
                 return
-            await self.disconnect_ws()
+            await self.websocket.disconnect_ws()
             await interaction.followup.send("Successfully disconnected!", ephemeral=True)
         else:
-            await self.disconnect_ws()
+            await self.websocket.disconnect_ws()
             await interaction.followup.send("Successfully force disconnected the websocket!", ephemeral=True)
 
 
