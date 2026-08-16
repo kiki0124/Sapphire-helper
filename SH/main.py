@@ -155,9 +155,11 @@ class SHBot(commands.Bot):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID, MODERATORS_ROLE_ID)
     async def extensions_cmd(self, interaction: discord.Interaction, action: Literal["load", "reload", "unload"] | None = None, extension: str | None = None):
         await interaction.response.defer(ephemeral=True)
+        cog_dir = Path(__file__).parent / 'cogs'
+        files = [file for file in os.listdir(cog_dir) if file.endswith('.py')]
         if action is None:
-            cog_dir = Path(__file__).parent / 'cogs'
-            files = sorted(file for file in os.listdir(cog_dir) if file.endswith('.py'))
+
+            files = sorted(files)
 
             loaded = {file: f"cogs.{file[:-3]}" for file in files if f"cogs.{file[:-3]}" in self.extensions}
             not_loaded = [file for file in files if f"cogs.{file[:-3]}" not in self.extensions]
@@ -189,8 +191,6 @@ class SHBot(commands.Bot):
 
         else:
             if extension is None:
-                cog_dir = Path(__file__).parent / 'cogs'
-                files = [file for file in os.listdir(cog_dir) if file.endswith('.py')]
                 for file in files:
                     try:
                         await self.perform_extension_action(action, f"cogs.{file[:-3]}")
