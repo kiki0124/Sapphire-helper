@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 - Error handling for failing to convert a member object.
 - Runtime debugging for reminders ([#85](https://github.com/kiki0124/Sapphire-helper/issues/85))
 - Runtime debugging for EPI
+- For messages using cv2, changed from `Recommended by @mention` -> `Recommended by [@username](user_profile_link)` ([#96](https://github.com/kiki0124/Sapphire-helper/issues/96))
+- Auto detection of cluster downtime + live custer tracking ([#99](https://github.com/kiki0124/Sapphire-helper/issues/99))
 
 ### Fixed
 - Fixed `/unrelated` command not adding `not-solved` tag. ([#82](https://github.com/kiki0124/Sapphire-helper/issues/82))

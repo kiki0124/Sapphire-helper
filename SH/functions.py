@@ -52,6 +52,43 @@ def format_recommended_by(user: User | Member) -> str:
     return f"-# Recommended by [@{user.name}](https://discord.com/users/{user.id})"
 
 
+def str_to_timedelta(duration: str) -> timedelta:
+    td = timedelta()
+    duration_list = duration.replace(" ", "").split(",")
+    for duration in duration_list:
+        if duration.endswith("s"):
+            new_time = duration.rstrip("s")
+            td += timedelta(seconds=float(new_time))
+        elif duration.endswith("sec"):
+            new_time = duration.rstrip("sec")
+            td += timedelta(seconds=float(new_time))
+
+        elif duration.endswith("m"):
+            new_time = duration.rstrip("m")
+            td += timedelta(minutes=float(new_time))
+        elif duration.endswith("min"):
+            new_time = duration.rstrip("min")
+            td += timedelta(minutes=float(new_time))
+
+        elif duration.endswith("h"):
+            new_time = duration.rstrip("h")
+            td += timedelta(hours=float(new_time))
+        elif duration.endswith("hour"):
+            new_time = duration.rstrip("hour")
+            td += timedelta(hours=float(new_time))
+
+        elif duration.endswith("d"):
+            new_time = duration.rstrip("d")
+            td += timedelta(days=float(new_time))
+        elif duration.endswith("day"):
+            new_time = duration.rstrip("day")
+            td += timedelta(days=float(new_time))
+
+        else:
+            raise ValueError(f"`{duration}` is invalid!")
+    return td
+
+
 def sql_to_dict(sql_results: list[tuple]) -> dict[str, Any]:
     """Formats a sql.Row into dict"""
 
