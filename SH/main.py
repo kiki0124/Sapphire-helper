@@ -150,7 +150,7 @@ class SHBot(commands.Bot):
             if currently_loaded:
                 await self.unload_extension(extension)
 
-    @app_commands.command(name="extensions", description="Reload a extension")
+    @app_commands.command(name="extensions", description="Manage the bot's extensions")
     @app_commands.describe(action="The action to perform", extension="The extension file to reload (if not specified, all extensions will be reloaded)")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID, MODERATORS_ROLE_ID)
     async def extensions_cmd(self, interaction: discord.Interaction, action: Literal["load", "reload", "unload"] | None = None, extension: str | None = None):
