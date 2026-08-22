@@ -166,12 +166,17 @@ class SHBot(commands.Bot):
         self.rtdr_posts.pop(thread_id, None)
 
 
-    def add_post_to_pending(self, thread_id: int) -> None:
+    def add_post_to_pending(self, thread_id: int, *, timestamp: int | None = None) -> None:
         """
         Adds a post to the `pending_posts` cache and store the time it was inserted at.
+
+        Parameters
+        ----------
+        `timestamp`: `int`
+            When the post is added to pending. Defaults to the current timestamp.
         """
-        now = int(datetime.now(UTC).timestamp())
-        self.pending_posts[thread_id] = now
+        timestamp = timestamp or int(datetime.now(UTC).timestamp())
+        self.pending_posts[thread_id] = timestamp
 
     def remove_post_from_pending(self, thread_id: int) -> None:
         """
