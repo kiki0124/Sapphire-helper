@@ -213,6 +213,12 @@ class Websocket:
                 except asyncio.CancelledError:
                     raise
 
+                except aiohttp.ClientResponseError as e:
+                    if e.status == 502:
+                        await self.cog.bot.send_log(ALERTS_THREAD_ID, content=f"An error occurred: {e}") # no pings for this
+                    else:
+                        await self.cog.bot.send_unhandled_error(e)
+
                 except Exception as e:
                     await self.cog.bot.send_unhandled_error(e)
 
