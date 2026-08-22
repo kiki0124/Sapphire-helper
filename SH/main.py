@@ -15,7 +15,6 @@ from datetime import datetime, UTC
 load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
-PREFIX = os.getenv("PREFIX")
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 
 class SHBot(commands.Bot):
@@ -25,7 +24,7 @@ class SHBot(commands.Bot):
         intents.guild_messages = True
         intents.guilds = True
         intents.guild_reactions = True
-        super().__init__(PREFIX, help_command=None, intents=intents, strip_after_prefix=True, 
+        super().__init__(commands.when_mentioned, help_command=None, intents=intents, strip_after_prefix=True, 
                         allowed_contexts=app_commands.AppCommandContext(guild=True),
                         allowed_installs=app_commands.AppInstallationType(guild=True)
                          )
