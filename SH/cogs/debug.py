@@ -108,7 +108,7 @@ class GlobalCacheModal(ui.Modal):
         assert(isinstance(self.owner_input.component, ui.UserSelect))
         assert(isinstance(self.debug_type.component, ui.CheckboxGroup))
 
-        debug_type: Literal['clear', 'view', 'add', 'remove', 'check'] = self.debug_type.component.values[0]
+        debug_type: Literal['clear', 'view', 'add', 'remove', 'check'] = self.debug_type.component.values[0] # type: ignore
 
         if self.cache_type == 'PENDING_POSTS':
             cache = interaction.client.pending_posts
@@ -117,7 +117,7 @@ class GlobalCacheModal(ui.Modal):
 
         if debug_type == "clear":
             cache.clear()
-            await interaction.client.send_log(ALERTS_THREAD_ID, content=f"{self.cache_type} cache has been cleared by {interaction.user.mention}")
+            await interaction.client.send_log(ALERTS_THREAD_ID, content=f"`{self.cache_type}` cache has been cleared by {interaction.user.mention}")
             await interaction.followup.send(f"{self.cache_type} cache has been cleared!", ephemeral=True)
             return
         elif debug_type == "view":
@@ -144,24 +144,26 @@ class GlobalCacheModal(ui.Modal):
 
         if debug_type == "add":
             if self.cache_type == 'RTDR':
+                if post.owner_id != interaction.client.user.id:
+                    await interaction.followup.send("This post must be created by Sapphire Helper in order for it to be a RTDR post!", ephemeral=True)
+                    return
                 if not self.owner_input.component.values:
                     await interaction.followup.send(f"A user is needed in order to add a post to RTDR!", ephemeral=True)
                     return
+
                 owner = self.owner_input.component.values[0]
                 cache[post_id] = owner.id
                 await interaction.followup.send(f"Successfully added <#{post_id}> to RTDR cache with {owner.mention} ({owner.id}) as owner.", ephemeral=True)
-                return
             else:
                 cache[post_id] = int(datetime.now(UTC).timestamp())
                 await interaction.followup.send(f"Successfully added <#{post_id}> to PENDING_POSTS cache.", ephemeral=True)
-                return
         elif debug_type == "remove":
             try:
                 del cache[post_id]
             except KeyError:
                 await interaction.followup.send(f"<#{post_id}> ({post_id}) is not in {self.cache_type} cache.", ephemeral=True)
-                return
-            await interaction.followup.send(f"Successfully removed <#{post_id}> ({post_id}) from {self.cache_type} cache.", ephemeral=True)
+            else:
+                await interaction.followup.send(f"Successfully removed <#{post_id}> ({post_id}) from {self.cache_type} cache.", ephemeral=True)
         else:
             in_cache = "is" if post_id in cache else "is not"
             await interaction.followup.send(f"<#{post_id}> ({post_id}) {in_cache} in {self.cache_type} cache.", ephemeral=True)
