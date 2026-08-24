@@ -261,8 +261,8 @@ class EPI(commands.Cog):
         self.epi_data.is_being_executed = False
 
     async def disable_sticky_message(self):
-        while self.epi_data.is_being_executed:
-            await asyncio.sleep(1) # self.is_being_executed is true at lines 196-197 - async handle_sticky_message, when the previous sticky message is deleted and the new one is being sent. 1 should probably be enough for these things to happen
+        if self.epi_data.sticky_task is not None:
+            self.epi_data.sticky_task.cancel()
 
         if self.epi_data.sticky_message is not None:
             try:
@@ -275,6 +275,7 @@ class EPI(commands.Cog):
 
     async def cog_unload(self):
         self.ping_status_page.cancel()
+        await self.disable_sticky_message()
 
     @group.command(name="enable", description="Enables EPI mode with the given text/message id")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
