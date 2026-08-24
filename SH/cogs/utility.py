@@ -285,7 +285,7 @@ class Utility(commands.Cog):
         if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != SUPPORT_CHANNEL_ID:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
             return
-        is_owner = user == await self.bot.get_post_owner_id(interaction.channel)
+        is_owner = user.id == await self.bot.get_post_owner_id(interaction.channel)
         if is_owner:
             await interaction.response.send_message(f"{user.mention} is the owner of this post. Therefore they cannot be removed.", ephemeral=True)
             return
