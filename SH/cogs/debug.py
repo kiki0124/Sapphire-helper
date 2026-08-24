@@ -189,7 +189,8 @@ class DebugCog(commands.Cog):
         owner_id = await self.bot.get_post_owner_id(post)
         await interaction.followup.send(view=DebugPostView(post, is_pending=is_pending, pending_post_timestamp=pending_post_timestamp,
                                                            owner_id=owner_id),
-                                                           allowed_mentions=discord.AllowedMentions.none())
+                                                           allowed_mentions=discord.AllowedMentions.none(),
+                                                           ephemeral=True)
 
     @debug_group_cmd.command(name="eval_sql", description="Execute an SQL command")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
