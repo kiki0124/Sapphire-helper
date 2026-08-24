@@ -317,7 +317,7 @@ class Reminders(commands.Cog):
 
 
     async def close_pending_posts(self):
-        for post_id, inserted_at in self.bot.pending_posts.items():
+        for post_id, inserted_at in tuple(self.bot.pending_posts.items()): # tuple to avoid modifying while iterating through the dictionary
             # only close posts that have been pending for > 1 day
             if not check_time_more_than(inserted_at, timedelta(days=1)):
                 continue

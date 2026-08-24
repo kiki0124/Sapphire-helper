@@ -11,6 +11,7 @@ from pathlib import Path
 import time
 from aiocache import cached
 from datetime import datetime, UTC
+from traceback import print_exception
 
 load_dotenv()
 
@@ -106,6 +107,7 @@ class SHBot(commands.Bot):
             content += f"\n### Tasks.Loop Error:\n>>> - {task._name}\n- Current iterations: `{task.current_loop}`"
         await self.send_log(ALERTS_THREAD_ID, content=content, 
                             allowed_mentions=discord.AllowedMentions(users=[discord.Object(1105414178937774150), discord.Object(802167689011134474)]))
+        print_exception(error)
 
     @cached()
     async def get_unsolve_id(self) -> int:
