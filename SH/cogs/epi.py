@@ -530,6 +530,11 @@ class EPI(commands.Cog):
         except ValueError:
             await interaction.followup.send(f"`{duration}` is not a valid duration. (E.g: 10s | 30m | 1m, 30s)", ephemeral=True)
             return
+
+        if td.seconds > (60 * 60 * 6): # 6 hours
+            await interaction.followup.send(f"Slowmode cannot be longer than 6 hours!", ephemeral=True)
+            return
+
         view = ui.View()
         view.add_item(SelectChannels("slowmode", reason, interaction, td))
         await interaction.followup.send(content="Select the channels where the given slowmode should be applied below.\n-# Minimum of 1, maximum of 5.", view=view)
