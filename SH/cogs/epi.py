@@ -4,8 +4,9 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands, ui
 from dotenv import load_dotenv
+from datetime import timedelta
 from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, \
-    generate_random_id, check_time_more_than
+    generate_random_id, check_time_more_than, str_to_timedelta
 import aiohttp, json, os, asyncio, re, datetime
 from typing import Literal, Optional, Any, TYPE_CHECKING
 
@@ -66,8 +67,8 @@ class GetNotifiedView(ui.LayoutView):
         self.add_item(container)
 
 
-class select_channels(ui.ChannelSelect):
-    def __init__(self, action: str, reason: str, i: discord.Interaction, slowmode: int | None = None):
+class SelectChannels(ui.ChannelSelect):
+    def __init__(self, action: str, reason: str, i: discord.Interaction, slowmode: timedelta | None = None):
         super().__init__(
             channel_types=[discord.ChannelType.text, discord.ChannelType.forum],
             placeholder=f"Select channels to",
@@ -76,7 +77,7 @@ class select_channels(ui.ChannelSelect):
         )
         self.action = action
         self.reason = reason
-        self.slowmode = slowmode
+        self.slowmode: int = slowmode.seconds if slowmode is not None else 0
         self.i = i
 
     async def lock_channel(self, channel: discord.TextChannel|discord.ForumChannel, interaction: discord.Interaction):
@@ -146,12 +147,12 @@ class select_channels(ui.ChannelSelect):
                 case "slowmode":
                     await channel.edit(slowmode_delay=self.slowmode, reason=f"/slowmode used by {interaction.user.name} ({interaction.user.id}). Reason: {self.reason}")
                     if self.slowmode > 0:
-                        await interaction.followup.send(f"Successfully set slowmode in {channel.mention} to {self.slowmode} seconds with reason: {self.reason}", ephemeral=True)
+                        await interaction.followup.send(f"Successfully set slowmode in {channel.mention} to {self.slowmode}s with reason: {self.reason}", ephemeral=True)
                     elif self.slowmode == 0:
                         await interaction.followup.send(f"Successfully disabled slowmode in {channel.mention}!", ephemeral=True)
                     successful.append(channel.id)
         if successful: # Check that channels were successfully edited
-            action_str = self.action + "ed" if self.slowmode is None else f"set slowmode to {self.slowmode}" if self.slowmode > 0 else "disabled slowmode"
+            action_str = self.action + "ed" if self.slowmode is None else f"set slowmode to {self.slowmode}s" if self.slowmode > 0 else "disabled slowmode"
             await interaction.client.send_log(EPI_LOG_THREAD_ID, content=f"{interaction.user.mention} {action_str} in {', '.join([f'<#{c}>' for c in successful])}. Reason: {self.reason}")
             await self.i.edit_original_response(view=None)
 
@@ -507,7 +508,7 @@ class EPI(commands.Cog):
     async def lock(self, interaction: discord.Interaction, reason: app_commands.Range[str, 1, 200]):
         await interaction.response.defer(ephemeral=True)
         view = ui.View()
-        view.add_item(select_channels("lock", reason, interaction))
+        view.add_item(SelectChannels("lock", reason, interaction))
         await interaction.followup.send(content="Select the channels to be locked below.\n-# Minimum of 1, maximum of 5.", view=view)
                 
     @app_commands.command(name="unlock", description="Unlock the given channels through the select menu sent. Should only be used in emergencies.")
@@ -516,16 +517,21 @@ class EPI(commands.Cog):
     async def unlock(self, interaction: discord.Interaction, reason: app_commands.Range[str, 1, 200]):
         await interaction.response.defer(ephemeral=True)
         view = ui.View()
-        view.add_item(select_channels("unlock", reason, interaction))
+        view.add_item(SelectChannels("unlock", reason, interaction))
         await interaction.followup.send("Select the channels that should be unlocked below.\n-# Minimum of 1, maximum of 5.", view=view, ephemeral=True)
 
     @app_commands.command(name="slowmode", description="Set a slowmode to channels using the select menu sent. Should only be used in emergencies.")
-    @app_commands.describe(time="The new slowmode time for the channel, in seconds. Max 21600. Put 0 to disable slowmode.", reason="What's the reason for this slowmode?")
+    @app_commands.describe(duration="The new slowmode for the channel (10s | 50m | 1m, 30s)", reason="What's the reason for this slowmode?")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def slowmode(self, interaction: discord.Interaction, time: app_commands.Range[int, 0, 21600], reason: app_commands.Range[str, 1, 200]):
+    async def slowmode(self, interaction: discord.Interaction, duration: str, reason: app_commands.Range[str, 1, 200]):
         await interaction.response.defer(ephemeral=True)
+        try:
+            td = str_to_timedelta(duration)
+        except ValueError:
+            await interaction.followup.send(f"`{duration}` is not a valid duration. (E.g: 10s | 30m | 1m, 30s)", ephemeral=True)
+            return
         view = ui.View()
-        view.add_item(select_channels("slowmode", reason,interaction ,time))
+        view.add_item(SelectChannels("slowmode", reason, interaction, td))
         await interaction.followup.send(content="Select the channels where the given slowmode should be applied below.\n-# Minimum of 1, maximum of 5.", view=view)
 
     async def set_webhook_page(self, partial_channel: discord.PartialMessageable) -> None:
