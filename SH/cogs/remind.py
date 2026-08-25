@@ -35,7 +35,7 @@ class CloseNowRow(ui.ActionRow):
         super().__init__()
         self.is_owner: bool = False
 
-    @ui.button(label="Issue Resolved? Close Post Now", style=discord.ButtonStyle.green, custom_id="remind-close-now")
+    @ui.button(label="Issue Resolved", style=discord.ButtonStyle.green, custom_id="remind-close-now")
     async def on_close_now_click(self, interaction: discord.Interaction[SHBot], _: ui.Button):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(f"-# Closed by {interaction.user}")))
@@ -58,7 +58,7 @@ class CloseNowRow(ui.ActionRow):
         interaction.client.remove_post_from_rtdr(interaction.channel_id)
 
 
-    @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="remind-cancel")
+    @ui.button(label="Still need help", style=discord.ButtonStyle.red, custom_id="remind-cancel")
     async def on_cancel_click(self, interaction: discord.Interaction[SHBot], _: ui.Button):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         footer = f"-# Cancelled by {interaction.user}"
@@ -69,7 +69,7 @@ class CloseNowRow(ui.ActionRow):
         interaction.client.remove_post_from_pending(interaction.channel_id)
 
         if self.is_owner:
-            description = "Please send a message here explaining what you still need help with."
+            description = f"Heya {interaction.user.mention}, please send a message here explaining what you still need help with."
             footer = f"-# When the issue is resolved, you may use </solved:{await interaction.client.get_solved_id()}> to mark it as solved."
             view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
             await interaction.message.reply(view=view)

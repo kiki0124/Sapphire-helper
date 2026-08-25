@@ -53,7 +53,7 @@ class ConfirmCloseButtons(ui.ActionRow):
         interaction.client.remove_post_from_rtdr(interaction.channel_id)
 
 
-    @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
+    @ui.button(label="Still need help", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
     async def on_cancel_click(self, interaction: discord.Interaction[SHBot], _: ui.Button):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         footer = f"-# Cancelled by {interaction.user}"
@@ -63,7 +63,7 @@ class ConfirmCloseButtons(ui.ActionRow):
         await interaction.response.edit_message(view=new_view)
 
         if self.is_owner:
-            description = "Please send a message here explaining what you still need help with."
+            description = f"Heya {interaction.user.mention}, please send a message here explaining what you still need help with."
             footer = f"-# When the issue is resolved, you may use </solved:{await interaction.client.get_solved_id()}> to mark it as solved."
             view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(description), ui.Separator(visible=True), 
                                                             ui.TextDisplay(footer)))
