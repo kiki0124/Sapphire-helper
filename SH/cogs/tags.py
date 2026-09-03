@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands, ui
 from functions import check_tag_exists, save_tag, get_tag_content, get_tag_data, increment_tag_uses, delete_tag, update_tag_content, \
-    get_most_used_tags, format_recommended_by
+    get_most_used_tags, format_recommended_by, update_tag_name
 import os
 from difflib import get_close_matches
 import asyncio
@@ -21,6 +21,7 @@ EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 TAG_LOGGING_THREAD_ID = int(os.getenv("TAG_LOGGING_THREAD_ID"))
+
 
 class CreateTagModal(ui.Modal):
     def __init__(self, tag_cog: Tags):
@@ -60,25 +61,64 @@ class CreateTagModal(ui.Modal):
             await interaction.followup.send("A tag with this name already exists...\n-# Use `/tag delete` to delete it", ephemeral=True)
 
 class UpdateTagModal(ui.Modal):
-    def __init__(self, tag: str):
+    def __init__(self, cog: Tags, tag_name: str, tag_content: str):
         super().__init__(title="Update tag", custom_id="update_tag_modal")
-        self.tag = tag
-    label = ui.Label(
-        text="New content:", 
-        component=ui.TextInput(
-            style=discord.TextStyle.paragraph, 
-            placeholder="The new content that this tag should have", 
-            max_length=950
+        self.cog = cog
+        self.tag_name: str = tag_name
+        self.tag_content = tag_content
+
+        self.add_item(ui.TextDisplay(f"Original content for `{self.tag_name}`:```{tag_content}```"))
+
+        self.new_name_label = ui.Label(
+            text="New name (Optional):", 
+            component=ui.TextInput(
+                style=discord.TextStyle.short, 
+                placeholder="The new name of the tag", 
+                max_length=25,
+                required=False
+            )
         )
-    )
+
+        self.new_content_label = ui.Label(
+            text="New content (Optional):", 
+            component=ui.TextInput(
+                style=discord.TextStyle.paragraph, 
+                placeholder="The new content that this tag should have", 
+                max_length=950,
+                required=False
+            )
+        )
+
+        self.add_item(self.new_name_label)
+        self.add_item(self.new_content_label)
 
     async def on_submit(self, interaction: discord.Interaction[SHBot]):
         await interaction.response.defer(ephemeral=True)
-        new_content = self.label.component.value
-        await update_tag_content(self.tag, new_content)
-        content=f"Tag `{self.tag}` edited by {interaction.user.mention}. \nNew content: ```\n{new_content}\n```"
+        new_content: str = self.new_content_label.component.value # type: ignore
+        new_name: str = self.new_name_label.component.value # type: ignore
+
+        if not new_content and not new_name:
+            await interaction.followup.send("One of `name` or `content` must be edited!", ephemeral=True)
+            return
+
+        content: str = f"`{self.tag_name}` tag updated by {interaction.user.mention}\n\n"
+        if new_name:
+            new_tag_content = await get_tag_content(new_name)
+            if new_tag_content is not None and new_tag_content != self.tag_content:
+                await interaction.followup.send(f"`{new_name}` already exists!", ephemeral=True)
+                return
+            await update_tag_name(self.tag_name, new_name)
+            content += f"New name: `{new_name}`\n"
+            await self.cog.update_cached_tags()
+
+        if new_content:
+            tag_name = new_name or self.tag_name # use the updated name if set
+            await update_tag_content(tag_name, new_content)
+            content += f"New content: ```{new_content}```"
+
+
         await interaction.client.send_log(TAG_LOGGING_THREAD_ID, content=content)
-        await interaction.followup.send(f"Successfully updated `{self.tag}`'s content!", ephemeral=True)
+        await interaction.followup.send(f"Tag updated successfully!", ephemeral=True)
 
 
 class TagConfirmRow(ui.ActionRow):
@@ -117,8 +157,6 @@ class Tags(commands.Cog):
         self.bot = bot
         self.cached_tags: list[str] = [] # tags cached to use for autocomplete and suggesting similar tags
         self.tags_lock = asyncio.Lock() # Lock to prevent mutating 'cached_tags' at the same time
-        
-        self.update_tags_task: asyncio.Task[None] | None = None
 
     def get_similar_tags(self, tag_name: str) -> ui.Container:
         container = ui.Container(ui.TextDisplay("Tag not found, sorry!"))
@@ -134,30 +172,12 @@ class Tags(commands.Cog):
     async def cog_load(self):
         """Cache the tags"""
         self.cached_tags = await get_most_used_tags()
-
-    async def cog_unload(self) -> None:
-        if self.update_tags_task is not None and not self.update_tags_task.done():
-            self.update_tags_task.cancel()
     
-    async def _update_cached_tags(self):
+    async def update_cached_tags(self):
         """The actual implementation to update the cached tags"""
-        await asyncio.sleep(15 * 60) # sleep 15 minutes
         async with self.tags_lock:
             self.cached_tags.clear()
-            self.cached_tags = await get_most_used_tags()
-
-        self.update_tags_task = None
-
-    async def update_cached_tags(self):
-        """Handles creating the asyncio.Task if needed
-
-        NOTE: This should only be called when:
-            - A tag is created
-            - A tag is deleted (Only if the tag is cached)
-            - A tag is used (Only if the tag is not cached)
-        """
-        if self.update_tags_task is None:
-            self.update_tags_task = asyncio.create_task(self._update_cached_tags())
+            self.cached_tags.extend(await get_most_used_tags())
 
     tag_group = app_commands.Group(name="tag", description="Commands related to the tag system")
 
@@ -246,7 +266,6 @@ class Tags(commands.Cog):
                     pass
                 await i.client.send_log(TAG_LOGGING_THREAD_ID, content=f"`{tag}` tag deleted by {i.user.mention}")
 
-                # only update the cached tags if the tag was cached
                 try:
                     async with self.tags_lock:
                         self.cached_tags.remove(tag)
@@ -256,7 +275,7 @@ class Tags(commands.Cog):
                     # Only update the cached tags if the tag was cached
                     await self.update_cached_tags()
 
-            confirm_button.callback = on_confirm_click
+            confirm_button.callback = on_confirm_click # type: ignore
             container = ui.Container()
             content = f"### Are you sure you would like to delete the `{tag}` tag?\nClick *Confirm* to delete, dismiss message to cancel."
             if tag_obj['creator_id'] != interaction.user.id:
@@ -273,11 +292,13 @@ class Tags(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(tag="The name of the tag that should be edited")
     async def update(self, interaction: discord.Interaction, tag: str):
-        if tag in self.cached_tags or await check_tag_exists(tag):
-            await interaction.response.send_modal(UpdateTagModal(tag))
-        else:
+        tag_data = await get_tag_data(tag)
+        if tag_data is None:
             view = ui.LayoutView().add_item(self.get_similar_tags(tag))
             await interaction.response.send_message(view=view, ephemeral=True)
+            return
+        
+        await interaction.response.send_modal(UpdateTagModal(self, tag_data['name'], tag_data['content']))
 
     @use.autocomplete("tag")
     async def tag_use_autocomplete(self, interaction: discord.Interaction, current: str):
@@ -305,8 +326,7 @@ class Tags(commands.Cog):
     async def tag_debug(self, interaction: discord.Interaction):
         view = ui.LayoutView()
         
-        update_task_content = "`None`" if self.update_tags_task is None else "Currently executing"
-        description = f"- Update_Task: {update_task_content}\n- Tags Cached: {len(self.cached_tags)}"
+        description = f"Tags Cached: {len(self.cached_tags)}"
         container = ui.Container(ui.TextDisplay(description),
                                  ui.Separator(), ui.TextDisplay(f"```json\n{self.cached_tags}```"))
         view.add_item(container)
