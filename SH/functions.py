@@ -237,26 +237,25 @@ async def get_tag_data(name: str) -> dict[str, Any] | None:
     async with sql.connect(DB_PATH) as conn:
         result = await conn.fetchone("SELECT * FROM tags WHERE name=?", (name, ))
         if result:
-            return {
-                "name": result["name"],
-                "content": result["content"],
-                "creator_id": result["creator_id"],
-                "created_ts": result["created_ts"],
-                "uses": result["uses"]
-            }
+            return result # type: ignore
         return None
+
+async def update_tag_name(original_name: str, new_name: str):
+    async with sql.connect(DB_PATH) as conn:
+        await conn.execute("UPDATE tags SET name=? WHERE name=?", (new_name, original_name))
+        await conn.commit()
 
 async def update_tag_content(name: str, content: str):
     async with sql.connect(DB_PATH) as conn:
-        await conn.execute("UPDATE tags SET content=? WHERE name=?", (content, name,))
+        await conn.execute("UPDATE tags SET content=? WHERE name=?", (content, name))
         await conn.commit()
 
 async def get_most_used_tags() -> list[str]:
     """  
-    Returns the most used tags, max 25
+    Returns the most used tags, max 100
     """
     async with sql.connect(DB_PATH) as conn:
-        result = await conn.fetchall("SELECT name FROM tags ORDER BY uses LIMIT 25")
+        result = await conn.fetchall("SELECT name FROM tags ORDER BY uses LIMIT 100")
         return [tag['name'] for tag in result]
 
 async def delete_tag(name: str):
