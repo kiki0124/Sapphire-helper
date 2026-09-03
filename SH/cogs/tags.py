@@ -189,7 +189,6 @@ class Tags(commands.Cog):
     
     async def update_cached_tags(self):
         """Populate cached tags"""
-        print("populating cached tags")
         async with self.tags_lock:
             self.cached_tags.clear()
             self.cached_tags.extend(await get_most_used_tags())
