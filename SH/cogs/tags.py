@@ -23,18 +23,21 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 TAG_LOGGING_THREAD_ID = int(os.getenv("TAG_LOGGING_THREAD_ID"))
 
 
+MAX_TAG_CACHE_SIZE = 100
+
+
 class CreateTagModal(ui.Modal):
     def __init__(self, tag_cog: Tags):
         super().__init__(
             title="Create new tag",
-            timeout=None
+            timeout=60 * 15
             )
         self.tag_cog = tag_cog
 
     name = ui.Label(
         text="Name:",
         component=ui.TextInput(
-            max_length=20,
+            max_length=100,
             placeholder="cv2"
         )
     )
@@ -56,13 +59,15 @@ class CreateTagModal(ui.Modal):
             await interaction.client.send_log(TAG_LOGGING_THREAD_ID, content=content)
             await interaction.followup.send(f"Tag `{tag_name}` saved successfully!\nYou can now access it with `/tag use`", ephemeral=True)
 
-            await self.tag_cog.update_cached_tags()
+
+            if len(self.tag_cog.cached_tags) < MAX_TAG_CACHE_SIZE:
+                self.tag_cog.cached_tags.append(tag_name)
         else:
             await interaction.followup.send("A tag with this name already exists...\n-# Use `/tag delete` to delete it", ephemeral=True)
 
 class UpdateTagModal(ui.Modal):
     def __init__(self, cog: Tags, tag_name: str, tag_content: str):
-        super().__init__(title="Update tag", custom_id="update_tag_modal")
+        super().__init__(title="Update tag", custom_id="update_tag_modal", timeout=60 * 15)
         self.cog = cog
         self.tag_name: str = tag_name
         self.tag_content = tag_content
@@ -74,7 +79,7 @@ class UpdateTagModal(ui.Modal):
             component=ui.TextInput(
                 style=discord.TextStyle.short, 
                 placeholder="The new name of the tag", 
-                max_length=25,
+                max_length=100,
                 required=False
             )
         )
@@ -101,24 +106,33 @@ class UpdateTagModal(ui.Modal):
             await interaction.followup.send("One of `name` or `content` must be edited!", ephemeral=True)
             return
 
-        content: str = f"`{self.tag_name}` tag updated by {interaction.user.mention}\n\n"
+        response = "Tag updated successfully!\n"
+        log_content: str = f"`{self.tag_name}` tag updated by {interaction.user.mention}\n\n"
         if new_name:
             new_tag_content = await get_tag_content(new_name)
             if new_tag_content is not None and new_tag_content != self.tag_content:
                 await interaction.followup.send(f"`{new_name}` already exists!", ephemeral=True)
                 return
             await update_tag_name(self.tag_name, new_name)
-            content += f"New name: `{new_name}`\n"
-            await self.cog.update_cached_tags()
+            log_content += f"New name: `{new_name}`\n"
+            response += f"- `{self.tag_name}` -> `{new_name}`\n"
+
+            # only add to cache if previously cached (since we are just replacing the name)
+            try:
+                self.cog.cached_tags.remove(self.tag_name)
+            except ValueError:
+                pass
+            else:
+                self.cog.cached_tags.append(new_name)
 
         if new_content:
             tag_name = new_name or self.tag_name # use the updated name if set
             await update_tag_content(tag_name, new_content)
-            content += f"New content: ```{new_content}```"
+            log_content += f"New content: ```{new_content}```"
+            response += f"- Content updated"
 
-
-        await interaction.client.send_log(TAG_LOGGING_THREAD_ID, content=content)
-        await interaction.followup.send(f"Tag updated successfully!", ephemeral=True)
+        await interaction.client.send_log(TAG_LOGGING_THREAD_ID, content=log_content)
+        await interaction.followup.send(response, ephemeral=True)
 
 
 class TagConfirmRow(ui.ActionRow):
@@ -170,11 +184,12 @@ class Tags(commands.Cog):
         return container
     
     async def cog_load(self):
-        """Cache the tags"""
+        """Cache the tags on startup"""
         self.cached_tags = await get_most_used_tags()
     
     async def update_cached_tags(self):
-        """The actual implementation to update the cached tags"""
+        """Populate cached tags"""
+        print("populating cached tags")
         async with self.tags_lock:
             self.cached_tags.clear()
             self.cached_tags.extend(await get_most_used_tags())
@@ -272,7 +287,6 @@ class Tags(commands.Cog):
                 except ValueError:
                     pass
                 else:
-                    # Only update the cached tags if the tag was cached
                     await self.update_cached_tags()
 
             confirm_button.callback = on_confirm_click # type: ignore
@@ -300,25 +314,29 @@ class Tags(commands.Cog):
         
         await interaction.response.send_modal(UpdateTagModal(self, tag_data['name'], tag_data['content']))
 
+    def handle_tag_autocomplete(self, query: str) -> list[app_commands.Choice]:
+        if not query:
+            tags = self.cached_tags[0:25]
+        else:
+            query = query.casefold()
+            tags = [tag for tag in self.cached_tags if query in tag.casefold()][0:25]
+        return [app_commands.Choice(name=tag, value=tag) for tag in tags]
+
     @use.autocomplete("tag")
-    async def tag_use_autocomplete(self, interaction: discord.Interaction, current: str):
-        tag_choices_all = [app_commands.Choice(name=tag_name, value=tag_name) for tag_name in self.cached_tags]
-        return tag_choices_all[0:25]
-    
+    async def tag_use_autocomplete(self, _: discord.Interaction, query: str):
+        return self.handle_tag_autocomplete(query)
+
     @update.autocomplete("tag")
-    async def tag_update_autocomplete(self, interaction: discord.Interaction, current: str):
-        tag_choices_all = [app_commands.Choice(name=tag_name, value=tag_name) for tag_name in self.cached_tags]
-        return tag_choices_all[0:25]
+    async def tag_update_autocomplete(self, _: discord.Interaction, query: str):
+        return self.handle_tag_autocomplete(query)
     
     @info.autocomplete("tag")
-    async def tag_info_autocomplete(self, interaction: discord.Interaction, current: str):
-        tag_choices_all = [app_commands.Choice(name=tag_name, value=tag_name) for tag_name in self.cached_tags]
-        return tag_choices_all[0:25]
+    async def tag_info_autocomplete(self, _: discord.Interaction, query: str):
+        return self.handle_tag_autocomplete(query)
 
     @delete.autocomplete("tag")
-    async def tag_delete_autocomplete(self, interaction: discord.Interaction, current: str):
-        tag_choices_all = [app_commands.Choice(name=tag_name, value=tag_name) for tag_name in self.cached_tags]
-        return tag_choices_all[0:25]
+    async def tag_delete_autocomplete(self, _: discord.Interaction, query: str):
+        return self.handle_tag_autocomplete(query)
     
 
     @tag_group.command(name="debug", description="Get debug information for cached tags")
