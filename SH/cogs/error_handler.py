@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 from discord import app_commands
 from discord.ext import commands
-from functions import format_list
+from utils import format_list
 from dotenv import load_dotenv
 import os
 

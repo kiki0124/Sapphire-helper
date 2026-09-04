@@ -5,7 +5,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 import os
 from dotenv import load_dotenv
-from functions import setup_db
+from utils import setup_db, MaxCache
 import unittest, test_functions
 from pathlib import Path
 import time
@@ -31,7 +31,7 @@ class SHBot(commands.Bot):
                          )
 
         self.alert_webhook_url: str | None = None
-        self.incomplete_msg_posts: set[int] = set() # list of the post ids
+        self.incomplete_msg_posts = MaxCache(70) # list of the post IDs | ~70 posts were added in ~1 month
         self.uptime = time.time() # used in cogs/bot,py
 
         self.rtdr_posts: dict[int, int] = {} # posts for RTDR

@@ -7,6 +7,8 @@ import random
 from typing import Any, TYPE_CHECKING
 from pathlib import Path
 
+from collections import OrderedDict
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from discord import User, Member
@@ -87,6 +89,68 @@ def str_to_timedelta(duration: str) -> timedelta:
         else:
             raise ValueError(f"`{duration}` is invalid!")
     return td
+
+
+
+class MaxCache:
+    """
+    A custom cache that acts as a set/dict with a max size.
+    When the max size is reached upon adding new a item, the oldest item in the cache is removed.
+    """
+    __slots__ = ('_cache', 'max_size')
+    
+    def __init__(self, max_size: int) -> None:
+        self._cache = OrderedDict()
+        self.max_size = max_size
+
+    def __str__(self) -> str:
+        return str(self._cache)
+
+    def __repr__(self) -> str:
+        return repr(self._cache)
+
+    def __len__(self) -> int:
+        return len(self._cache)
+
+    def __bool__(self) -> bool:
+        return bool(self._cache)
+
+    def __contains__(self, item) -> bool:
+        return item in self._cache
+
+    
+    # dict-like functions
+    def __setitem__(self, key, value) -> None:
+        if len(self) == self.max_size:
+            self._cache.popitem(last=False)
+        self._cache[key] = value
+
+    def __getitem__(self, key) -> Any:
+        return self._cache[key]
+
+    def get(self, key, default = None) -> Any:
+        return self._cache.get(key, default)
+
+    def pop(self, key, default = None) -> Any:
+        return self._cache.pop(key, default)
+
+
+    def popitem(self, last: bool = True) -> Any:
+        return self._cache.popitem(last)
+
+
+    # set-like functions
+    def add(self, key) -> None:
+        """Add to the cache with the value as ``None``"""
+        self.__setitem__(key, None)
+
+    def remove(self, key) -> None:
+        """Remove element elem from the cache. Raises :exec:`KeyError` if elem is not contained in the cache."""
+        del self._cache[key]
+
+    def discard(self, key) -> None:
+        """Remove element elem from the cache if it is present."""
+        self._cache.pop(key, None)
 
 
 def sql_to_dict(sql_results: list[tuple]) -> dict[str, Any]:

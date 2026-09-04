@@ -5,7 +5,7 @@ from discord.ext import commands
 from discord import app_commands, ui
 from discord.utils import format_dt
 
-from functions import  check_time_more_than, str_to_timedelta
+from utils import  check_time_more_than, str_to_timedelta
 from datetime import datetime, timedelta, UTC
 import aiohttp
 import asyncio

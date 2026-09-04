@@ -1,5 +1,5 @@
 import unittest
-from functions import check_time_more_than
+from utils import check_time_more_than
 from datetime import datetime, timedelta, UTC
 
 class TestDatetime(unittest.TestCase):

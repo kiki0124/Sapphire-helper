@@ -5,7 +5,7 @@ from discord.ext import commands
 import asyncio
 import os
 from dotenv import load_dotenv
-from functions import generate_random_id
+from utils import generate_random_id
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import discord
 from discord.ext import commands, tasks
-from functions import check_time_more_than, generate_random_id
+from utils import check_time_more_than, generate_random_id
 import random
 import asyncio
 from discord import ui

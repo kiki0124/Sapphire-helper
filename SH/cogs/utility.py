@@ -7,7 +7,7 @@ import asyncio
 import datetime
 import os
 from dotenv import load_dotenv
-from functions import generate_random_id, format_recommended_by
+from utils import generate_random_id, format_recommended_by
 from typing import Union, Literal, Callable, TYPE_CHECKING
 import re
 if TYPE_CHECKING:
@@ -186,7 +186,7 @@ class Utility(commands.Cog):
         self.bot.remove_post_from_rtdr(post.id)
         self.bot.remove_post_from_pending(post.id)
         if post.id in self.bot.incomplete_msg_posts:
-            self.bot.incomplete_msg_posts.remove(post.id)
+            self.bot.incomplete_msg_posts.pop(post.id)
 
     async def mark_post_as_solved(self, post: discord.Thread) -> None:
         """  

@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 from discord.ext import commands
 from discord import app_commands
-import functions
+import utils
 from discord import ui, CheckboxGroupOption
 from discord.utils import snowflake_time, format_dt
 from datetime import datetime, UTC
@@ -77,7 +77,7 @@ class EvalSqlModal(ui.Modal):
         await interaction.response.defer()
 
         sql_cmd_input = self.sql_cmd.component.value
-        sql_result = str(await functions.execute_sql(sql_cmd_input.strip()))
+        sql_result = str(await utils.execute_sql(sql_cmd_input.strip()))
         await interaction.followup.send(f"```json\n{sql_result[0:1950]}```")
 
 class GlobalCacheModal(ui.Modal):
@@ -201,7 +201,7 @@ class DebugCog(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def debug_db(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        await functions.setup_db()
+        await utils.setup_db()
         await interaction.followup.send("Success!\n", ephemeral=True)
 
 
