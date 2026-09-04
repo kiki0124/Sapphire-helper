@@ -93,10 +93,15 @@ class ConfirmCloseView(ui.LayoutView):
         self.add_item(self.container)
 
 
+SOLVED_POSITIVE_PATTERN = re.compile(r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b", re.IGNORECASE)
+SOLVED_NEGATIVE_PATTERN = re.compile(r"doe?s?n.?t|hasn.?t|isn.?t|not?\b|previously|however|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t|advance\b|ahead o?f? time|used to",
+                                     re.IGNORECASE)
+
+
 class AutoAdd(commands.Cog):
-    def __init__(self, bot: SHBot):
+    def __init__(self, bot: SHBot): 
         self.bot = bot
-        self.sent_post_ids = [] # A list of posts where the bot sent a suggestion message to use /solved
+        self.sent_cmd_suggestion_posts: set[int] = set() # A set of post IDS where the bot sent a suggestion message to use /solved
 
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):
@@ -107,7 +112,7 @@ class AutoAdd(commands.Cog):
         if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
             if message.id == message.channel.id:
                 await self.on_thread_create(message.channel)
-            if message.channel.id not in self.sent_post_ids:
+            if message.channel.id not in self.sent_cmd_suggestion_posts:
                 await self.send_suggestion_message(message)
             if message.id != message.channel.id:
                 await self.replace_unanswered_tag(message)
@@ -140,11 +145,10 @@ class AutoAdd(commands.Cog):
             return
         tags = message.channel._applied_tags
         if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
-            pattern = r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b"
-            negative_pattern = r"doe?s?n.?t|hasn.?t|isn.?t|not?\b|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t|advance\b|ahead o?f? time"
-            if not re.search(negative_pattern, message.content, re.IGNORECASE) and re.search(pattern, message.content, re.IGNORECASE):
-                await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.bot.get_solved_id()}>")
-                self.sent_post_ids.append(message.channel.id)
+            if SOLVED_POSITIVE_PATTERN.search(message.content) is None or SOLVED_NEGATIVE_PATTERN.search(message.content) is not None:
+                return
+            await message.reply(content=f"-# <:tree_corner:1272886415558049893>Command suggestion: </solved:{await self.bot.get_solved_id()}>")
+            self.sent_cmd_suggestion_posts.add(message.channel.id)
 
     async def replace_unanswered_tag(self, message: discord.Message):
         if UNANSWERED_TAG_ID not in message.channel._applied_tags or message.author.id == self.bot.user.id:
@@ -164,7 +168,7 @@ class AutoAdd(commands.Cog):
             await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=message.channel.mention, tags=tags, context="Replace unanswered tag with not solved")
 
     @commands.Cog.listener('on_raw_message_delete')
-    async def suggest_closing_post(self, payload: discord.RawMessageDeleteEvent):
+    async def suggest_close_on_starter_msg_delete(self, payload: discord.RawMessageDeleteEvent):
         message_channel = self.bot.get_channel(payload.channel_id)
         is_in_support = isinstance(message_channel, discord.Thread) and message_channel.parent_id == SUPPORT_CHANNEL_ID
         is_starter_message = payload.message_id == payload.channel_id
