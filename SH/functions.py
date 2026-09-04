@@ -24,7 +24,7 @@ async def setup_db():
         async with conn.cursor() as cu:
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
-            await cu.execute("CREATE TABLE IF NOT EXISTS tags(name STRING UNIQUE NOT NULL, content STRING NULL, creator_id INTEGER NOT NULL, created_ts INTEGER, uses INTEGER NOT NULL DEFAULT 0)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS tags(name TEXT UNIQUE NOT NULL, content TEXT NULL, creator_id INTEGER NOT NULL, created_ts INTEGER, uses INTEGER NOT NULL DEFAULT 0)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -198,8 +198,7 @@ async def get_locked_channels() -> list[int]:
             result = await cu.fetchall()
             if result:
                 return [row['channel_id'] for row in result]
-            else:
-                return []
+            return []
 
 async def delete_channel_permissions(channel_id: int) -> None:
     async with sql.connect(DB_PATH) as conn:
