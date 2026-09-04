@@ -198,8 +198,7 @@ async def get_locked_channels() -> list[int]:
             result = await cu.fetchall()
             if result:
                 return [row['channel_id'] for row in result]
-            else:
-                return []
+            return []
 
 async def delete_channel_permissions(channel_id: int) -> None:
     async with sql.connect(DB_PATH) as conn:
