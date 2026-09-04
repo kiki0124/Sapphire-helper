@@ -99,7 +99,7 @@ SOLVED_NEGATIVE_PATTERN = re.compile(r"doe?s?n.?t|hasn.?t|isn.?t|not?\b|previous
 
 
 class AutoAdd(commands.Cog):
-    def __init__(self, bot: SHBot): 
+    def __init__(self, bot: SHBot):
         self.bot = bot
         self.sent_cmd_suggestion_posts: set[int] = set() # A set of post IDS where the bot sent a suggestion message to use /solved
 
