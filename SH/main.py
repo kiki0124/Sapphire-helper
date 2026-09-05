@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Literal
+
 import discord
 from discord.ext import commands, tasks
-from discord import app_commands
+from discord import app_commands, ui
 import os
 from dotenv import load_dotenv
 from functions import setup_db
@@ -17,6 +19,9 @@ load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
+EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
+MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
+DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 class SHBot(commands.Bot):
     def __init__(self) -> None:
@@ -36,6 +41,9 @@ class SHBot(commands.Bot):
 
         self.rtdr_posts: dict[int, int] = {} # posts for RTDR
         self.pending_posts: dict[int, int] = {} # posts for pending
+
+        self.extensions_cmd.binding = self
+        self.tree.add_command(self.extensions_cmd, override=True)
 
     async def setup_hook(self):
         unittest.main(test_functions, exit=False)
@@ -131,6 +139,81 @@ class SHBot(commands.Bot):
                 break
         return solved_id
 
+
+    async def perform_extension_action(self, action: Literal["load", "reload", "unload"], extension: str) -> None:
+        currently_loaded = self.extensions.get(extension)
+        if action == "load":
+            if currently_loaded is False:
+                await self.load_extension(extension)
+        elif action == "reload":
+            await self.reload_extension(extension)
+        elif action == "unload":
+            if currently_loaded:
+                await self.unload_extension(extension)
+
+    @app_commands.command(name="extensions", description="Manage the bot's extensions")
+    @app_commands.describe(action="The action to perform", extension="The extension file to reload (if not specified, all extensions will be reloaded)")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID, MODERATORS_ROLE_ID)
+    async def extensions_cmd(self, interaction: discord.Interaction, action: Literal["load", "reload", "unload"] | None = None, extension: str | None = None):
+        await interaction.response.defer(ephemeral=True)
+        cog_dir = Path(__file__).parent / 'cogs'
+        files = [file for file in os.listdir(cog_dir) if file.endswith('.py')]
+        if action is None:
+
+            files = sorted(files)
+
+            loaded = {file: f"cogs.{file[:-3]}" for file in files if f"cogs.{file[:-3]}" in self.extensions}
+            not_loaded = [file for file in files if f"cogs.{file[:-3]}" not in self.extensions]
+
+            view = ui.LayoutView()
+
+            header_container = ui.Container(ui.TextDisplay("## Extensions"), ui.Separator())
+            header_container.add_item(ui.TextDisplay(f"- Loaded: **{len(loaded)}/{len(files)}**"))
+            header_container.accent_color = discord.Colour.green() if not not_loaded else discord.Colour.brand_red()
+            view.add_item(header_container)
+
+            if loaded:
+                loaded_container = ui.Container(ui.TextDisplay("### Loaded"), ui.Separator())
+                for file, ext_name in loaded.items():
+                    content = f"- ✅ `{file}`"
+                    loaded_container.add_item(ui.TextDisplay(content))
+                loaded_container.accent_color = discord.Colour.green()
+                view.add_item(loaded_container)
+
+            if not_loaded:
+                not_loaded_container = ui.Container(ui.TextDisplay("### Not loaded"), ui.Separator())
+                fmt = "\n".join(f"- ❌ `{file}`" for file in not_loaded)
+                not_loaded_container.add_item(ui.TextDisplay(fmt))
+                not_loaded_container.accent_color = discord.Colour.brand_red()
+                view.add_item(not_loaded_container)
+
+            await interaction.followup.send(view=view, ephemeral=True)
+            return
+
+        else:
+            if extension is None:
+                for file in files:
+                    try:
+                        await self.perform_extension_action(action, f"cogs.{file[:-3]}")
+                    except commands.ExtensionError as error:
+                        await interaction.followup.send(f"Failed to {action} `{file[:-3]}`: `{error}`", ephemeral=True)
+                        return
+                await interaction.followup.send(f"{action.capitalize()}ed all extensions!", ephemeral=True)
+                return
+
+            try:
+                await self.perform_extension_action(action, f"cogs.{extension}")
+            except commands.ExtensionError as error:
+                await interaction.followup.send(f"Failed to {action} `{extension}`: `{error}`", ephemeral=True)
+            else:
+                await interaction.followup.send(f"{action.capitalize()}ed `{extension}`!", ephemeral=True)
+
+    @extensions_cmd.autocomplete("extension")
+    async def extensions_autocomplete(self, _: discord.Interaction, current: str):
+        cog_dir = Path(__file__).parent / 'cogs'
+        files = [file for file in os.listdir(cog_dir) if file.endswith('.py')]
+        choices = [app_commands.Choice(name=file, value=file[:-3]) for file in files if current.lower() in file.lower()]
+        return choices[:25]
 
     async def get_post_owner_id(self, post: discord.Thread | app_commands.AppCommandThread) -> int:
         """
