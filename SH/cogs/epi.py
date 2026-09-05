@@ -413,21 +413,6 @@ class EPI(commands.Cog):
         await interaction.followup.send(f"Are you sure you want to disable EPI mode? This will ping `{len(self.epi_data.users)}` user(s) that clicked the 'Notify me when this issue is resolved' button.\n-# Dismiss this message to cancel.",
                                         view=view, ephemeral=True)
 
-    @group.command(name="view", description="View the current EPI mode status")
-    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def epi_view(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        if not self.epi_data:
-            await interaction.followup.send(content="EPI mode is not currently enabled! Run the command again when EPI mode is activated.")
-            return
-
-        started_at = f"<t:{self.epi_data.started_at}:f>" # type: ignore
-        status_message_url = self.epi_data.status_message.jump_url if self.epi_data.status_message else "Not Set"
-        message = self.epi_data.message or "Not set"
-        is_sticky = self.epi_data.sticky_message is not None
-
-        await interaction.followup.send(f"- Started at: {started_at}\n- Custom message: {message}\n- Status message: {status_message_url}\n- User count: {len(self.epi_data.users)}\n- Sticky: {is_sticky}")
-
     @group.command(name="edit", description="Edit current EPI information")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(message="A custom text message to be displayed. Leave empty to not edit or '-' to remove.", status_message_id="ID of a message from #status to be displayed. Leave empty to not edit or '-' to remove", sticky="Should a sticky message be created in #general? Leave empty to not edit.")
@@ -753,14 +738,15 @@ class EPI(commands.Cog):
                 self.epi_data.status_page = req.status == 200 # true if the status is 200 - OK, else false
 
 
-    @group.command(name="debug", description="Get debug information on EPI and paging")
+    @group.command(name="debug_info", description="Get debug information on EPI and paging")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID, MODERATORS_ROLE_ID)
     async def epi_debug(self, interaction: discord.Interaction):
         container = ui.Container()
 
         epi_info = (f"- Enabled: `{self.epi_data._enabled}`",
                     f"- *Sticky* Msg: {self.epi_data.sticky_message.jump_url}" if self.epi_data.sticky_message else f"- *Sticky* Msg: `None`",
                     f"- *Status* Msg: {self.epi_data.status_message.jump_url}" if self.epi_data.status_message else f"- *Status* Msg: `None`",
-                    f"- Message: *{self.epi_data.message}*",
+                    f"- Custom Message: *{self.epi_data.message}*",
                     f"- No. of users: `{len(self.epi_data.users)}`",
                     f"- Status Page: `{self.epi_data.status_page}`",
                     f"- No. of thread_msg_mapping: `{len(self.epi_data.thread_to_msgs_map)}`")
