@@ -179,7 +179,7 @@ class DebugCog(commands.Cog):
     @app_commands.describe(post="The post to debug")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def debug_post(self, interaction: discord.Interaction, post: app_commands.AppCommandThread): # AppCommandThread is needed as .Thread can't resolve if the post is archived
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         is_pending = post.id in self.bot.pending_posts
         if is_pending:
             pending_post_timestamp = self.bot.pending_posts[post.id]
