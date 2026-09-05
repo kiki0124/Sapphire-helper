@@ -4,11 +4,11 @@ from datetime import datetime, UTC, timedelta
 import asqlite as sql
 from string import ascii_letters, digits
 import random
-from typing import Any, TYPE_CHECKING
+from collections import OrderedDict
 from pathlib import Path
 
-from collections import OrderedDict
 
+from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from discord import User, Member
