@@ -185,8 +185,6 @@ class Utility(commands.Cog):
         self.close_tasks.pop(post.id)
         self.bot.remove_post_from_rtdr(post.id)
         self.bot.remove_post_from_pending(post.id)
-        if post.id in self.bot.incomplete_msg_posts:
-            self.bot.incomplete_msg_posts.pop(post.id)
 
     async def mark_post_as_solved(self, post: discord.Thread) -> None:
         """  
