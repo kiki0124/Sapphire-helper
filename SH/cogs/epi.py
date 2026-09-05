@@ -5,7 +5,7 @@ from discord.ext import commands, tasks
 from discord import app_commands, ui
 from dotenv import load_dotenv
 from datetime import timedelta
-from functions import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, \
+from utils import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, \
     generate_random_id, check_time_more_than, str_to_timedelta
 import aiohttp, json, os, asyncio, re, datetime
 from typing import Literal, Optional, Any, TYPE_CHECKING

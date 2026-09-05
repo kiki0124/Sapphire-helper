@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands, tasks
-from functions import save_post_as_pending, remove_post_from_pending, get_pending_posts, get_post_creator_id, get_rtdr_posts, generate_random_id, get_waiting_posts, add_post_to_waiting, remove_post_from_waiting, get_pending_posts_data, get_waiting_posts_data
+from utils import save_post_as_pending, remove_post_from_pending, get_pending_posts, get_post_creator_id, get_rtdr_posts, generate_random_id, get_waiting_posts, add_post_to_waiting, remove_post_from_waiting, get_pending_posts_data, get_waiting_posts_data
 import datetime, os, asyncio, random
 from dotenv import load_dotenv
 from discord import ui

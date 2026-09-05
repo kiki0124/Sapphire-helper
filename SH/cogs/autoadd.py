@@ -6,7 +6,7 @@ import re
 import random
 import os
 from dotenv import load_dotenv
-from functions import generate_random_id
+from utils import generate_random_id, MaxCache
 from discord import ui
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -101,7 +101,8 @@ SOLVED_NEGATIVE_PATTERN = re.compile(r"doe?s?n.?t|hasn.?t|isn.?t|not?\b|previous
 class AutoAdd(commands.Cog):
     def __init__(self, bot: SHBot):
         self.bot = bot
-        self.sent_cmd_suggestion_posts: set[int] = set() # A set of post IDS where the bot sent a suggestion message to use /solved
+        self.sent_cmd_suggestion_posts: MaxCache = MaxCache(250) # A set of post IDS where the bot sent a suggestion message to use /solved
+                                                                 # ~450-500 posts were added in a month, so 250 should be more than enough.
 
     @commands.Cog.listener('on_ready')
     async def add_persistent_view(self):

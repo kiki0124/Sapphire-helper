@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
-from functions import check_tag_exists, save_tag, get_tag_content, get_tag_data, increment_tag_uses, delete_tag, update_tag_content, \
+from utils import check_tag_exists, save_tag, get_tag_content, get_tag_data, increment_tag_uses, delete_tag, update_tag_content, \
     get_most_used_tags, format_recommended_by, update_tag_name
 import os
 from difflib import get_close_matches
