@@ -235,7 +235,7 @@ class Websocket:
 class ClusterTracker(commands.Cog):
     def __init__(self, bot: SHBot) -> None:
         self.bot = bot
-        self.cluster_tracker = StatusPage(timedelta(minutes=16))
+        self.cluster_tracker = StatusPage(timedelta(minutes=8))
 
         self.websocket = Websocket(self)
 
