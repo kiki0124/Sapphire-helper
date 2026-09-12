@@ -65,7 +65,7 @@ class RTDR(commands.Cog):
                 gallery_items.append(item)
         return gallery_items, files
 
-    async def get_content(self, messages: list[discord.Message]) -> str:
+    def get_content(self, messages: list[discord.Message]) -> str:
         """  
         Returns a string of messages that should be used in the content of the post in this format
         ```
@@ -75,7 +75,7 @@ class RTDR(commands.Cog):
         ```
         or "No message content found" if all messages don't have content (only have attachments)
         """
-        content = 'No message content found'
+        content = '*No message content found*'
         messages_content: list[str] = []
         for message in messages:
             if message.content:
@@ -96,7 +96,7 @@ class RTDR(commands.Cog):
         await reference_message.channel.typing()
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
         gallery_items, files = await self.get_media_gallery_items(messages_to_move)
-        content = await self.get_content(messages_to_move)
+        content = self.get_content(messages_to_move)
         support = self.bot.get_channel(SUPPORT_CHANNEL_ID)
         title = f"Support for {reference_message.author.name}"
         if message and message.content.removeprefix(self.bot.user.mention): # make sure the message has a content beyond @sapphire helper
