@@ -5,7 +5,7 @@ from discord.ext import commands
 from discord import app_commands, ui
 from discord.utils import format_dt
 
-from utils import check_time_more_than, str_to_timedelta
+from utils import check_time_more_than, str_to_timedelta, cluster_tracker_add, cluster_tracker_fetch_users, cluster_tracker_remove, format_mentions
 from datetime import datetime, timedelta, UTC
 import aiohttp
 import asyncio
@@ -316,6 +316,7 @@ class ClusterTracker(commands.Cog):
             if experts_channel is None:
                 return
 
+            view = ui.LayoutView()
             container = ui.Container(accent_color=discord.Colour.brand_red())
             header = f"## Clusters offline <t:{self.cluster_tracker.started_at}:R> ([STATUS](https://sapph.xyz/status))"
             container.add_item(ui.TextDisplay(header))
@@ -327,7 +328,12 @@ class ClusterTracker(commands.Cog):
             container.add_item(ui.Separator())
             container.add_item(ui.TextDisplay("-# Use `/cluster_tracker status` for live information."))
 
-            self.cluster_tracker.notified_message = await experts_channel.send(view=ui.LayoutView().add_item(container))
+            view.add_item(container)
+            to_ping: list[int] = await cluster_tracker_fetch_users()
+            if to_ping:
+                view.add_item(ui.TextDisplay(f"-# {next(format_mentions(to_ping))}"))
+
+            self.cluster_tracker.notified_message = await experts_channel.send(view=view)
 
     @staticmethod
     def format_online(online: bool) -> str:
@@ -507,6 +513,23 @@ class ClusterTracker(commands.Cog):
             await self.websocket.disconnect_ws()
             await interaction.followup.send("Successfully force disconnected the websocket!", ephemeral=True)
 
-
+    @group_cmd.command(name="notify_me", description="Pings you when clusters are offline for more than set threshold")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.describe(action="view - see all users to be notified, the rest are self-explanatory")
+    async def cluster_tracking_notify_me(self, interaction: discord.Interaction, action: Literal['view', 'add', 'remove'] = 'add'):
+        await interaction.response.defer(ephemeral=True)
+        if action == 'add':
+            await cluster_tracker_add(interaction.user.id)
+            await interaction.followup.send("You will now be notified!", ephemeral=True)
+        elif action == 'view':
+            to_notify: list[int] = await cluster_tracker_fetch_users()
+            if to_notify:
+                for mentions in format_mentions(to_notify):
+                    await interaction.followup.send(mentions, ephemeral=True)
+            else:
+                await interaction.followup.send("*No users will currently be notified*", ephemeral=True)
+        else:
+            await cluster_tracker_remove(interaction.user.id)
+            await interaction.followup.send("You will no longer be notified!", ephemeral=True)
 async def setup(bot: SHBot):
     await bot.add_cog(ClusterTracker(bot))

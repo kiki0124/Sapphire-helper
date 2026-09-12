@@ -8,7 +8,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, Generator, Iterable, TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from discord import User, Member
@@ -27,6 +27,7 @@ async def setup_db():
             await cu.execute("CREATE TABLE IF NOT EXISTS reminder_waiting(post_id INTEGER PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)")
             await cu.execute("CREATE TABLE IF NOT EXISTS locked_channels_permissions(channel_id INTEGER PRIMARY KEY NOT NULL, allow BIGINT, deny BIGINT)")
             await cu.execute("CREATE TABLE IF NOT EXISTS tags(name TEXT UNIQUE NOT NULL, content TEXT NULL, creator_id INTEGER NOT NULL, created_ts INTEGER, uses INTEGER NOT NULL DEFAULT 0)")
+            await cu.execute("CREATE TABLE IF NOT EXISTS cluster_tracker_notify(user_id INTEGER PRIMARY KEY NOT NULL)")
             await conn.commit()
 
 def generate_random_id() -> str:
@@ -89,6 +90,27 @@ def str_to_timedelta(duration: str) -> timedelta:
         else:
             raise ValueError(f"`{duration}` is invalid!")
     return td
+
+
+def format_mentions(user_ids: Iterable[int]) -> Generator[str]:
+    """
+    Yields mentions formatted. (E.g: '<@123>, <@456>')
+    """
+    mentions: list[str] = []
+    total_length = 0
+    for user_id in user_ids:
+        mention_fmt = f"<@{user_id}>"
+        mention_fmt_len = len(mention_fmt) + 2 # + 2 to include ', '
+        if (total_length + mention_fmt_len) > 2000:
+            yield ", ".join(mentions)
+            total_length = 0
+            mentions.clear()
+
+        mentions.append(mention_fmt)
+        total_length += mention_fmt_len
+
+    if mentions:
+        yield ", ".join(mentions)
 
 
 
@@ -325,3 +347,21 @@ async def delete_tag(name: str):
     async with sql.connect(DB_PATH) as conn:
         await conn.execute("DELETE FROM tags WHERE name=?", (name,))
         await conn.commit()
+
+
+# CLUSTER_TRACKER NOTIFY
+
+async def cluster_tracker_add(user_id: int) -> None:
+    async with sql.connect(DB_PATH) as conn:
+        await conn.execute("INSERT INTO cluster_tracker_notify (user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING", (user_id ,))
+        await conn.commit()
+
+async def cluster_tracker_remove(user_id: int) -> None:
+    async with sql.connect(DB_PATH) as conn:
+        await conn.execute("DELETE FROM cluster_tracker_notify WHERE user_id=?", (user_id ,))
+        await conn.commit()
+
+async def cluster_tracker_fetch_users() -> list[int]:
+    async with sql.connect(DB_PATH) as conn:
+        results = await conn.fetchall("SELECT user_id FROM cluster_tracker_notify")
+        return [result['user_id'] for result in results]

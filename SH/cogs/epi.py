@@ -6,10 +6,10 @@ from discord import app_commands, ui
 from dotenv import load_dotenv
 from datetime import timedelta
 from utils import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, \
-    generate_random_id, check_time_more_than, str_to_timedelta
+    generate_random_id, check_time_more_than, str_to_timedelta, format_mentions
 import aiohttp, json, os, asyncio, re, datetime
 
-from typing import Literal, Optional, Any, Generator,TYPE_CHECKING
+from typing import Literal, Optional, Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from main import SHBot
 
@@ -329,24 +329,6 @@ class EPI(commands.Cog):
 
         return None
 
-    @staticmethod
-    def get_mentions_chunk(user_ids: set[int]) -> Generator[str]:
-        mentions: list[str] = []
-        total_length = 0
-        for user_id in user_ids:
-            mention_fmt = f"<@{user_id}>"
-            mention_fmt_len = len(mention_fmt) + 2 # + 2 to include ', '
-            if (total_length + mention_fmt_len) > 2000:
-                yield ", ".join(mentions)
-                total_length = 0
-                mentions.clear()
-
-            mentions.append(mention_fmt)
-            total_length += mention_fmt_len
-
-        if mentions:
-            yield ", ".join(mentions)
-
     @group.command(name="disable", description="Disable EPI mode- mark the issue as solved & ping all users that asked to be pinged")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(message="[Optional] A custom message to be displayed with the \"Hey, this is fixed now!\" message")
@@ -404,7 +386,7 @@ class EPI(commands.Cog):
             general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
             main_message = await general.send(content=content)
             if self.epi_data.users:
-                for mentions in self.get_mentions_chunk(self.epi_data.users):
+                for mentions in format_mentions(self.epi_data.users):
                     await main_message.reply(content=mentions)
 
             await interaction.channel.send(f"EPI mode successfully disabled by {interaction.user.name}.\nUsers mentioned: {len(self.epi_data.users)}")
