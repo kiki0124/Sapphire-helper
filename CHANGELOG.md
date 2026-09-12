@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
 - Runtime debugging for EPI
 - For messages using cv2, changed from `Recommended by @mention` -> `Recommended by [@username](user_profile_link)` ([#96](https://github.com/kiki0124/Sapphire-helper/issues/96))
 - Auto detection of cluster downtime + live custer tracking ([#99](https://github.com/kiki0124/Sapphire-helper/issues/99))
-- Partial removal of prefix commands, only the bot's mention count as a prefix now. ([#100](https://github.com/kiki0124/Sapphire-helper/issues/100)
+- Partial removal of prefix commands, only the bot's mention count as a prefix now. ([#100](https://github.com/kiki0124/Sapphire-helper/issues/100))
+- Slowmode duration now accepts formatted input such as `1h` or `50m, 30s` etc.
+- Improve Tag UX greatly ([#108](https://github.com/kiki0124/Sapphire-helper/issues/108))
 
 ### Fixed
 - Fixed `/unrelated` command not adding `not-solved` tag. ([#82](https://github.com/kiki0124/Sapphire-helper/issues/82))
@@ -25,6 +27,8 @@ All notable changes to this project will be documented in this file.
 - Removing certain DB Tables and Implementing Global Caches ([#94](https://github.com/kiki0124/Sapphire-helper/issues/94))
 - Added `psutil` to `requirements.txt` ([#103](https://github.com/kiki0124/Sapphire-helper/issues/103)
 - (In response to ([#94](https://github.com/kiki0124/Sapphire-helper/issues/94))), `pending_posts` can now be restored even after cache clear.
+- Optimise regex searching for suggesting `/solved` command.
+- Custom Max Cache for `sent_cmd_suggestion_posts` and `incomplete_msg_posts` ([#111](https://github.com/kiki0124/Sapphire-helper/issues/111))
 
 
 ## [6.2] - 21/7/26
