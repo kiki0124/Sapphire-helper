@@ -65,7 +65,8 @@ class EvalSqlModal(ui.Modal):
         tables_and_queries = ("Table Name: Possible query names:",
                               "- reminder_waiting: (`post_id`, `timestamp`)",
                               "- locked_channels_permissions: (`channel_id`, `allow`, `deny`)",
-                              "- tags: (`name`, `content`, `creator_id`, `created_ts`, `uses`)")
+                              "- tags: (`name`, `content`, `creator_id`, `created_ts`, `uses`)",
+                              "- cluster_tracker_notify: `user_id`")
         self.add_item(ui.TextDisplay('\n'.join(tables_and_queries)))
 
         self.sql_cmd = ui.Label(text="SQL Command", component=ui.TextInput(style=discord.TextStyle.long,
