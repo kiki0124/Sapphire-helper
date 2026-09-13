@@ -45,12 +45,11 @@ class GetNotifiedView(ui.LayoutView):
         super().__init__(timeout=None)
         self.description = description
 
-        title = "## Some services are currently experiencing issues"
-        accent_colour = 16749824
-        footer = "We're sorry for the inconvenience caused and thank you for your patience!"
+        title = "# Some services are __currently experiencing issues__"
+        footer = "*We're sorry for the inconvenience caused & thank you for your patience!*"
         get_notified_button = GetNotifiedButton(epi_users)
 
-        container = ui.Container(accent_colour=accent_colour)
+        container = ui.Container(accent_colour=discord.Colour.brand_red())
 
         container.add_item(ui.TextDisplay(title))
         if status_message is not None:
