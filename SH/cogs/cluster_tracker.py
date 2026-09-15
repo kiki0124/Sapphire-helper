@@ -30,6 +30,7 @@ class Cluster(NamedTuple):
     ping: int
     online: bool
 
+
 class StatusPage:
     """
     This helps to track clusters.
@@ -531,5 +532,7 @@ class ClusterTracker(commands.Cog):
         else:
             await cluster_tracker_remove(interaction.user.id)
             await interaction.followup.send("You will no longer be notified!", ephemeral=True)
+
+
 async def setup(bot: SHBot):
     await bot.add_cog(ClusterTracker(bot))
