@@ -156,7 +156,6 @@ class SelectChannels(ui.ChannelSelect):
             await self.i.edit_original_response(view=None)
 
 
-
 class EpiData:
     """
     The object that holds the data for EPI.
@@ -227,6 +226,33 @@ class EpiData:
 
     def __bool__(self):
         return self._enabled
+
+
+PAGE_SERVICE_LITERAL_T = Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"]
+
+class PageView(ui.LayoutView):
+    def __init__(self, *, message: str, priority: int, service: PAGE_SERVICE_LITERAL_T, cb_affected: bool, case_id: str):
+        super().__init__(timeout=None)
+        cb_affected_fmt = '✅' if cb_affected else '❌'
+        description = (f"- Priority: `{priority}`",
+                       f"- Service: *{service}*",
+                       f"- CB affected: {cb_affected_fmt}")
+
+        container = ui.Container(ui.TextDisplay(f"{message}"), 
+                                 ui.Separator(), 
+                                 ui.TextDisplay("\n".join(description)),
+                                 ui.TextDisplay(f"-# Case ID: {case_id}"))
+
+        if priority == 1:
+            accent_colour = None
+        elif priority == 2:
+            accent_colour = discord.Colour.orange()
+        else:
+            accent_colour = discord.Colour.brand_red()
+        container.accent_colour = accent_colour
+
+        self.add_item(container)
+
 
 class EPI(commands.Cog):
     def __init__(self, bot: SHBot):
@@ -631,7 +657,7 @@ class EPI(commands.Cog):
         priority="1 - lowest, 4 - highest (most critical)", 
         cb_affected="Whether custom branding is affected or not (for Sapphire outages)"
     )
-    async def page(self, interaction: discord.Interaction, service: Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"], message: str, 
+    async def page(self, interaction: discord.Interaction, service: PAGE_SERVICE_LITERAL_T, message: str, 
                    priority: Literal["4 | Night", "3 | Major issue", "2 | Minor issue", "1 | Information"], cb_affected: bool):
         priority_dict : dict[str, int] = {
             "4 | Night": 4,
@@ -642,7 +668,7 @@ class EPI(commands.Cog):
 
         case_id = generate_random_id()
         priority_num = priority_dict[priority]
-        new_content = f"Notification sent successfully.\n-# Message: {message} | Priority: {priority_num} | Service: {service} | CB affected: {cb_affected} | ID: {case_id}"
+        new_view = PageView(message=message, priority=priority_num, service=service, cb_affected=cb_affected, case_id=case_id)
 
         if self.recent_page and not check_time_more_than(self.recent_page['timestamp'], datetime.timedelta(minutes=15)):
             await interaction.response.defer(ephemeral=True)
@@ -659,7 +685,7 @@ class EPI(commands.Cog):
                     "id": case_id
                 }
                 await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup_msg, case_id, cb_affected, user=interaction.user)
-                await followup_msg.edit(content=new_content)
+                await followup_msg.edit(view=new_view, content=None)
 
             button = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page-confirm")
             button.callback = callback
@@ -681,7 +707,7 @@ class EPI(commands.Cog):
                 "id": case_id
             }
             await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup, case_id, cb_affected, user=interaction.user)
-            await followup.edit(content=new_content)
+            await followup.edit(view=new_view, content=None)
 
     @commands.Cog.listener("on_message")
     async def autopage_on_ratelimit(self, ratelimit_message: discord.Message):
