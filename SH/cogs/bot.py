@@ -7,7 +7,6 @@ from discord import ui
 import os
 from dotenv import load_dotenv
 import psutil
-from pathlib import Path
 import time
 from typing import TYPE_CHECKING
 
