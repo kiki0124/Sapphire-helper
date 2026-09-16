@@ -47,10 +47,16 @@ class StatusPage:
         The message that was sent in the experts-channel when the threshold was hit.
     offline: :class:`int`
         The number of clusters currently offline.
+    received_at: :class:`datetime`
+        The datetime (UTC) of when the websocket data was received.
+    clusters: list[:class:`Cluster`]
+        The Sapphire clusters.
+    offline_clusters: list[:class:`Cluster`]
+        The clusters that are offline.
     """
 
     __slots__ = ('threshold', 'started_at', 'notified_message',
-                 'clusters', 'dashboard_online', 'cb_online', 'received_at')
+                 'clusters', 'offline_clusters', 'dashboard_online', 'cb_online', 'received_at')
 
     def __init__(self, threshold: timedelta):
         self.threshold = threshold
@@ -59,6 +65,7 @@ class StatusPage:
         self.notified_message: discord.Message | None = None
 
         self.clusters: list[Cluster] = []
+        self.offline_clusters: list[Cluster] = []
 
         self.dashboard_online: bool = True
         self.cb_online: bool = True
@@ -78,14 +85,6 @@ class StatusPage:
             return False
 
         return check_time_more_than(self.started_at, self.threshold)
-
-
-    @property
-    def offline_clusters(self) -> list[Cluster]:
-        """
-        Returns the number of offline clusters
-        """
-        return [cluster for cluster in self.clusters if not cluster.online]
 
 
     @staticmethod
@@ -118,19 +117,21 @@ class StatusPage:
         cb_payload = payload[1]
         dashboard_payload = payload[2]
 
+        self.offline_clusters.clear()
         self.clusters.clear()
 
         offline: int = 0
-        for i, cluster in enumerate(clusters_payload, start=1):
-            is_online = cluster['state'] == "online"
-
+        for i, cluster_data in enumerate(clusters_payload, start=1):
+            is_online = cluster_data['state'] == "online"
+            cluster = Cluster(number=i, ping=cluster_data['ping'], 
+                                         online=is_online)
             if not is_online:
                 offline += 1
                 if self.started_at == 0:
                     self.started_at = int(datetime.now(UTC).timestamp())
+                self.offline_clusters.append(cluster)
 
-            self.clusters.append(Cluster(number=i, ping=cluster['ping'], 
-                                         online=is_online))
+            self.clusters.append(cluster)
 
         self.cb_online = cb_payload['smallBar']['text'] == "Operational"
         self.dashboard_online = dashboard_payload['smallBar']['text'] == "Operational"
@@ -149,6 +150,7 @@ class StatusPage:
         self.started_at = 0
         self.received_at = datetime.now(UTC)
         self.clusters.clear()
+        self.offline_clusters.clear()
         self.cb_online = True
         self.dashboard_online = True
         self.notified_message = None
@@ -325,7 +327,7 @@ class ClusterTracker(commands.Cog):
 
             offline_clusters = self.cluster_tracker.offline_clusters
             clusters_offline_fmt = "\n".join(f"- Cluster **{cluster.number}**" for cluster in offline_clusters)
-            container.add_item(ui.TextDisplay(f"*Currently offline **[{len(offline_clusters)}]**:*\n{clusters_offline_fmt}"))
+            container.add_item(ui.TextDisplay(f"*Currently offline **[{len(offline_clusters)}/{len(self.cluster_tracker.clusters)}]**:*\n{clusters_offline_fmt}"))
             container.add_item(ui.Separator())
             container.add_item(ui.TextDisplay("-# Use `/cluster_tracker status` for live information."))
 
@@ -374,7 +376,7 @@ class ClusterTracker(commands.Cog):
         if action == 'View' or (action is None and threshold is None):
             offline_clusters = self.cluster_tracker.offline_clusters
 
-            offline_container = ui.Container(ui.TextDisplay(f"## [Clusters Offline: {len(offline_clusters)}](https://sapph.xyz/status)"))
+            offline_container = ui.Container(ui.TextDisplay(f"## [Clusters Offline: {len(offline_clusters)}/{len(self.cluster_tracker.clusters)}](https://sapph.xyz/status)"))
             if offline_clusters:
                 colour = discord.Colour.brand_red()
                 offline_container.add_item(ui.Separator())
