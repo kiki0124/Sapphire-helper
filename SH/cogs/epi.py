@@ -775,7 +775,7 @@ class EPI(commands.Cog):
 
         container.add_item(ui.Separator(visible=False))
 
-        container.add_item(ui.TextDisplay("### Last Recent Page"))
+        container.add_item(ui.TextDisplay("### Most Recent Page"))
         container.add_item(ui.Separator())
         container.add_item(ui.TextDisplay(f"```py\n{self.recent_page}```"))
         await interaction.response.send_message(view=ui.LayoutView().add_item(container), ephemeral=True)

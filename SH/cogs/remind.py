@@ -394,7 +394,7 @@ class Reminders(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send(f"Sleeping for 5 seconds to prevent clashes with reminders...")
         await asyncio.sleep(5)
-        await self.check_for_pending_posts([self.bot.get_channel(post.id) or await post.fetch()])
+        await self.check_for_pending_posts([interaction.guild.get_thread(post.id) or await post.fetch()])
 
         await interaction.followup.send(f"Simulation complete for {post.mention}!", ephemeral=True)
 
