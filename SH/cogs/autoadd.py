@@ -26,6 +26,7 @@ MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
 APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
+
 class ConfirmCloseButtons(ui.ActionRow):
     def __init__(self):
         super().__init__()
@@ -70,7 +71,7 @@ class ConfirmCloseButtons(ui.ActionRow):
             await interaction.message.reply(view=view)
 
     async def interaction_check(self, interaction: discord.Interaction[SHBot]) -> bool:
-        self.is_owner = interaction.user.id == await interaction.client.get_post_owner_id(interaction.channel)
+        self.is_owner = interaction.user.id == interaction.client.get_post_owner_id(interaction.channel)
         if not (self.is_owner or interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)):
             await interaction.response.send_message(content=f"Only <@&{EXPERTS_ROLE_ID}>, <@&{MODERATORS_ROLE_ID}>, <@&{DEVELOPERS_ROLE_ID}> and the post creator can use this!", ephemeral=True)
             return False
@@ -93,10 +94,36 @@ class ConfirmCloseView(ui.LayoutView):
         self.add_item(self.container)
 
 
+class MoreInfoView(ui.LayoutView):
+    def __init__(self):
+        super().__init__(timeout=None)
+        setup_container = ui.Container(ui.TextDisplay("### Need help with setting up something?"),
+                                       ui.Separator(),
+                                       ui.TextDisplay("\n".join(("- Explain clearly what you are trying to setup/overall goall",
+                                                                "- If you are facing problems:",
+                                                                "  - What have you already tried?",
+                                                                "  - Attach a screenshot/video of your current setup"))))
+
+        unexpected_issue_container = ui.Container(ui.TextDisplay("### Faced an unexpected issue?"),
+                                                  ui.Separator(),
+                                                  ui.TextDisplay("\n".join(("- Explain exactly the issue you are facing",
+                                                                           "- What have you already tried?",
+                                                                           "- Check your [error log](https://dashboard.sapph.xyz/?redirect=/general-settings/error-log) & send a photo of it",
+                                                                           "- Show a screenshot/video of your setup"))))
+
+        useful_links_container = ui.Container(ui.TextDisplay("### Useful Links"),
+                                              ui.Separator(),
+                                              ui.TextDisplay("\n".join(("- [Docs](https://docs.sapph.xyz/#/overview)",
+                                                                       "- [Guides](https://docs.sapph.xyz/#/guides/)",
+                                                                       "- [FAQ](https://docs.sapph.xyz/#/faq/)",
+                                                                       "- [Common Issues](https://docs.sapph.xyz/#/troubleshoot/)"))))
+
+        self.add_item(setup_container).add_item(unexpected_issue_container).add_item(useful_links_container)
+
+
 SOLVED_POSITIVE_PATTERN = re.compile(r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b", re.IGNORECASE)
 SOLVED_NEGATIVE_PATTERN = re.compile(r"doe?s?n.?t|hasn.?t|isn.?t|not?\b|previously|however|but\b|before|won.?t|didn.?t|\?|can.?t|nothing|wouldn.?t|advance\b|ahead o?f? time|used to",
                                      re.IGNORECASE)
-
 
 class AutoAdd(commands.Cog):
     def __init__(self, bot: SHBot):
@@ -118,31 +145,32 @@ class AutoAdd(commands.Cog):
             if message.id != message.channel.id:
                 await self.replace_unanswered_tag(message)
 
+
+    async def maybe_send_incomplete_message(self, thread: discord.Thread) -> None:
+        starter_message = thread.starter_message
+        if not starter_message:
+            return
+        title_words = thread.name.split()
+        starter_message_words = starter_message.content.split()
+        if (
+            ((len(title_words) < 7 and len(starter_message_words) < 4)
+            or starter_message.content.casefold() == thread.name.casefold())
+            and thread.owner_id != self.bot.user.id # prevent the message from sending if it was sent via rtdr
+        ):
+            await starter_message.reply(view=MoreInfoView(), mention_author=True)
+            self.bot.incomplete_msg_posts.add(thread.id)
+
+
     async def on_thread_create(self, thread: discord.Thread):
         tags = thread.applied_tags
         tags.append(thread.parent.get_tag(UNANSWERED_TAG_ID))
         action_id = generate_random_id()
         await thread.edit(applied_tags=tags, reason=f"ID: {action_id}. Auto-add unanswered tag to a new post.")
         await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=thread.mention, tags=tags, context="Auto add unanswered tag")
-        start_msg = thread.starter_message
-        content_len = len(start_msg.content) if start_msg.content else 0
-        if (
-            content_len + len(thread.name) < 25
-            or start_msg.content.casefold() == thread.name.casefold()
-            and thread.owner_id != self.bot.user.id # prevent the message from sending if it was sent via rtdr
-        ):
-            view = ui.LayoutView()
-            container = ui.Container()
-            view.add_item(container)
-            greets = ["Hi", "Hey", "Hello", "Hi there"]
-            container.add_item(
-                ui.TextDisplay(f"{random.choice(greets)}, please answer these questions if you haven't already, so we can help you faster.\n* What exactly is your question or the problem you're experiencing?\n* What have you already tried?\n* What are you trying to do / what is your overall goal?\n* If possible, please include a screenshot or screen recording of your setup.")
-            )
-            await thread.starter_message.reply(view=view, mention_author=True)
-            self.bot.incomplete_msg_posts.add(thread.id)
+        await self.maybe_send_incomplete_message(thread)
 
     async def send_suggestion_message(self, message: discord.Message):
-        if message.author.id == self.bot.user.id or message.author.id != await self.bot.get_post_owner_id(message.channel):
+        if message.author.id == self.bot.user.id or message.author.id != self.bot.get_post_owner_id(message.channel):
             return
         tags = message.channel._applied_tags
         if SOLVED_TAG_ID not in tags and NEED_DEV_REVIEW_TAG_ID not in tags and message.id != message.channel.id: # if the message id == message channel id it means that its a starter message of a thread.
@@ -155,7 +183,7 @@ class AutoAdd(commands.Cog):
         if UNANSWERED_TAG_ID not in message.channel._applied_tags or message.author.id == self.bot.user.id:
             return
         applied_tags = message.channel.applied_tags
-        owner_id = await self.bot.get_post_owner_id(message.channel)
+        owner_id = self.bot.get_post_owner_id(message.channel)
         if message.author.id != owner_id:
             tags = [message.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
             cb = message.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID)
@@ -178,7 +206,7 @@ class AutoAdd(commands.Cog):
             tag_filters = NEED_DEV_REVIEW_TAG_ID not in tags and SOLVED_TAG_ID not in tags
             other_filters = not message_channel.locked and not message_channel.archived
             if tag_filters and other_filters:
-                owner_id = await self.bot.get_post_owner_id(message_channel)
+                owner_id = self.bot.get_post_owner_id(message_channel)
                 await message_channel.send(
                     view=ConfirmCloseView(post_author=owner_id)
                 )

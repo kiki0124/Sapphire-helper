@@ -75,7 +75,7 @@ class CloseNowRow(ui.ActionRow):
             await interaction.message.reply(view=view)
 
     async def interaction_check(self, interaction: discord.Interaction[SHBot]) -> bool:
-        self.is_owner = interaction.user.id == await interaction.client.get_post_owner_id(interaction.channel)
+        self.is_owner = interaction.user.id == interaction.client.get_post_owner_id(interaction.channel)
         if not (interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or self.is_owner):
             await interaction.response.send_message(content="Only Moderators, Community Experts, Developers and the post creator can use this.", ephemeral=True)
             return False
@@ -233,7 +233,7 @@ class Reminders(commands.Cog):
                 del posts[i]
                 continue
 
-            owner_id = await self.bot.get_post_owner_id(post)
+            owner_id = self.bot.get_post_owner_id(post)
             if owner_id is not None:
                 user_ids.append(owner_id)
         return user_ids
@@ -243,7 +243,7 @@ class Reminders(commands.Cog):
         if not support:
             return
 
-        owner_ids = await self.filter_and_get_post_owner_ids(posts)
+        owner_ids = self.filter_and_get_post_owner_ids(posts)
         if not owner_ids:
             return
         # owner ids of which are still in the server
@@ -252,7 +252,7 @@ class Reminders(commands.Cog):
         for i in range(len(posts) - 1, -1, -1): # we need to do this so that we don't modify the rest of the list when we remove a post
             post = posts[i]
 
-            owner_id = await self.bot.get_post_owner_id(post)
+            owner_id = self.bot.get_post_owner_id(post)
             if owner_id in valid_owner_ids:
                 continue
 
@@ -282,7 +282,7 @@ class Reminders(commands.Cog):
             if not self.reminders_filter(post):
                 continue
 
-            post_author_id = await self.bot.get_post_owner_id(post)
+            post_author_id = self.bot.get_post_owner_id(post)
             
             # If the last message > 3d, we send the reminder regardless of other requirements
             if check_time_more_than(last_msg_timestamp, timedelta(days=3)):
@@ -310,7 +310,7 @@ class Reminders(commands.Cog):
         
         if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
             others_filter = not message.channel.locked and NEED_DEV_REVIEW_TAG_ID not in message.channel._applied_tags
-            owner_id = await self.bot.get_post_owner_id(message.channel)
+            owner_id = self.bot.get_post_owner_id(message.channel)
             message_author = message.author.id == owner_id
             if message_author and others_filter and message.channel.id in self.bot.pending_posts:
                 self.bot.remove_post_from_pending(message.channel.id)
