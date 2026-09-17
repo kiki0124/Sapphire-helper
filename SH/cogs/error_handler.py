@@ -74,6 +74,8 @@ class ErrorHandler(commands.Cog):
 		elif isinstance(e, commands.MissingAnyRole):
 			missing_roles = [f"<@&{role_id}>" for role_id in e.missing_roles]
 			error_message = f"Only {format_list(missing_roles)} can use this command!"
+		else:
+			return
 
 		await ctx.reply(content=error_message, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
 
