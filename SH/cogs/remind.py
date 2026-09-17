@@ -217,7 +217,7 @@ class Reminders(commands.Cog):
 
         await self.bot.send_log(ALERTS_THREAD_ID, content="\n".join(log_end_content))
 
-    async def filter_and_get_post_owner_ids(self, posts: list[discord.Thread]) -> list[int]:
+    def filter_and_get_post_owner_ids(self, posts: list[discord.Thread]) -> list[int]:
         """
         Remove posts that are:
             - Not from support
