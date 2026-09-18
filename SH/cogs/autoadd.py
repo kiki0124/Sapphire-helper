@@ -97,28 +97,27 @@ class ConfirmCloseView(ui.LayoutView):
 class MoreInfoView(ui.LayoutView):
     def __init__(self):
         super().__init__(timeout=None)
-        setup_container = ui.Container(ui.TextDisplay("### Need help with setting up something?"),
-                                       ui.Separator(),
-                                       ui.TextDisplay("\n".join(("- Explain clearly what you are trying to setup/overall goall",
-                                                                "- If you are facing problems:",
-                                                                "  - What have you already tried?",
-                                                                "  - Attach a screenshot/video of your current setup"))))
+        setup_container = ui.Container(
+            ui.TextDisplay("### Need help with setting up something?"),
+            ui.Separator(),
+            ui.TextDisplay("\n".join(("- Explain clearly what you are trying to setup/overall goall",
+                                    "- If you are facing problems:",
+                                    "  - What have you already tried?",
+                                    "  - Attach a screenshot/video of your current setup"))),
+            ui.TextDisplay("While waiting, you may check out *[Docs](https://docs.sapph.xyz/#/overview)/[Guides](https://docs.sapph.xyz/#/guides/)/[FAQ](https://docs.sapph.xyz/#/faq/)* for possible solutions!")
+            )
 
-        unexpected_issue_container = ui.Container(ui.TextDisplay("### Faced an unexpected issue?"),
-                                                  ui.Separator(),
-                                                  ui.TextDisplay("\n".join(("- Explain exactly the issue you are facing",
-                                                                           "- What have you already tried?",
-                                                                           "- Check your [error log](https://dashboard.sapph.xyz/?redirect=/general-settings/error-log) & send a photo of it",
-                                                                           "- Show a screenshot/video of your setup"))))
+        unexpected_issue_container = ui.Container(
+            ui.TextDisplay("### Faced an unexpected issue?"),
+            ui.Separator(),
+            ui.TextDisplay("\n".join(("- Explain exactly the issue you are facing",
+                                    "- What have you already tried?",
+                                    "- Check your [error log](https://dashboard.sapph.xyz/?redirect=/general-settings/error-log) & send a photo of it",
+                                    "- Show a screenshot/video of your setup"))),
+            ui.TextDisplay("While waiting, you may check out some *[Common Issues](https://docs.sapph.xyz/#/troubleshoot/)*"))
 
-        useful_links_container = ui.Container(ui.TextDisplay("### Useful Links"),
-                                              ui.Separator(),
-                                              ui.TextDisplay("\n".join(("- [Docs](https://docs.sapph.xyz/#/overview)",
-                                                                       "- [Guides](https://docs.sapph.xyz/#/guides/)",
-                                                                       "- [FAQ](https://docs.sapph.xyz/#/faq/)",
-                                                                       "- [Common Issues](https://docs.sapph.xyz/#/troubleshoot/)"))))
 
-        self.add_item(setup_container).add_item(unexpected_issue_container).add_item(useful_links_container)
+        self.add_item(setup_container).add_item(unexpected_issue_container)
 
 
 SOLVED_POSITIVE_PATTERN = re.compile(r"solved|thanks?|works?|fixe?d|thx|tysm|\bty\b", re.IGNORECASE)
