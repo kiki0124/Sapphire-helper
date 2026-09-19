@@ -29,6 +29,7 @@ class Cluster(NamedTuple):
     number: int
     ping: int
     online: bool
+    offline_since: int
 
 
 class StatusPage:
@@ -118,20 +119,32 @@ class StatusPage:
         dashboard_payload = payload[2]
 
         self.offline_clusters.clear()
-        self.clusters.clear()
-
         offline: int = 0
-        for i, cluster_data in enumerate(clusters_payload, start=1):
+
+        now_ts = int(datetime.now(UTC).timestamp())
+        for i, cluster_data in enumerate(clusters_payload):
             is_online = cluster_data['state'] == "online"
-            cluster = Cluster(number=i, ping=cluster_data['ping'], 
-                                         online=is_online)
+            ping = cluster_data['ping']
+
+            if i == len(self.clusters):
+                cluster = Cluster(number=i + 1, ping=ping, 
+                                            online=is_online, offline_since=now_ts)
+                self.clusters.append(cluster)
+            else:
+                if self.clusters[i].online:
+                    cluster = Cluster(number=i + 1, ping=ping, 
+                                                online=is_online, offline_since=now_ts)
+                else:
+                    cluster = Cluster(number=i + 1, ping=ping, 
+                                                online=is_online, offline_since=self.clusters[i].offline_since)
+
+                self.clusters[i] = cluster
+    
             if not is_online:
                 offline += 1
                 if self.started_at == 0:
-                    self.started_at = int(datetime.now(UTC).timestamp())
+                    self.started_at = now_ts
                 self.offline_clusters.append(cluster)
-
-            self.clusters.append(cluster)
 
         self.cb_online = cb_payload['smallBar']['text'] == "Operational"
         self.dashboard_online = dashboard_payload['smallBar']['text'] == "Operational"
@@ -293,6 +306,10 @@ class ClusterTracker(commands.Cog):
     def get_expert_channel(self) -> discord.TextChannel | None:
         return discord.utils.get(self.bot.get_all_channels(), name="sapphire-experts") # type: ignore
 
+    @staticmethod
+    def fmt_offline_clusters(offline_clusters: list[Cluster]) -> str:
+        return "\n".join(f"- Cluster **{cluster.number}** (offline <t:{cluster.offline_since}:R>)" for cluster in offline_clusters)
+
     async def handle_offline_clusters(self,  offline: int) -> None:
         if offline == 0:
             # No clusters were detected offline
@@ -326,7 +343,7 @@ class ClusterTracker(commands.Cog):
             container.add_item(ui.Separator())
 
             offline_clusters = self.cluster_tracker.offline_clusters
-            clusters_offline_fmt = "\n".join(f"- Cluster **{cluster.number}**" for cluster in offline_clusters)
+            clusters_offline_fmt = self.fmt_offline_clusters(offline_clusters)
             container.add_item(ui.TextDisplay(f"*Currently offline **[{len(offline_clusters)}/{len(self.cluster_tracker.clusters)}]**:*\n{clusters_offline_fmt}"))
             container.add_item(ui.Separator())
             container.add_item(ui.TextDisplay("-# Use `/cluster_tracker status` for live information."))
@@ -363,10 +380,6 @@ class ClusterTracker(commands.Cog):
             await interaction.followup.send(f"Successfully set threshold! (`{self.format_timedelta(old_threshold)}` -> `{threshold}`)",
                                             ephemeral=True)
 
-        if not self.cluster_tracker:
-            await interaction.followup.send("Cluster tracker data is empty!", ephemeral=True)
-            return
-
         if action == 'Clear':
             self.cluster_tracker.clear()
             await interaction.followup.send("Successfully cleared!", ephemeral=True)
@@ -374,6 +387,10 @@ class ClusterTracker(commands.Cog):
 
      
         if action == 'View' or (action is None and threshold is None):
+            if not self.cluster_tracker:
+                await interaction.followup.send("Cluster tracker data is empty!", ephemeral=True)
+                return
+
             offline_clusters = self.cluster_tracker.offline_clusters
 
             offline_container = ui.Container(ui.TextDisplay(f"## [Clusters Offline: {len(offline_clusters)}/{len(self.cluster_tracker.clusters)}](https://sapph.xyz/status)"))
@@ -381,8 +398,7 @@ class ClusterTracker(commands.Cog):
                 colour = discord.Colour.brand_red()
                 offline_container.add_item(ui.Separator())
 
-                fmt = "\n".join(f"- Cluster **{cluster.number}**" for cluster in offline_clusters)
-                content = f"Offline (<t:{self.cluster_tracker.started_at}:R>):\n{fmt}"
+                content = f"Offline (<t:{self.cluster_tracker.started_at}:R>):\n{self.fmt_offline_clusters(self.cluster_tracker.clusters)}"
                 offline_container.add_item(ui.TextDisplay(content))
             else:
                 colour = discord.Colour.green()
@@ -446,7 +462,7 @@ class ClusterTracker(commands.Cog):
                 clusters.append(cluster)
 
             if len(clusters) == 1:
-                await interaction.followup.send(f"- Cluster **{cluster.number}.** - `{cluster.ping}ms` | Online: {self.format_online(cluster.online)}",
+                await interaction.followup.send(f"- Cluster **{cluster.number}** - `{cluster.ping}ms` | Online: {self.format_online(cluster.online)}",
                                                 ephemeral=True)
                 return
         else:
@@ -465,7 +481,7 @@ class ClusterTracker(commands.Cog):
 
         clusters = clusters[0:15]
 
-        fmt = "\n".join([f"- Cluster **{cluster.number}.** - `{cluster.ping}ms` | Online: {self.format_online(cluster.online)}" \
+        fmt = "\n".join([f"- Cluster **{cluster.number}.** `{cluster.ping}ms` | Online: {self.format_online(cluster.online)}" \
                             for cluster in clusters])
 
         container = ui.Container()
