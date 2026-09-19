@@ -756,9 +756,9 @@ class EPI(commands.Cog):
                 self.epi_data.status_page = req.status == 200 # true if the status is 200 - OK, else false
 
 
-    @group.command(name="debug_info", description="Get debug information on EPI and paging")
+    @group.command(name="view", description="Get debug information on EPI and paging")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID, MODERATORS_ROLE_ID)
-    async def epi_debug(self, interaction: discord.Interaction):
+    async def epi_view(self, interaction: discord.Interaction):
         container = ui.Container()
 
         epi_info = (f"- Enabled: `{self.epi_data._enabled}`",
