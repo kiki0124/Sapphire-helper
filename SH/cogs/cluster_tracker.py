@@ -249,6 +249,8 @@ class Websocket:
 
 
 class ClusterTracker(commands.Cog):
+    MAX_OFFLINE_CLUSTERS_PER_MESSAGE = 25
+
     def __init__(self, bot: SHBot) -> None:
         self.bot = bot
         self.cluster_tracker = StatusPage(timedelta(minutes=8))
@@ -306,8 +308,8 @@ class ClusterTracker(commands.Cog):
     def get_expert_channel(self) -> discord.TextChannel | None:
         return discord.utils.get(self.bot.get_all_channels(), name="sapphire-experts") # type: ignore
 
-    @staticmethod
-    def fmt_offline_clusters(offline_clusters: list[Cluster]) -> str:
+    def fmt_offline_clusters(self, offline_clusters: list[Cluster]) -> str:
+        offline_clusters = offline_clusters if len(offline_clusters) < 25 else offline_clusters[0:self.MAX_OFFLINE_CLUSTERS_PER_MESSAGE]
         return "\n".join(f"- Cluster **{cluster.number}** (offline <t:{cluster.offline_since}:R>)" for cluster in offline_clusters)
 
     async def handle_offline_clusters(self,  offline: int) -> None:
@@ -345,6 +347,9 @@ class ClusterTracker(commands.Cog):
             offline_clusters = self.cluster_tracker.offline_clusters
             clusters_offline_fmt = self.fmt_offline_clusters(offline_clusters)
             container.add_item(ui.TextDisplay(f"*Currently offline **[{len(offline_clusters)}/{len(self.cluster_tracker.clusters)}]**:*\n{clusters_offline_fmt}"))
+            if len(offline_clusters) > self.MAX_OFFLINE_CLUSTERS_PER_MESSAGE:
+                container.add_item(ui.TextDisplay(f"*And {len(offline_clusters) - self.MAX_OFFLINE_CLUSTERS_PER_MESSAGE} more...*"))
+
             container.add_item(ui.Separator())
             container.add_item(ui.TextDisplay("-# Use `/cluster_tracker status` for live information."))
 
@@ -398,8 +403,10 @@ class ClusterTracker(commands.Cog):
                 colour = discord.Colour.brand_red()
                 offline_container.add_item(ui.Separator())
 
-                content = f"Offline (<t:{self.cluster_tracker.started_at}:R>):\n{self.fmt_offline_clusters(self.cluster_tracker.clusters)}"
+                content = f"Started <t:{self.cluster_tracker.started_at}:R>:\n{self.fmt_offline_clusters(offline_clusters)}"
                 offline_container.add_item(ui.TextDisplay(content))
+                if len(offline_clusters) > self.MAX_OFFLINE_CLUSTERS_PER_MESSAGE:
+                    offline_container.add_item(ui.TextDisplay(f"*And {len(offline_clusters) - self.MAX_OFFLINE_CLUSTERS_PER_MESSAGE} more...*"))
             else:
                 colour = discord.Colour.green()
             offline_container.accent_color = colour
@@ -481,8 +488,7 @@ class ClusterTracker(commands.Cog):
 
         clusters = clusters[0:15]
 
-        fmt = "\n".join([f"- Cluster **{cluster.number}.** `{cluster.ping}ms` | Online: {self.format_online(cluster.online)}" \
-                            for cluster in clusters])
+        fmt = "\n".join([f"- Cluster **{cluster.number}.** `{cluster.ping}ms` | Online: {self.format_online(cluster.online)}" for cluster in clusters])
 
         container = ui.Container()
         container.add_item(ui.TextDisplay(f"### {len(clusters)}/{len(self.cluster_tracker.clusters)} clusters"))
