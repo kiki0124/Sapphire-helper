@@ -9,7 +9,11 @@ From Kiki
 This is a (private) helper bot made for the Sapphire Support server. Among the many things it does, here are the major features:
 - Managing supports posts (solve/unsolve cmds, auto-cleanup, auto-reminders and more!)
 - Paging the lead developer
+- Tracking status of Sapphire clusters
 - Overall, improving QOL of users
+
+
+**Current version:** 6.3 (*unreleased*)
 
 ## Setup
 
@@ -33,7 +37,7 @@ pip install -r requirements.txt
   python main.py
   ```
 
-### 4. Use the sync command - `sh!sync` - to sync all slash commands. Then, restart your discord client.
+### 4. Use the sync command - `<mention_bot> sync` - to sync all slash commands. Then, restart your discord client.
 
 
 ## Contributing
