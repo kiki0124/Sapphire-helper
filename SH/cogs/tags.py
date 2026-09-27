@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands, ui
 from utils import check_tag_exists, save_tag, get_tag_content, get_tag_data, increment_tag_uses, delete_tag, update_tag_content, \
-    get_most_used_tags, format_recommended_by, update_tag_name
+    get_most_used_tags, format_recommended_by, update_tag_name, generate_random_id
 import os
 from difflib import get_close_matches
 import asyncio
@@ -20,7 +20,12 @@ if TYPE_CHECKING:
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
+
+ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 TAG_LOGGING_THREAD_ID = int(os.getenv("TAG_LOGGING_THREAD_ID"))
+
+NOT_SOLVED_TAG_ID = int(os.getenv("NOT_SOLVED_TAG_ID"))
+UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 
 
 MAX_TAG_CACHE_SIZE = 100
@@ -143,7 +148,7 @@ class TagConfirmRow(ui.ActionRow):
         super().__init__()
 
     @ui.button(label="Confirm", style=discord.ButtonStyle.success)
-    async def confirm(self, interaction: discord.Interaction, _: ui.Button):
+    async def confirm(self, interaction: discord.Interaction[SHBot], _: ui.Button):
         await interaction.response.defer()
         try:
             await interaction.delete_original_response()
@@ -164,6 +169,18 @@ class TagConfirmRow(ui.ActionRow):
         if self.tag not in self.tag_cog.cached_tags:
             await self.tag_cog.update_cached_tags()
         await interaction.channel.send(view=tag_view, allowed_mentions=discord.AllowedMentions.none())
+
+        # only add not-solved if the post is unanswered
+        try:
+            unanswered_tag_index: int = interaction.channel._applied_tags.index(UNANSWERED_TAG_ID) # type: ignore
+        except ValueError:
+            return
+        
+        new_tags: list[discord.ForumTag] = interaction.channel.applied_tags # type: ignore
+        new_tags[unanswered_tag_index] = interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID) # replace unanswered tag with not_solved tag
+        await interaction.channel.edit(applied_tags=new_tags)
+        await interaction.client.send_log(ALERTS_THREAD_ID, action_id=generate_random_id(), post_mention=interaction.channel.mention, 
+                                          tags=new_tags, context="/tag use executed")
 
 
 class Tags(commands.Cog):
