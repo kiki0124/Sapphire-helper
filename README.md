@@ -5,15 +5,12 @@ From Kiki
 >  Hi there, I've made this repository public on 9.9.25 (9.9.25 for the Americans between us) for the purpose of continuosly improving Sapphire Helper in both features & performance, and also allowing people to learn from it.
 
 
-## About
+## Sapphire Helper v6.3 (*unreleased*)
 This is a (private) helper bot made for the Sapphire Support server. Among the many things it does, here are the major features:
 - Managing supports posts (solve/unsolve cmds, auto-cleanup, auto-reminders and more!)
 - Paging the lead developer
 - Tracking status of Sapphire clusters
 - Overall, improving QOL of users
-
-
-**Current version:** 6.3 (*unreleased*)
 
 ## Setup
 
