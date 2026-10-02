@@ -170,13 +170,16 @@ class TagConfirmRow(ui.ActionRow):
             await self.tag_cog.update_cached_tags()
         await interaction.channel.send(view=tag_view, allowed_mentions=discord.AllowedMentions.none())
 
+
+        if not isinstance(interaction.channel, discord.Thread) or not isinstance(interaction.channel.parent, discord.ForumChannel):
+            return
         # only add not-solved if the post is unanswered
         try:
-            unanswered_tag_index: int = interaction.channel._applied_tags.index(UNANSWERED_TAG_ID) # type: ignore
+            unanswered_tag_index: int = interaction.channel._applied_tags.index(UNANSWERED_TAG_ID)
         except ValueError:
             return
         
-        new_tags: list[discord.ForumTag] = interaction.channel.applied_tags # type: ignore
+        new_tags = interaction.channel.applied_tags # type: ignore
         new_tags[unanswered_tag_index] = interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID) # replace unanswered tag with not_solved tag
         await interaction.channel.edit(applied_tags=new_tags)
         await interaction.client.send_log(ALERTS_THREAD_ID, action_id=generate_random_id(), post_mention=interaction.channel.mention, 
