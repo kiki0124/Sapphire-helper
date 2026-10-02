@@ -234,7 +234,7 @@ class Reminders(commands.Cog):
                 continue
 
             owner_id = self.bot.get_post_owner_id(post)
-            if owner_id is not None:
+            if owner_id != 0:
                 user_ids.append(owner_id)
         return user_ids
 
