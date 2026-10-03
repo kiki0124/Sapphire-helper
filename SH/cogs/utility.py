@@ -178,11 +178,15 @@ class Utility(commands.Cog):
         Used with asyncio.create_task to close the given post after the given delay in seconds.
         """
         await asyncio.sleep(close_delay) # wait for close_delay hours
+        self.close_tasks.pop(post.id)
+
+        if SOLVED_TAG_ID not in post._applied_tags:
+            # still-need-help button will remove the SOLVED_TAG but not pop from close_tasks
+            return
         await post.edit(
             archived=True,
             reason=f"Auto archive {'solved' if close_delay == 3600 else 'unrelated'} post after {close_delay} seconds"
         )
-        self.close_tasks.pop(post.id)
         self.bot.remove_post_from_rtdr(post.id)
         self.bot.remove_post_from_pending(post.id)
 

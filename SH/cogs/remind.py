@@ -19,14 +19,16 @@ if TYPE_CHECKING:
 load_dotenv()
 
 SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
+NOT_SOLVED_TAG_ID = int(os.getenv("NOT_SOLVED_TAG_ID"))
+UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
+APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
+
 SUPPORT_CHANNEL_ID = int(os.getenv('SUPPORT_CHANNEL_ID'))
 NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
 CUSTOM_BRANDING_TAG_ID = int(os.getenv("CUSTOM_BRANDING_TAG_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
-UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
-APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 
@@ -63,7 +65,11 @@ class CloseNowRow(ui.ActionRow):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         footer = f"-# Cancelled by {interaction.user}"
         if SOLVED_TAG_ID in interaction.channel._applied_tags:
-            footer += f" | Use </unsolve:{await interaction.client.get_unsolve_id()}> to unsolve"
+            new_tags: list[discord.ForumTag] = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)] # type: ignore
+            await interaction.channel.edit(applied_tags=new_tags)
+            await interaction.client.send_log(ALERTS_THREAD_ID, action_id=generate_random_id(),
+                                              post_mention=interaction.channel.mention, tags=new_tags,
+                                              context="Post unsolved, still need help button clicked")
         new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(footer)))
         await interaction.response.edit_message(view=new_view)
         interaction.client.remove_post_from_pending(interaction.channel_id)
