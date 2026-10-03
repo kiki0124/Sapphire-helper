@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - Updated required discord.py version to `2.7.1` in `requirements.txt`
 - Fixed RTDR owners being cleared and becoming unretrievable ([#93](https://github.com/kiki0124/Sapphire-helper/issues/93))
 - Fixed `not solved` tag not being added when using `/tag use` ([#114](https://github.com/kiki0124/Sapphire-helper/issues/114))
+- Fixed *Still need help* (*Cancel*) button not unsolving posts.
 
 ### Notable Internal Changes
 - Removal of `members` (privileged) Intent ([#84](https://github.com/kiki0124/Sapphire-helper/issues/84))
