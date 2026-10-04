@@ -119,7 +119,6 @@ class StatusPage:
         dashboard_payload = payload[2]
 
         self.offline_clusters.clear()
-        offline: int = 0
 
         now_ts = int(datetime.now(UTC).timestamp())
         for i, cluster_data in enumerate(clusters_payload):
@@ -141,7 +140,6 @@ class StatusPage:
                 self.clusters[i] = cluster
     
             if not is_online:
-                offline += 1
                 if self.started_at == 0:
                     self.started_at = now_ts
                 self.offline_clusters.append(cluster)
@@ -150,7 +148,7 @@ class StatusPage:
         self.dashboard_online = dashboard_payload['smallBar']['text'] == "Operational"
         self.received_at = datetime.now(UTC)
 
-        return offline
+        return len(self.offline_clusters)
 
     def reset_state(self):
         """
