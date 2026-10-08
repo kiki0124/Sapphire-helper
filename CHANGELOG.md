@@ -1,16 +1,19 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+This file records notable changes to Sapphire Helper. The current development version is 6.3; the entries below describe unreleased work unless a release heading states otherwise.
 
-## [Unversioned] -
+Dates in release headings use day/month/year. Issue and pull-request links provide implementation context. Historical release entries are retained; this is not an exhaustive list of commits.
+
+## [6.3] - Unreleased
 
 ### Added
 - Reminders now ignore posts that are unanswered ([#83](https://github.com/kiki0124/Sapphire-helper/issues/83))
 - Error handling for failing to convert a member object.
 - Runtime debugging for reminders ([#85](https://github.com/kiki0124/Sapphire-helper/issues/85))
 - Runtime debugging for EPI
+- Revised setup, deployment, configuration, command, architecture and contribution documentation.
 - For messages using cv2, changed from `Recommended by @mention` -> `Recommended by [@username](user_profile_link)` ([#96](https://github.com/kiki0124/Sapphire-helper/issues/96))
-- Auto detection of cluster downtime + live custer tracking ([#99](https://github.com/kiki0124/Sapphire-helper/issues/99))
+- Auto detection of cluster downtime + live cluster tracking ([#99](https://github.com/kiki0124/Sapphire-helper/issues/99))
 - Partial removal of prefix commands, only the bot's mention count as a prefix now. ([#100](https://github.com/kiki0124/Sapphire-helper/issues/100))
 - Slowmode duration now accepts formatted input such as `1h` or `50m, 30s` etc.
 - Improve Tag UX greatly ([#108](https://github.com/kiki0124/Sapphire-helper/issues/108))
@@ -62,4 +65,4 @@ All notable changes to this project will be documented in this file.
 - Refactor reminders + close_abandoned_posts ([74](https://github.com/kiki0124/Sapphire-helper/pull/74))
 - Change Backend in Paging ([78](https://github.com/kiki0124/Sapphire-helper/pull/78))
 
-See [commits](https://github.com/kiki0124/Sapphire-helper/commits/main/) for all changes!
+See the [commit history](https://github.com/kiki0124/Sapphire-helper/commits/main/) for all changes!
