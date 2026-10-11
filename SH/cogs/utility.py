@@ -130,10 +130,12 @@ class ndr_options_buttons(ui.View):
         )
 
 class SolvedView(ui.LayoutView):
-    def __init__(self, unsolve_id: int) -> None:
+    def __init__(self, unsolve_id: int, *, solver: discord.User | discord.Member | None = None) -> None:
         super().__init__(timeout=None)
         container = ui.Container(accent_color=discord.Colour.green())
         title = "### Marked as Solved"
+        if solver is not None:
+            title += f" by [@{solver.name}](https://discord.com/users/{solver.id})"
 
         one_hour_from_now = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
         footer= f"-# Auto closes {discord.utils.format_dt(one_hour_from_now, 'R')}. Use </unsolve:{unsolve_id}> to cancel."
@@ -153,7 +155,7 @@ class SolvedRowWithNDR(ui.ActionRow):
     async def on_confirm_button_click(self, interaction: discord.Interaction[SHBot], button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         await interaction.delete_original_response()
-        await interaction.channel.send(view=SolvedView(await interaction.client.get_unsolve_id()))
+        await interaction.channel.send(view=SolvedView(await interaction.client.get_unsolve_id(), solver=interaction.user))
         await self.mark_post_as_solved(interaction.channel)
 
 # This is sent when the post has a NDR tag
