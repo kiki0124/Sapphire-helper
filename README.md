@@ -4,7 +4,7 @@ Sapphire Helper is a Discord bot built for the Sapphire Support server. It manag
 
 The source was made public on 9 September 2025 so people can learn from it and contribute improvements. The current development version is **6.3 (unreleased)**.
 
-[!IMPORTANT]
+> [!IMPORTANT]
 > **Need support for Sapphire or appeal.gg?** Visit the [support server](https://discord.gg/RrHJYrh4Mm). Use this repository for Sapphire Helper bugs, feature requests and contributions.
 
 ## Features
