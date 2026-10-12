@@ -112,9 +112,38 @@ class StatusPage:
 
     def update_from_ws_data(self, payload: list[dict[str, Any]]) -> int:
         """
-        Updates state and returns the no. of offline clusters
+        Updates state and returns the no. of offline clusters.
+
+        Returns -1 if empty, this is likely due to the ws giving empty data.
+
+        Example payload:
+
+            [
+                {
+                    "name": "Main bot",
+                    "clusters": [] (this may be empty if there is an error on the ws)
+                },
+                {
+                    "name": "Custom branded bots",
+                    "smallBar": {
+                        "text": "Unavailable",
+                        "color": "red"
+                    },
+                    "bots": true
+                },
+                {
+                    "name": "Dashboard",
+                    "smallBar": {
+                        "text": "Operational",
+                        "color": "green"
+                    }
+                }
+            ]
         """
-        clusters_payload = payload[0]['clusters']
+        clusters_payload: list = payload[0]['clusters']
+        if not clusters_payload:
+            return -1
+
         cb_payload = payload[1]
         dashboard_payload = payload[2]
 
@@ -292,6 +321,8 @@ class ClusterTracker(commands.Cog):
 
                 if event == "status":
                     offline = self.cluster_tracker.update_from_ws_data(actual_data)
+                    if offline == -1:
+                        return
                     await self.handle_offline_clusters(offline)
 
     @staticmethod
