@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 import psutil
 from pathlib import Path
 import time
-from typing import TYPE_CHECKING
+from sys import version_info as py_version
+from typing import Literal, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from main import SHBot
@@ -26,6 +27,8 @@ class Bot(commands.Cog):
     def __init__(self, bot: SHBot):
         self.bot = bot
         self.last_restarted = time.time()
+
+        self.process = psutil.Process()
 
     @staticmethod
     def get_cooldown_key(ctx: commands.Context):
@@ -67,6 +70,14 @@ class Bot(commands.Cog):
             return
         await ctx.reply(content=f"Successfully synced {len(synced)} slash command(s)", mention_author=False)
 
+
+    @staticmethod
+    def convert_bytes(bytes: int, to: Literal['MB', 'GB'] = 'GB') -> float:
+        if to == 'GB':
+            return bytes / (1024 ** 3)
+
+        return bytes / (1024 ** 2)
+
     @commands.command()
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def stats(self, ctx: commands.Context):
@@ -74,17 +85,32 @@ class Bot(commands.Cog):
         container = ui.Container(accent_colour=0xA06BE6)
 
         title = ui.TextDisplay("## [Sapphire Helper | Version 6.3](https://github.com/kiki0124/sapphire-helper)")
-        info_text = (f"- **CPU Count:** {os.cpu_count()}",
-                     f"- **CPU Load:** {psutil.cpu_percent()}%",
-                     f"- **Available memory:** {str(round(psutil.virtual_memory()[0]/1000000000))}GB",
-                     f"- **Memory Usage:** {psutil.virtual_memory()[2]}%",
+
+        cpu_text = (f"- **CPU Count:** {os.cpu_count()}",
+                     f"- **CPU Load:** {psutil.cpu_percent()}%")
+
+        virtual_mem = psutil.virtual_memory()
+        ram_total = virtual_mem.total
+        sh_ram_usage = self.process.memory_info().rss
+        sh_ram_usage_percent = (sh_ram_usage / ram_total) * 100
+        mem_text = (f"- **Total Ram:** {self.convert_bytes(ram_total):.0f}GB",
+                    f"- **Total Ram Usage:** {self.convert_bytes(virtual_mem.used):.0f}GB ({virtual_mem.percent}%)",
+                    f"- **SH Ram Usage:** {self.convert_bytes(sh_ram_usage):.1f}GB ({sh_ram_usage_percent:.1f}%)")
+
+
+        python_version_fmt = f"{py_version.major}.{py_version.minor}.{py_version.micro}"
+        other_info_text = (
                      f"- **Uptime (since)**: <t:{int(self.bot.uptime)}:R>",
-                     f"- **Last Restarted**: <t:{int(self.last_restarted)}:R>",
-                     f"-# discord.py version {discord.__version__}")
+                     f"- **Last Restarted**: <t:{int(self.last_restarted)}:R>\n",
+                     f"-# discord.py {discord.__version__}\n-# python {python_version_fmt}")
         
         container.add_item(title)
         container.add_item(ui.Separator())
-        container.add_item(ui.TextDisplay('\n'.join(info_text)))
+
+        container.add_item(ui.TextDisplay('\n'.join(cpu_text)))
+        container.add_item(ui.TextDisplay('\n'.join(mem_text)))
+        container.add_item(ui.TextDisplay('\n'.join(other_info_text)))
+
         view.add_item(container)
         await ctx.reply(view=view, mention_author=False)
 

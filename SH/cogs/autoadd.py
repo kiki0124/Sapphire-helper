@@ -210,9 +210,10 @@ class AutoAdd(commands.Cog):
             other_filters = not message_channel.locked and not message_channel.archived
             if tag_filters and other_filters:
                 owner_id = self.bot.get_post_owner_id(message_channel)
-                await message_channel.send(
-                    view=ConfirmCloseView(post_author=owner_id)
-                )
+
+                view = ConfirmCloseView(post_author=owner_id)
+                view.stop() # remove from message-specific store, rely on custom_id/persistent view store
+                await message_channel.send(view=view)
 
 async def setup(bot: SHBot):
     await bot.add_cog(AutoAdd(bot))
