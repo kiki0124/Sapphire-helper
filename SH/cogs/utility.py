@@ -84,7 +84,7 @@ class NeedDevReviewView(ui.LayoutView):
 
 class ndr_options_buttons(ui.View):
     def __init__(self, Interaction: discord.Interaction[SHBot]):
-        super().__init__(timeout=None)
+        super().__init__(timeout=60 * 15)
         self.Interaction = Interaction
     
     async def mark_post_as_ndr(self, post: discord.Thread):
@@ -124,8 +124,12 @@ class ndr_options_buttons(ui.View):
         await self.Interaction.delete_original_response()
         await interaction.response.defer()
         await self.mark_post_as_ndr(interaction.channel)
+
+        view = NeedDevReviewView(executor_id=interaction.user.id)
+        view.stop()
+
         await interaction.channel.send(
-            view=NeedDevReviewView(executor_id=interaction.user.id),
+            view=view,
             allowed_mentions=discord.AllowedMentions.none()
         )
 

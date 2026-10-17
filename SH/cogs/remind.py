@@ -292,7 +292,10 @@ class Reminders(commands.Cog):
             
             # If the last message > 3d, we send the reminder regardless of other requirements
             if check_time_more_than(last_msg_timestamp, timedelta(days=3)):
-                await post.send(view=CloseNowView(post_author_id, time_ago="3 days"))
+                view = CloseNowView(post_author_id, time_ago="3 days")
+                view.stop()
+
+                await post.send(view=view)
                 self.bot.add_post_to_pending(post.id)
                 continue
 
@@ -306,7 +309,10 @@ class Reminders(commands.Cog):
                 if last_message.author.id == post_author_id:
                     continue
 
-            await post.send(view=CloseNowView(post_author_id, time_ago="24 hours"))
+            view = CloseNowView(post_author_id, time_ago="24 hours")
+            view.stop()
+
+            await post.send(view=view)
             self.bot.add_post_to_pending(post.id)
             
     @commands.Cog.listener('on_message')
