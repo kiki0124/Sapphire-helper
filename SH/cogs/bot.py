@@ -102,7 +102,7 @@ class Bot(commands.Cog):
         other_info_text = (
                      f"- **Uptime (since)**: <t:{int(self.bot.uptime)}:R>",
                      f"- **Last Restarted**: <t:{int(self.last_restarted)}:R>\n",
-                     f"-# discord.py {discord.__version__}\n-# python {python_version_fmt}")
+                     f"-# discord.py {discord.__version__}  •  python {python_version_fmt}")
         
         container.add_item(title)
         container.add_item(ui.Separator())
