@@ -231,7 +231,7 @@ class EpiData:
 PAGE_SERVICE_LITERAL_T = Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"]
 
 class PageView(ui.LayoutView):
-    def __init__(self, *, message: str, priority: int, service: PAGE_SERVICE_LITERAL_T, cb_affected: bool, case_id: str):
+    def __init__(self, *, message: str, priority: int, service: PAGE_SERVICE_LITERAL_T, cb_affected: bool, case_id: str, pager: int):
         super().__init__(timeout=None)
         cb_affected_fmt = '✅' if cb_affected else '❌'
         description = (f"- Priority: `{priority}`",
@@ -241,7 +241,7 @@ class PageView(ui.LayoutView):
         container = ui.Container(ui.TextDisplay(f"{message}"), 
                                  ui.Separator(), 
                                  ui.TextDisplay("\n".join(description)),
-                                 ui.TextDisplay(f"-# Case ID: {case_id}"))
+                                 ui.TextDisplay(f"-# Case ID: {case_id}  •  Sent by <@{pager}>"))
 
         if priority == 1:
             accent_colour = None
@@ -697,7 +697,8 @@ class EPI(commands.Cog):
 
         case_id = generate_random_id()
         priority_num = priority_dict[priority]
-        new_view = PageView(message=message, priority=priority_num, service=service, cb_affected=cb_affected, case_id=case_id)
+        new_view = PageView(message=message, priority=priority_num, service=service, 
+                            cb_affected=cb_affected, case_id=case_id, pager=interaction.user.id)
 
         if self.recent_page and not check_time_more_than(self.recent_page['timestamp'], datetime.timedelta(minutes=15)):
             await interaction.response.defer(ephemeral=True)
