@@ -104,7 +104,7 @@ class MoreInfoView(ui.LayoutView):
         setup_container = ui.Container(
             ui.TextDisplay("### Need help with setting up something?"),
             ui.Separator(),
-            ui.TextDisplay("\n".join(("- Explain clearly what you are trying to setup/overall goall",
+            ui.TextDisplay("\n".join(("- Explain clearly what you are trying to setup/overall goal",
                                     "- If you are facing problems:",
                                     "  - What have you already tried?",
                                     "  - Attach a screenshot/video of your current setup"))),
