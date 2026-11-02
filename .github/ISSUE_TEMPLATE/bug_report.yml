@@ -1,60 +1,61 @@
-name: Bug Report
-description: Reporting an error or unexpected behaviour
-labels: unconfirmed bug
+name: Bug report
+description: Report an error or unexpected behaviour in Sapphire Helper.
+labels: ["unconfirmed bug"]
 body:
   - type: markdown
     attributes:
-      value: >
-        Please note that this form is for reporting bugs only!
+      value: |
+        Use this form for Sapphire Helper bugs. For Sapphire or appeal.gg support, visit https://discord.gg/RrHJYrh4Mm.
+        Remove tokens, webhook credentials and private configuration from examples and logs.
   - type: input
+    id: summary
     attributes:
       label: Summary
-      description: A general overview of what the bug is
+      description: Briefly describe the affected command or workflow and the problem.
     validations:
       required: true
   - type: textarea
+    id: reproduction
     attributes:
-      label: Reproduction Steps
-      description: >
-         What was done to cause the bug
+      label: Reproduction steps
+      description: Include the command or trigger, relevant tags/post state, and the invoking user's role.
+      placeholder: |
+        1. Start with...
+        2. Run or trigger...
+        3. Observe...
     validations:
       required: true
   - type: textarea
+    id: expected
     attributes:
-      label: Minimal Reproducible Code/Example and Traceback
-      description: >
-        The specific code that caused the bug and traceback, if applicable.
-      render: python
-    validations:
-      required: false
-  - type: textarea
-    attributes:
-      label: Expected Results
-      description: >
-        What should have happened without the bug?
+      label: Expected behaviour
+      description: What should happen?
     validations:
       required: true
   - type: textarea
+    id: actual
     attributes:
-      label: Actual Results
-      description: >
-        What actually happened?
+      label: Actual behaviour
+      description: What happened instead? Attach screenshots or video if helpful.
     validations:
       required: true
   - type: textarea
+    id: traceback
     attributes:
-      label: System Information
-      description: >
-        OS and Python version if applicable
-    validations:
-      required: false
+      label: Traceback or minimal example
+      description: Include the full relevant traceback or a minimal reproducible example, if available.
+      render: text
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: For your own instance, include the commit/version, Python and discord.py versions, OS, and whether you use Docker. Otherwise, say that you are reporting behaviour in the support server.
   - type: checkboxes
+    id: checklist
     attributes:
       label: Checklist
-      description: >
-        Please ensure you have met all these checkboxes before creating the issue!
       options:
-        - label: I have searched the open issues for duplicates.
+        - label: I searched existing issues for duplicates.
           required: true
-        - label: I have shown the entire traceback, if possible.
+        - label: I included the relevant traceback if available and removed private credentials.
           required: true

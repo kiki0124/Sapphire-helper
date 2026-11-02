@@ -65,7 +65,7 @@ class RTDR(commands.Cog):
                 gallery_items.append(item)
         return gallery_items, files
 
-    async def get_content(self, messages: list[discord.Message]) -> str:
+    def get_content(self, messages: list[discord.Message]) -> str:
         """  
         Returns a string of messages that should be used in the content of the post in this format
         ```
@@ -75,7 +75,7 @@ class RTDR(commands.Cog):
         ```
         or "No message content found" if all messages don't have content (only have attachments)
         """
-        content = 'No message content found'
+        content = '*No message content found*'
         messages_content: list[str] = []
         for message in messages:
             if message.content:
@@ -92,11 +92,11 @@ class RTDR(commands.Cog):
         else:
             return f"{reference_msg.author.mention} please provide any additional information here so we can give you the best help." # default message - if none of the special ones above are used
 
-    async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> discord.Thread:
+    async def handle_request(self, reference_message: discord.Message, user: discord.Member, message: discord.Message|None = None) -> None:
         await reference_message.channel.typing()
         messages_to_move: list[discord.Message] = await self.get_messages_to_move(reference_message)
         gallery_items, files = await self.get_media_gallery_items(messages_to_move)
-        content = await self.get_content(messages_to_move)
+        content = self.get_content(messages_to_move)
         support = self.bot.get_channel(SUPPORT_CHANNEL_ID)
         title = f"Support for {reference_message.author.name}"
         if message and message.content.removeprefix(self.bot.user.mention): # make sure the message has a content beyond @sapphire helper
@@ -122,7 +122,6 @@ class RTDR(commands.Cog):
         self.bot.add_post_to_rtdr(thread_id=post[0].id, owner_id=reference_message.author.id)
         await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire or appeal.gg. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire or appeal.gg related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300, allowed_mentions=discord.AllowedMentions.none())
         await reference_message.channel.delete_messages(messages_to_move, reason=f"rtdr system used by {user.name}")
-        return post[0]
     
     @staticmethod
     def is_allowed_rtdr_channel(channel: discord.TextChannel | discord.Thread, everyone_role: discord.Role):

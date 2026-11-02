@@ -1,42 +1,73 @@
-# Discord Bot Setup with Docker
-This project contains a Discord bot containerized with Docker. You can easily run it using `docker run` (instructions below).
+# Docker deployment
 
-## Installing Docker Desktop
+Docker provides the bot's Python runtime. You still need a configured Discord application, environment values and persistent database storage. Install Docker and start its engine before following this guide.
 
-1. **Download and install Docker Desktop** from [Docker's official website](https://www.docker.com/products/docker-desktop).
-2. Start Docker Desktop once installed.
+## Build the image
 
-## Running the Bot
-Cd into the root directory (the directory where we have the Dockerfile) and run the following command:
+Run the commands in this guide yourself from the repository root:
 
-```bash
-   docker build -t sapphire-helper . && docker run --env-file .env -v ./database:/app/database sapphire-helper
+```sh
+docker build -f Dockerfile -t sapphire-helper SH
 ```
 
-### Explanation:
-- `docker build`: This command tells Docker to build a Docker image.
-- `-t sapphire-helper`: The -t flag assigns a tag (name) to the image you're building. In this case, the image will be named sapphire-helper.
-- `.`: This represents the current directory as the build context. Docker will look for the Dockerfile in the current directory to build the image.
-- `&&`: The && is a logical AND operator, which means the second command (docker run) will only run if the first command (docker build) succeeds.
-- `docker run`: This command tells Docker to run a container based on the sapphire-helper image that was just built.
-- `--env-file .env`: Loads environment variables from the .env file located in the current directory (.). 
-- `-v`: -v is used to mount a volume between the host and the container. . 
-- `./database`: The database directory on your host machine (relative to where you are running the Docker command). 
-- `/app/database`: The directory inside the container where the host directory (./database) will be mounted. This makes the ./database directory from the host machine accessible inside the container at /app/database
-This is useful for persistent storage (e.g., for databases or files) because changes made to files inside /app/database will also appear in ./database on the host.
-- `sapphire-helper`: This is the name of the Docker image you built earlier. Docker will create and run a container from this image.
+The root Dockerfile expects `requirements.txt` and `main.py` at the root of its build context. Using `SH` as the context places the application at `/app`, matching its startup command. Building with `docker build .` does not match the current repository layout.
 
-### Changes made to the codebase
-1. Added `Dockerfile` (this file contains the instruction for docker to build the docker image)
-2. Created `/database` directory, the `data.db` will be inside this directory - Why? - because while using docker we need to store the database directly on the host system so that the database won't be deleted if we remove or stop the Container where the bot is running
-3. Updated `functions.py` to use the new path for database, added a constant `DB_PATH` which will have the path to database
-4. Added `.dockerfile` to ignore certain files from adding to docker image during build (similar to .gitignore)
+The Dockerfile uses Python 3.11 and installs the pinned requirements. It also explicitly installs `aiocache`, which is already in the requirements file.
 
-### Note:
-1. The docker command mentioned above will run the docker container in **interactive mode** so that we will get logs on our terminal directly, but for production (deploying on servers) we need the container to run on **detached mode** so add the `-d` flag to the docker command before running it, the command should look like this:
+## Configuration and database
 
-``` sh
-   docker build -t sapphire-helper . && docker run -d --env-file .env -v ./database:/app/database sapphire-helper
+Copy `_.env` to `.env` at the repository root and configure it using [the configuration reference](Documentation/configuration.md). The run command passes those values into the container; the environment file does not need to be copied into the image.
+
+The application stores SQLite at `/app/database/data.db` in this layout. The separate `/database` directory created by the Dockerfile is unused by the application.
+
+Use a named volume mounted at `/app/database`. Docker creates it on first use, and it survives container replacement. There is no need to create a host database directory when using the named-volume commands below.
+
+The repository's root `.dockerignore` is outside the `SH` build context. Keep that context free of secrets and local database files when building an image; the Dockerfile copies the entire context.
+
+## Start the bot
+
+For foreground logs:
+
+```sh
+docker run --name sapphire-helper --env-file .env -v sapphire-helper-data:/app/database sapphire-helper
 ```
 
-2. Changing the codebase (like adding new features, or modifying existing feature) won't break the docker configuration most of the times so this docker setup works like set it and forgot it, but it is highly recomended to test running the docker locally before pushing the new changes to github (just to be safe)
+For background operation, use this command instead:
+
+```sh
+docker run -d --name sapphire-helper --env-file .env -v sapphire-helper-data:/app/database sapphire-helper
+```
+
+These are alternatives. A container named `sapphire-helper` must not already exist when you run either command.
+
+Register slash commands with `@Sapphire Helper sync` after the bot connects. The invoking account needs a configured staff role.
+
+## Logs and lifecycle
+
+```sh
+docker logs -f sapphire-helper
+docker stop sapphire-helper
+docker start sapphire-helper
+```
+
+Stopping a container retains its files and volume. Starting an existing container reuses its original image and environment configuration.
+
+After changing the application, rebuild the image and recreate the container. Stop and remove the old container first, then use the appropriate run command above with the same volume:
+
+```sh
+docker stop sapphire-helper
+docker rm sapphire-helper
+docker build -f Dockerfile -t sapphire-helper SH
+```
+
+The named volume remains available after these commands. Do not remove it unless you intend to discard the stored database.
+
+The bot's mention-based `restart` command reloads cogs in the running process. It does not restart the container or use a newly built image.
+
+## Persistence and validation
+
+The volume retains reusable tags, saved channel permissions and cluster-notification subscriptions. Incident state and several caches live in memory. Pending reminder recovery inspects Discord messages rather than restoring a complete process snapshot.
+
+Stop the bot before taking a simple file-copy backup of SQLite. Back up storage before changing its schema or replacing a production instance.
+
+Before deployment, verify that the image builds, the bot connects, storage is writable, and the affected Discord workflows work in a test server. Startup utility tests do not validate permissions or external integrations. These instructions describe the source layout; they are not a report of a verified container build.

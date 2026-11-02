@@ -19,14 +19,16 @@ if TYPE_CHECKING:
 load_dotenv()
 
 SOLVED_TAG_ID = int(os.getenv("SOLVED_TAG_ID"))
+NOT_SOLVED_TAG_ID = int(os.getenv("NOT_SOLVED_TAG_ID"))
+UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
+APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
+
 SUPPORT_CHANNEL_ID = int(os.getenv('SUPPORT_CHANNEL_ID'))
 NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
 CUSTOM_BRANDING_TAG_ID = int(os.getenv("CUSTOM_BRANDING_TAG_ID"))
 MODERATORS_ROLE_ID = int(os.getenv("MODERATORS_ROLE_ID"))
 EXPERTS_ROLE_ID = int(os.getenv("EXPERTS_ROLE_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
-UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
-APPEAL_GG_TAG_ID = int(os.getenv("APPEAL_GG_TAG_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 
 
@@ -63,7 +65,11 @@ class CloseNowRow(ui.ActionRow):
         text_display: discord.TextDisplay = ui.LayoutView.from_message(interaction.message).find_item(10) # type: ignore
         footer = f"-# Cancelled by {interaction.user}"
         if SOLVED_TAG_ID in interaction.channel._applied_tags:
-            footer += f" | Use </unsolve:{await interaction.client.get_unsolve_id()}> to unsolve"
+            new_tags: list[discord.ForumTag] = [interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID)] # type: ignore
+            await interaction.channel.edit(applied_tags=new_tags)
+            await interaction.client.send_log(ALERTS_THREAD_ID, action_id=generate_random_id(),
+                                              post_mention=interaction.channel.mention, tags=new_tags,
+                                              context="Post unsolved, still need help button clicked")
         new_view = discord.ui.LayoutView().add_item(ui.Container(ui.TextDisplay(f"~~{text_display.content}~~"), ui.Separator(), ui.TextDisplay(footer)))
         await interaction.response.edit_message(view=new_view)
         interaction.client.remove_post_from_pending(interaction.channel_id)
@@ -75,7 +81,7 @@ class CloseNowRow(ui.ActionRow):
             await interaction.message.reply(view=view)
 
     async def interaction_check(self, interaction: discord.Interaction[SHBot]) -> bool:
-        self.is_owner = interaction.user.id == await interaction.client.get_post_owner_id(interaction.channel)
+        self.is_owner = interaction.user.id == interaction.client.get_post_owner_id(interaction.channel)
         if not (interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID) or self.is_owner):
             await interaction.response.send_message(content="Only Moderators, Community Experts, Developers and the post creator can use this.", ephemeral=True)
             return False
@@ -217,7 +223,7 @@ class Reminders(commands.Cog):
 
         await self.bot.send_log(ALERTS_THREAD_ID, content="\n".join(log_end_content))
 
-    async def filter_and_get_post_owner_ids(self, posts: list[discord.Thread]) -> list[int]:
+    def filter_and_get_post_owner_ids(self, posts: list[discord.Thread]) -> list[int]:
         """
         Remove posts that are:
             - Not from support
@@ -233,8 +239,8 @@ class Reminders(commands.Cog):
                 del posts[i]
                 continue
 
-            owner_id = await self.bot.get_post_owner_id(post)
-            if owner_id is not None:
+            owner_id = self.bot.get_post_owner_id(post)
+            if owner_id != 0:
                 user_ids.append(owner_id)
         return user_ids
 
@@ -243,7 +249,7 @@ class Reminders(commands.Cog):
         if not support:
             return
 
-        owner_ids = await self.filter_and_get_post_owner_ids(posts)
+        owner_ids = self.filter_and_get_post_owner_ids(posts)
         if not owner_ids:
             return
         # owner ids of which are still in the server
@@ -252,7 +258,7 @@ class Reminders(commands.Cog):
         for i in range(len(posts) - 1, -1, -1): # we need to do this so that we don't modify the rest of the list when we remove a post
             post = posts[i]
 
-            owner_id = await self.bot.get_post_owner_id(post)
+            owner_id = self.bot.get_post_owner_id(post)
             if owner_id in valid_owner_ids:
                 continue
 
@@ -282,11 +288,14 @@ class Reminders(commands.Cog):
             if not self.reminders_filter(post):
                 continue
 
-            post_author_id = await self.bot.get_post_owner_id(post)
+            post_author_id = self.bot.get_post_owner_id(post)
             
             # If the last message > 3d, we send the reminder regardless of other requirements
             if check_time_more_than(last_msg_timestamp, timedelta(days=3)):
-                await post.send(view=CloseNowView(post_author_id, time_ago="3 days"))
+                view = CloseNowView(post_author_id, time_ago="3 days")
+                view.stop()
+
+                await post.send(view=view)
                 self.bot.add_post_to_pending(post.id)
                 continue
 
@@ -300,7 +309,10 @@ class Reminders(commands.Cog):
                 if last_message.author.id == post_author_id:
                     continue
 
-            await post.send(view=CloseNowView(post_author_id, time_ago="24 hours"))
+            view = CloseNowView(post_author_id, time_ago="24 hours")
+            view.stop()
+
+            await post.send(view=view)
             self.bot.add_post_to_pending(post.id)
             
     @commands.Cog.listener('on_message')
@@ -310,7 +322,7 @@ class Reminders(commands.Cog):
         
         if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
             others_filter = not message.channel.locked and NEED_DEV_REVIEW_TAG_ID not in message.channel._applied_tags
-            owner_id = await self.bot.get_post_owner_id(message.channel)
+            owner_id = self.bot.get_post_owner_id(message.channel)
             message_author = message.author.id == owner_id
             if message_author and others_filter and message.channel.id in self.bot.pending_posts:
                 self.bot.remove_post_from_pending(message.channel.id)
@@ -394,7 +406,7 @@ class Reminders(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send(f"Sleeping for 5 seconds to prevent clashes with reminders...")
         await asyncio.sleep(5)
-        await self.check_for_pending_posts([self.bot.get_channel(post.id) or await post.fetch()])
+        await self.check_for_pending_posts([interaction.guild.get_thread(post.id) or await post.fetch()])
 
         await interaction.followup.send(f"Simulation complete for {post.mention}!", ephemeral=True)
 

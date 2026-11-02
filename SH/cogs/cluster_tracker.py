@@ -5,7 +5,7 @@ from discord.ext import commands
 from discord import app_commands, ui
 from discord.utils import format_dt
 
-from utils import check_time_more_than, str_to_timedelta
+from utils import check_time_more_than, str_to_timedelta, cluster_tracker_add, cluster_tracker_fetch_users, cluster_tracker_remove, format_mentions
 from datetime import datetime, timedelta, UTC
 import aiohttp
 import asyncio
@@ -29,6 +29,8 @@ class Cluster(NamedTuple):
     number: int
     ping: int
     online: bool
+    offline_since: int
+
 
 class StatusPage:
     """
@@ -46,10 +48,16 @@ class StatusPage:
         The message that was sent in the experts-channel when the threshold was hit.
     offline: :class:`int`
         The number of clusters currently offline.
+    received_at: :class:`datetime`
+        The datetime (UTC) of when the websocket data was received.
+    clusters: list[:class:`Cluster`]
+        The Sapphire clusters.
+    offline_clusters: list[:class:`Cluster`]
+        The clusters that are offline.
     """
 
     __slots__ = ('threshold', 'started_at', 'notified_message',
-                 'clusters', 'dashboard_online', 'cb_online', 'received_at')
+                 'clusters', 'offline_clusters', 'dashboard_online', 'cb_online', 'received_at')
 
     def __init__(self, threshold: timedelta):
         self.threshold = threshold
@@ -58,6 +66,7 @@ class StatusPage:
         self.notified_message: discord.Message | None = None
 
         self.clusters: list[Cluster] = []
+        self.offline_clusters: list[Cluster] = []
 
         self.dashboard_online: bool = True
         self.cb_online: bool = True
@@ -77,14 +86,6 @@ class StatusPage:
             return False
 
         return check_time_more_than(self.started_at, self.threshold)
-
-
-    @property
-    def offline_clusters(self) -> list[Cluster]:
-        """
-        Returns the number of offline clusters
-        """
-        return [cluster for cluster in self.clusters if not cluster.online]
 
 
     @staticmethod
@@ -111,31 +112,72 @@ class StatusPage:
 
     def update_from_ws_data(self, payload: list[dict[str, Any]]) -> int:
         """
-        Updates state and returns the no. of offline clusters
+        Updates state and returns the no. of offline clusters.
+
+        Returns -1 if empty, this is likely due to the ws giving empty data.
+
+        Example payload:
+
+            [
+                {
+                    "name": "Main bot",
+                    "clusters": [] (this may be empty if there is an error on the ws)
+                },
+                {
+                    "name": "Custom branded bots",
+                    "smallBar": {
+                        "text": "Unavailable",
+                        "color": "red"
+                    },
+                    "bots": true
+                },
+                {
+                    "name": "Dashboard",
+                    "smallBar": {
+                        "text": "Operational",
+                        "color": "green"
+                    }
+                }
+            ]
         """
-        clusters_payload = payload[0]['clusters']
+        clusters_payload: list = payload[0]['clusters']
+        if not clusters_payload:
+            return -1
+
         cb_payload = payload[1]
         dashboard_payload = payload[2]
 
-        self.clusters.clear()
+        self.offline_clusters.clear()
 
-        offline: int = 0
-        for i, cluster in enumerate(clusters_payload, start=1):
-            is_online = cluster['state'] == "online"
+        now_ts = int(datetime.now(UTC).timestamp())
+        for i, cluster_data in enumerate(clusters_payload):
+            is_online = cluster_data['state'] == "online"
+            ping = cluster_data['ping']
 
+            if i == len(self.clusters):
+                cluster = Cluster(number=i + 1, ping=ping, 
+                                            online=is_online, offline_since=now_ts)
+                self.clusters.append(cluster)
+            else:
+                if self.clusters[i].online:
+                    cluster = Cluster(number=i + 1, ping=ping, 
+                                                online=is_online, offline_since=now_ts)
+                else:
+                    cluster = Cluster(number=i + 1, ping=ping, 
+                                                online=is_online, offline_since=self.clusters[i].offline_since)
+
+                self.clusters[i] = cluster
+    
             if not is_online:
-                offline += 1
                 if self.started_at == 0:
-                    self.started_at = int(datetime.now(UTC).timestamp())
-
-            self.clusters.append(Cluster(number=i, ping=cluster['ping'], 
-                                         online=is_online))
+                    self.started_at = now_ts
+                self.offline_clusters.append(cluster)
 
         self.cb_online = cb_payload['smallBar']['text'] == "Operational"
         self.dashboard_online = dashboard_payload['smallBar']['text'] == "Operational"
         self.received_at = datetime.now(UTC)
 
-        return offline
+        return len(self.offline_clusters)
 
     def reset_state(self):
         """
@@ -148,6 +190,7 @@ class StatusPage:
         self.started_at = 0
         self.received_at = datetime.now(UTC)
         self.clusters.clear()
+        self.offline_clusters.clear()
         self.cb_online = True
         self.dashboard_online = True
         self.notified_message = None
@@ -233,9 +276,11 @@ class Websocket:
 
 
 class ClusterTracker(commands.Cog):
+    MAX_OFFLINE_CLUSTERS_PER_MESSAGE = 25
+
     def __init__(self, bot: SHBot) -> None:
         self.bot = bot
-        self.cluster_tracker = StatusPage(timedelta(minutes=16))
+        self.cluster_tracker = StatusPage(timedelta(minutes=8))
 
         self.websocket = Websocket(self)
 
@@ -276,6 +321,8 @@ class ClusterTracker(commands.Cog):
 
                 if event == "status":
                     offline = self.cluster_tracker.update_from_ws_data(actual_data)
+                    if offline == -1:
+                        return
                     await self.handle_offline_clusters(offline)
 
     @staticmethod
@@ -289,6 +336,10 @@ class ClusterTracker(commands.Cog):
 
     def get_expert_channel(self) -> discord.TextChannel | None:
         return discord.utils.get(self.bot.get_all_channels(), name="sapphire-experts") # type: ignore
+
+    def fmt_offline_clusters(self, offline_clusters: list[Cluster]) -> str:
+        offline_clusters = offline_clusters if len(offline_clusters) < 25 else offline_clusters[0:self.MAX_OFFLINE_CLUSTERS_PER_MESSAGE]
+        return "\n".join(f"- Cluster **{cluster.number}** (offline <t:{cluster.offline_since}:R>)" for cluster in offline_clusters)
 
     async def handle_offline_clusters(self,  offline: int) -> None:
         if offline == 0:
@@ -316,18 +367,27 @@ class ClusterTracker(commands.Cog):
             if experts_channel is None:
                 return
 
+            view = ui.LayoutView()
             container = ui.Container(accent_color=discord.Colour.brand_red())
             header = f"## Clusters offline <t:{self.cluster_tracker.started_at}:R> ([STATUS](https://sapph.xyz/status))"
             container.add_item(ui.TextDisplay(header))
             container.add_item(ui.Separator())
 
             offline_clusters = self.cluster_tracker.offline_clusters
-            clusters_offline_fmt = "\n".join(f"- Cluster **{cluster.number}**" for cluster in offline_clusters)
-            container.add_item(ui.TextDisplay(f"*Currently offline **[{len(offline_clusters)}]**:*\n{clusters_offline_fmt}"))
+            clusters_offline_fmt = self.fmt_offline_clusters(offline_clusters)
+            container.add_item(ui.TextDisplay(f"*Currently offline **[{len(offline_clusters)}/{len(self.cluster_tracker.clusters)}]**:*\n{clusters_offline_fmt}"))
+            if len(offline_clusters) > self.MAX_OFFLINE_CLUSTERS_PER_MESSAGE:
+                container.add_item(ui.TextDisplay(f"*And {len(offline_clusters) - self.MAX_OFFLINE_CLUSTERS_PER_MESSAGE} more...*"))
+
             container.add_item(ui.Separator())
             container.add_item(ui.TextDisplay("-# Use `/cluster_tracker status` for live information."))
 
-            self.cluster_tracker.notified_message = await experts_channel.send(view=ui.LayoutView().add_item(container))
+            view.add_item(container)
+            to_ping: list[int] = await cluster_tracker_fetch_users()
+            if to_ping:
+                view.add_item(ui.TextDisplay(f"-# {next(format_mentions(to_ping))}"))
+
+            self.cluster_tracker.notified_message = await experts_channel.send(view=view)
 
     @staticmethod
     def format_online(online: bool) -> str:
@@ -354,10 +414,6 @@ class ClusterTracker(commands.Cog):
             await interaction.followup.send(f"Successfully set threshold! (`{self.format_timedelta(old_threshold)}` -> `{threshold}`)",
                                             ephemeral=True)
 
-        if not self.cluster_tracker:
-            await interaction.followup.send("Cluster tracker data is empty!", ephemeral=True)
-            return
-
         if action == 'Clear':
             self.cluster_tracker.clear()
             await interaction.followup.send("Successfully cleared!", ephemeral=True)
@@ -365,16 +421,21 @@ class ClusterTracker(commands.Cog):
 
      
         if action == 'View' or (action is None and threshold is None):
+            if not self.cluster_tracker:
+                await interaction.followup.send("Cluster tracker data is empty!", ephemeral=True)
+                return
+
             offline_clusters = self.cluster_tracker.offline_clusters
 
-            offline_container = ui.Container(ui.TextDisplay(f"## [Clusters Offline: {len(offline_clusters)}](https://sapph.xyz/status)"))
+            offline_container = ui.Container(ui.TextDisplay(f"## [Clusters Offline: {len(offline_clusters)}/{len(self.cluster_tracker.clusters)}](https://sapph.xyz/status)"))
             if offline_clusters:
                 colour = discord.Colour.brand_red()
                 offline_container.add_item(ui.Separator())
 
-                fmt = "\n".join(f"- Cluster **{cluster.number}**" for cluster in offline_clusters)
-                content = f"Offline (<t:{self.cluster_tracker.started_at}:R>):\n{fmt}"
+                content = f"Started <t:{self.cluster_tracker.started_at}:R>:\n{self.fmt_offline_clusters(offline_clusters)}"
                 offline_container.add_item(ui.TextDisplay(content))
+                if len(offline_clusters) > self.MAX_OFFLINE_CLUSTERS_PER_MESSAGE:
+                    offline_container.add_item(ui.TextDisplay(f"*And {len(offline_clusters) - self.MAX_OFFLINE_CLUSTERS_PER_MESSAGE} more...*"))
             else:
                 colour = discord.Colour.green()
             offline_container.accent_color = colour
@@ -437,7 +498,7 @@ class ClusterTracker(commands.Cog):
                 clusters.append(cluster)
 
             if len(clusters) == 1:
-                await interaction.followup.send(f"- Cluster **{cluster.number}.** - `{cluster.ping}ms` | Online: {self.format_online(cluster.online)}",
+                await interaction.followup.send(f"- Cluster **{cluster.number}** - `{cluster.ping}ms` | Online: {self.format_online(cluster.online)}",
                                                 ephemeral=True)
                 return
         else:
@@ -456,8 +517,7 @@ class ClusterTracker(commands.Cog):
 
         clusters = clusters[0:15]
 
-        fmt = "\n".join([f"- Cluster **{cluster.number}.** - `{cluster.ping}ms` | Online: {self.format_online(cluster.online)}" \
-                            for cluster in clusters])
+        fmt = "\n".join([f"- Cluster **{cluster.number}.** `{cluster.ping}ms` | Online: {self.format_online(cluster.online)}" for cluster in clusters])
 
         container = ui.Container()
         container.add_item(ui.TextDisplay(f"### {len(clusters)}/{len(self.cluster_tracker.clusters)} clusters"))
@@ -506,6 +566,25 @@ class ClusterTracker(commands.Cog):
         else:
             await self.websocket.disconnect_ws()
             await interaction.followup.send("Successfully force disconnected the websocket!", ephemeral=True)
+
+    @group_cmd.command(name="notify_me", description="Pings you when clusters are offline for more than set threshold")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID, MODERATORS_ROLE_ID)
+    @app_commands.describe(action="view - see all users to be notified, the rest are self-explanatory")
+    async def cluster_tracking_notify_me(self, interaction: discord.Interaction, action: Literal['view', 'add', 'remove'] = 'add'):
+        await interaction.response.defer(ephemeral=True)
+        if action == 'add':
+            await cluster_tracker_add(interaction.user.id)
+            await interaction.followup.send("You will now be notified!", ephemeral=True)
+        elif action == 'view':
+            to_notify: list[int] = await cluster_tracker_fetch_users()
+            if to_notify:
+                for mentions in format_mentions(to_notify):
+                    await interaction.followup.send(mentions, ephemeral=True)
+            else:
+                await interaction.followup.send("*No users will currently be notified*", ephemeral=True)
+        else:
+            await cluster_tracker_remove(interaction.user.id)
+            await interaction.followup.send("You will no longer be notified!", ephemeral=True)
 
 
 async def setup(bot: SHBot):

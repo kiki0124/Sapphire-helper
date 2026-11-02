@@ -84,7 +84,7 @@ class NeedDevReviewView(ui.LayoutView):
 
 class ndr_options_buttons(ui.View):
     def __init__(self, Interaction: discord.Interaction[SHBot]):
-        super().__init__(timeout=None)
+        super().__init__(timeout=60 * 15)
         self.Interaction = Interaction
     
     async def mark_post_as_ndr(self, post: discord.Thread):
@@ -124,16 +124,22 @@ class ndr_options_buttons(ui.View):
         await self.Interaction.delete_original_response()
         await interaction.response.defer()
         await self.mark_post_as_ndr(interaction.channel)
+
+        view = NeedDevReviewView(executor_id=interaction.user.id)
+        view.stop()
+
         await interaction.channel.send(
-            view=NeedDevReviewView(executor_id=interaction.user.id),
+            view=view,
             allowed_mentions=discord.AllowedMentions.none()
         )
 
 class SolvedView(ui.LayoutView):
-    def __init__(self, unsolve_id: int) -> None:
+    def __init__(self, unsolve_id: int, *, solver: discord.User | discord.Member | None = None) -> None:
         super().__init__(timeout=None)
         container = ui.Container(accent_color=discord.Colour.green())
         title = "### Marked as Solved"
+        if solver is not None:
+            title += f" by [@{solver.name}](https://discord.com/users/{solver.id})"
 
         one_hour_from_now = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
         footer= f"-# Auto closes {discord.utils.format_dt(one_hour_from_now, 'R')}. Use </unsolve:{unsolve_id}> to cancel."
@@ -153,7 +159,7 @@ class SolvedRowWithNDR(ui.ActionRow):
     async def on_confirm_button_click(self, interaction: discord.Interaction[SHBot], button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         await interaction.delete_original_response()
-        await interaction.channel.send(view=SolvedView(await interaction.client.get_unsolve_id()))
+        await interaction.channel.send(view=SolvedView(await interaction.client.get_unsolve_id(), solver=interaction.user))
         await self.mark_post_as_solved(interaction.channel)
 
 # This is sent when the post has a NDR tag
@@ -178,11 +184,15 @@ class Utility(commands.Cog):
         Used with asyncio.create_task to close the given post after the given delay in seconds.
         """
         await asyncio.sleep(close_delay) # wait for close_delay hours
+        self.close_tasks.pop(post.id)
+
+        if SOLVED_TAG_ID not in post._applied_tags:
+            # still-need-help button will remove the SOLVED_TAG but not pop from close_tasks
+            return
         await post.edit(
             archived=True,
             reason=f"Auto archive {'solved' if close_delay == 3600 else 'unrelated'} post after {close_delay} seconds"
         )
-        self.close_tasks.pop(post.id)
         self.bot.remove_post_from_rtdr(post.id)
         self.bot.remove_post_from_pending(post.id)
 
@@ -241,7 +251,7 @@ class Utility(commands.Cog):
         --Integrated with rtdr system
         """
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == SUPPORT_CHANNEL_ID:
-            owner_id = await interaction.client.get_post_owner_id(interaction.channel)
+            owner_id = interaction.client.get_post_owner_id(interaction.channel)
             return bool(interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID)) or interaction.user.id == owner_id
         else:
             return False
@@ -283,7 +293,7 @@ class Utility(commands.Cog):
         if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != SUPPORT_CHANNEL_ID:
             await interaction.response.send_message(content=f"This command is only usable in a post in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
             return
-        is_owner = user.id == await self.bot.get_post_owner_id(interaction.channel)
+        is_owner = user.id == self.bot.get_post_owner_id(interaction.channel)
         if is_owner:
             await interaction.response.send_message(f"{user.mention} is the owner of this post. Therefore they cannot be removed.", ephemeral=True)
             return
@@ -453,7 +463,7 @@ class Utility(commands.Cog):
         if ctx.channel.id in self.bot.incomplete_msg_posts:
             await ctx.reply("You cannot use this command as an automatic message was already sent.", ephemeral=True, delete_after=5)
             return
-        user_id = await self.bot.get_post_owner_id(ctx.channel)
+        user_id = self.bot.get_post_owner_id(ctx.channel)
         text_prefix = "## Incomplete support post\nHey"
         if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
             text_prefix = f"## Incomplete support post\nHey <@{user_id}>"
@@ -512,7 +522,7 @@ class Utility(commands.Cog):
 
         text_prefix = "Hey"
         if self.is_mod_or_expert_or_dev(interaction=interaction):
-            user_id = await self.bot.get_post_owner_id(interaction.channel)
+            user_id = self.bot.get_post_owner_id(interaction.channel)
             text_prefix = f"Hey <@{user_id}>"
             await self.lock_unrelated_post(interaction.channel)
         else:

@@ -1,33 +1,56 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+This file records notable changes to Sapphire Helper. The current development version is 6.4; the entries below describe unreleased work unless a release heading states otherwise.
 
-## [Unversioned] -
+Dates in release headings use day/month/year. Issue and pull-request links provide implementation context. Historical release entries are retained; this is not an exhaustive list of commits.
+
+## Unreleased
+
+### Added
+
+
+### Fixed
+
+
+### Notable Internal Changes
+
+
+## [6.3](https://github.com/kiki0124/Sapphire-helper/compare/6.2...6.3) - 2/11/26
 
 ### Added
 - Reminders now ignore posts that are unanswered ([#83](https://github.com/kiki0124/Sapphire-helper/issues/83))
 - Error handling for failing to convert a member object.
 - Runtime debugging for reminders ([#85](https://github.com/kiki0124/Sapphire-helper/issues/85))
 - Runtime debugging for EPI
+- Revised setup, deployment, configuration, command, architecture and contribution documentation.
 - For messages using cv2, changed from `Recommended by @mention` -> `Recommended by [@username](user_profile_link)` ([#96](https://github.com/kiki0124/Sapphire-helper/issues/96))
-- Auto detection of cluster downtime + live custer tracking ([#99](https://github.com/kiki0124/Sapphire-helper/issues/99))
-- Partial removal of prefix commands, only the bot's mention count as a prefix now. ([#100](https://github.com/kiki0124/Sapphire-helper/issues/100)
+- Auto detection of cluster downtime + live cluster tracking ([#99](https://github.com/kiki0124/Sapphire-helper/issues/99))
+- Partial removal of prefix commands, only the bot's mention count as a prefix now. ([#100](https://github.com/kiki0124/Sapphire-helper/issues/100))
+- Slowmode duration now accepts formatted input such as `1h` or `50m, 30s` etc.
+- Improve Tag UX greatly ([#108](https://github.com/kiki0124/Sapphire-helper/issues/108))
+- Changed page "notification sent successfully" response to use cv2.
+- Improved ui and detection for sending automated *incomplete-post* messages.
+- Show who solved a *NDR* post in the response.
 
 ### Fixed
 - Fixed `/unrelated` command not adding `not-solved` tag. ([#82](https://github.com/kiki0124/Sapphire-helper/issues/82))
 - Fixed posts getting archived even though they should only be archived in an hour when using `/solved`
 - Updated required discord.py version to `2.7.1` in `requirements.txt`
 - Fixed RTDR owners being cleared and becoming unretrievable ([#93](https://github.com/kiki0124/Sapphire-helper/issues/93))
+- Fixed `not solved` tag not being added when using `/tag use` ([#114](https://github.com/kiki0124/Sapphire-helper/issues/114))
+- Fixed *Still need help* (*Cancel*) button not unsolving posts.
 
 ### Notable Internal Changes
 - Removal of `members` (privileged) Intent ([#84](https://github.com/kiki0124/Sapphire-helper/issues/84))
 - Simplifying and Optimising EPI ([#91](https://github.com/kiki0124/Sapphire-helper/issues/91))
 - Removing certain DB Tables and Implementing Global Caches ([#94](https://github.com/kiki0124/Sapphire-helper/issues/94))
-- Added `psutil` to `requirements.txt` ([#103](https://github.com/kiki0124/Sapphire-helper/issues/103)
+- Added `psutil` to `requirements.txt` ([#103](https://github.com/kiki0124/Sapphire-helper/issues/103))
 - (In response to ([#94](https://github.com/kiki0124/Sapphire-helper/issues/94))), `pending_posts` can now be restored even after cache clear.
+- Optimise regex searching for suggesting `/solved` command.
+- Custom Max Cache for `sent_cmd_suggestion_posts` and `incomplete_msg_posts` ([#111](https://github.com/kiki0124/Sapphire-helper/issues/111))
 
 
-## [6.2] - 21/7/26
+## 6.2 - 21/7/26
 
 ### Added
 - Cv2 for majority of messages ([#49](https://github.com/kiki0124/Sapphire-helper/issues/49))
@@ -54,4 +77,4 @@ All notable changes to this project will be documented in this file.
 - Refactor reminders + close_abandoned_posts ([74](https://github.com/kiki0124/Sapphire-helper/pull/74))
 - Change Backend in Paging ([78](https://github.com/kiki0124/Sapphire-helper/pull/78))
 
-See [commits](https://github.com/kiki0124/Sapphire-helper/commits/main/) for all changes!
+See the [commit history](https://github.com/kiki0124/Sapphire-helper/commits/main/) for all changes!

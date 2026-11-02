@@ -6,10 +6,10 @@ from discord import app_commands, ui
 from dotenv import load_dotenv
 from datetime import timedelta
 from utils import save_channel_permissions, get_channel_permissions, delete_channel_permissions, get_locked_channels, \
-    generate_random_id, check_time_more_than, str_to_timedelta
+    generate_random_id, check_time_more_than, str_to_timedelta, format_mentions
 import aiohttp, json, os, asyncio, re, datetime
-from typing import Literal, Optional, Any, TYPE_CHECKING
 
+from typing import Literal, Optional, Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from main import SHBot
 
@@ -45,12 +45,11 @@ class GetNotifiedView(ui.LayoutView):
         super().__init__(timeout=None)
         self.description = description
 
-        title = "## Some services are currently experiencing issues"
-        accent_colour = 16749824
-        footer = "We're sorry for the inconvenience caused and thank you for your patience!"
+        title = "# Some services are __currently experiencing issues__"
+        footer = "*We're sorry for the inconvenience caused & thank you for your patience!*"
         get_notified_button = GetNotifiedButton(epi_users)
 
-        container = ui.Container(accent_colour=accent_colour)
+        container = ui.Container(accent_colour=discord.Colour.brand_red())
 
         container.add_item(ui.TextDisplay(title))
         if status_message is not None:
@@ -157,7 +156,6 @@ class SelectChannels(ui.ChannelSelect):
             await self.i.edit_original_response(view=None)
 
 
-
 class EpiData:
     """
     The object that holds the data for EPI.
@@ -197,7 +195,7 @@ class EpiData:
 
         self.message: str | None = None
 
-        self.thread_to_msgs_map: dict[int, int] = {}
+        self.thread_to_msgs_map: dict[int, tuple[int, ui.LayoutView]] = {}
 
         self.status_message: discord.Message | None = None
         self.status_page: bool = True # true if its working, false if its not working
@@ -229,6 +227,33 @@ class EpiData:
     def __bool__(self):
         return self._enabled
 
+
+PAGE_SERVICE_LITERAL_T = Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"]
+
+class PageView(ui.LayoutView):
+    def __init__(self, *, message: str, priority: int, service: PAGE_SERVICE_LITERAL_T, cb_affected: bool, case_id: str, pager: int):
+        super().__init__(timeout=None)
+        cb_affected_fmt = '✅' if cb_affected else '❌'
+        description = (f"- Priority: `{priority}`",
+                       f"- Service: *{service}*",
+                       f"- CB affected: {cb_affected_fmt}")
+
+        container = ui.Container(ui.TextDisplay(f"{message}"), 
+                                 ui.Separator(), 
+                                 ui.TextDisplay("\n".join(description)),
+                                 ui.TextDisplay(f"-# Case ID: {case_id}  •  Sent by <@{pager}>"))
+
+        if priority == 1:
+            accent_colour = None
+        elif priority == 2:
+            accent_colour = discord.Colour.orange()
+        else:
+            accent_colour = discord.Colour.brand_red()
+        container.accent_colour = accent_colour
+
+        self.add_item(container)
+
+
 class EPI(commands.Cog):
     def __init__(self, bot: SHBot):
         self.bot = bot
@@ -238,25 +263,50 @@ class EPI(commands.Cog):
         self.recent_page: dict[str, Any] = {} # {"user_id": 1234, "message": "low taper fade is still massive", "timestamp": 1234.56, "priority": 1, "service": "Sapphire - bot", "cb_affected": False, "id": "AbC123"} , used for "a page was made 3 minutes ago, are you sure you want to continue?" for pages up to 5 minutes old
 
         self.epi_data = EpiData()
+        self.global_epi_view = GetNotifiedView("", 
+                                               epi_users=self.epi_data.users, status_page=self.epi_data.status_page, 
+                                               status_message=self.epi_data.status_message)
 
     group = app_commands.Group(name="epi", description="Commands related to Emergency Post Information system")
 
-    def generate_epi_layout_view(self) -> GetNotifiedView:
+
+    def generate_new_epi_view(self) -> GetNotifiedView:
+        """
+        Used for individual support posts.
+        """
         description: str = ""
         if self.epi_data.message:
             description += self.epi_data.message
 
-        return GetNotifiedView(description, epi_users=self.epi_data.users, status_page=self.epi_data.status_page, status_message=self.epi_data.status_message)
+        return GetNotifiedView(description, epi_users=self.epi_data.users,
+                               status_page=self.epi_data.status_page, 
+                               status_message=self.epi_data.status_message)
+
+    def generate_and_set_global_epi_view(self) -> GetNotifiedView:
+        """
+        Used for the sticky message in the #general.
+        """
+        description: str = ""
+        if self.epi_data.message:
+            description += self.epi_data.message
+
+        self.global_epi_view = GetNotifiedView(description, epi_users=self.epi_data.users, 
+                                               status_page=self.epi_data.status_page,
+                                               status_message=self.epi_data.status_message)
+        return self.global_epi_view
 
     async def handle_sticky_message(self, channel: discord.TextChannel | discord.PartialMessageable, delay: float = 4.0):
-        view = self.generate_epi_layout_view()
         await asyncio.sleep(delay)
         self.epi_data.is_being_executed = True
         if self.epi_data.sticky_message:
             try:
+                if not self.global_epi_view.is_finished():
+                    self.global_epi_view.stop()
                 await self.epi_data.sticky_message.delete()
             except discord.NotFound:
                 pass
+
+        view = self.generate_and_set_global_epi_view()
         self.epi_data.sticky_message = await channel.send(view=view)
         self.epi_data.sticky_task = None
         self.epi_data.is_being_executed = False
@@ -267,6 +317,8 @@ class EPI(commands.Cog):
 
         if self.epi_data.sticky_message is not None:
             try:
+                if not self.global_epi_view.is_finished():
+                    self.global_epi_view.stop()
                 await self.epi_data.sticky_message.delete()
             except discord.NotFound:
                 pass # message was not found, probably already deleted - do nothing
@@ -353,23 +405,25 @@ class EPI(commands.Cog):
             if message:
                 content += f"\n> {message}"
 
-            for thread_id, message_id in self.epi_data.thread_to_msgs_map.items():
+            for thread_id, (message_id, view) in self.epi_data.thread_to_msgs_map.items():
                 thread = self.bot.get_channel(thread_id)
                 if thread is None:
                     continue
                 try:
-                    msg = self.find_message(message_id) or await thread.fetch_message(message_id)
+                    msg: discord.Message = self.find_message(message_id) or await thread.fetch_message(message_id)
                 except discord.HTTPException:
                     continue
-                new_view = ui.LayoutView.from_message(msg)
-                for child in new_view.walk_children():
+
+                if not view.is_finished():
+                    view.stop()
+                for child in view.walk_children():
                     if hasattr(child, "disabled"):
                         child.disabled = True
                         break
 
                 was_archived = thread.archived
                 try:
-                    await msg.edit(view=new_view)
+                    await msg.edit(view=view)
                     await msg.reply(
                         content=content,
                         mention_author=False
@@ -386,18 +440,11 @@ class EPI(commands.Cog):
             general = interaction.guild.get_channel(GENERAL_CHANNEL_ID)
             main_message = await general.send(content=content)
             if self.epi_data.users:
-                mentions: list[str] = []
-                for user_id in self.epi_data.users:
-                    if len(", ".join(mentions)) + len(f"<@{user_id}>") + 2 < 2000: # + 2 is for the space and comma (,) next to each mention
-                        mentions.append(f"<@{user_id}>")
-                    else:
-                        await main_message.reply(content=", ".join(mentions), mention_author=False)
-                        mentions = [] # reset list for another pinging message with other users
-                if mentions:
-                    await main_message.reply(content=", ".join(mentions), mention_author=False)
+                for mentions in format_mentions(self.epi_data.users):
+                    await main_message.reply(content=mentions)
 
             await interaction.channel.send(f"EPI mode successfully disabled by {interaction.user.name}.\nUsers mentioned: {len(self.epi_data.users)}")
-            await self.bot.send_log(EPI_LOG_THREAD_ID, content=f"EPI mode disabled by {interaction.user.mention}\nCustom message: {message or 'not set'}")
+            await self.bot.send_log(EPI_LOG_THREAD_ID, content=f"EPI mode disabled by {interaction.user.mention}\nCustom message: {message or '*Not set*'}")
 
 
             await self.disable_sticky_message()
@@ -472,9 +519,9 @@ class EPI(commands.Cog):
     async def send_epi_info(self, thread: discord.Thread):
         if thread.parent_id == SUPPORT_CHANNEL_ID and self.epi_data:
             await asyncio.sleep(3) # make sure that epi messages will be sent last (after more info message)
-            view = self.generate_epi_layout_view()
+            view = self.generate_new_epi_view()
             message = await thread.send(view=view)
-            self.epi_data.thread_to_msgs_map[thread.id] = message.id
+            self.epi_data.thread_to_msgs_map[thread.id] = (message.id, view)
 
     @commands.Cog.listener('on_message')
     async def epi_sticky_message(self, message: discord.Message):
@@ -639,7 +686,7 @@ class EPI(commands.Cog):
         priority="1 - lowest, 4 - highest (most critical)", 
         cb_affected="Whether custom branding is affected or not (for Sapphire outages)"
     )
-    async def page(self, interaction: discord.Interaction, service: Literal["Sapphire - bot", "Sapphire - dashboard", "appeal.gg", "All"], message: str, 
+    async def page(self, interaction: discord.Interaction, service: PAGE_SERVICE_LITERAL_T, message: str, 
                    priority: Literal["4 | Night", "3 | Major issue", "2 | Minor issue", "1 | Information"], cb_affected: bool):
         priority_dict : dict[str, int] = {
             "4 | Night": 4,
@@ -650,7 +697,8 @@ class EPI(commands.Cog):
 
         case_id = generate_random_id()
         priority_num = priority_dict[priority]
-        new_content = f"Notification sent successfully.\n-# Message: {message} | Priority: {priority_num} | Service: {service} | CB affected: {cb_affected} | ID: {case_id}"
+        new_view = PageView(message=message, priority=priority_num, service=service, 
+                            cb_affected=cb_affected, case_id=case_id, pager=interaction.user.id)
 
         if self.recent_page and not check_time_more_than(self.recent_page['timestamp'], datetime.timedelta(minutes=15)):
             await interaction.response.defer(ephemeral=True)
@@ -667,7 +715,7 @@ class EPI(commands.Cog):
                     "id": case_id
                 }
                 await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup_msg, case_id, cb_affected, user=interaction.user)
-                await followup_msg.edit(content=new_content)
+                await followup_msg.edit(view=new_view, content=None)
 
             button = ui.Button(style=discord.ButtonStyle.danger, label="Confirm", custom_id="page-confirm")
             button.callback = callback
@@ -689,7 +737,7 @@ class EPI(commands.Cog):
                 "id": case_id
             }
             await self.send_page(f"{service} | Sent by @{interaction.user.name}", message, priority_num, followup, case_id, cb_affected, user=interaction.user)
-            await followup.edit(content=new_content)
+            await followup.edit(view=new_view, content=None)
 
     @commands.Cog.listener("on_message")
     async def autopage_on_ratelimit(self, ratelimit_message: discord.Message):
@@ -738,9 +786,9 @@ class EPI(commands.Cog):
                 self.epi_data.status_page = req.status == 200 # true if the status is 200 - OK, else false
 
 
-    @group.command(name="debug_info", description="Get debug information on EPI and paging")
+    @group.command(name="view", description="Get debug information on EPI and paging")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID, MODERATORS_ROLE_ID)
-    async def epi_debug(self, interaction: discord.Interaction):
+    async def epi_view(self, interaction: discord.Interaction):
         container = ui.Container()
 
         epi_info = (f"- Enabled: `{self.epi_data._enabled}`",
@@ -757,7 +805,7 @@ class EPI(commands.Cog):
 
         container.add_item(ui.Separator(visible=False))
 
-        container.add_item(ui.TextDisplay("### Last Recent Page"))
+        container.add_item(ui.TextDisplay("### Most Recent Page"))
         container.add_item(ui.Separator())
         container.add_item(ui.TextDisplay(f"```py\n{self.recent_page}```"))
         await interaction.response.send_message(view=ui.LayoutView().add_item(container), ephemeral=True)

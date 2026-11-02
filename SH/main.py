@@ -215,7 +215,7 @@ class SHBot(commands.Bot):
         choices = [app_commands.Choice(name=file, value=file[:-3]) for file in files if current.lower() in file.lower()]
         return choices[:25]
 
-    async def get_post_owner_id(self, post: discord.Thread | app_commands.AppCommandThread) -> int:
+    def get_post_owner_id(self, post: discord.Thread | app_commands.AppCommandThread) -> int:
         """
         Helper function to get the owner ID for a support post. Returns `0` if not found.
         """

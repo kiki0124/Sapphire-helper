@@ -1,11 +1,19 @@
-## What does this PR do?
-<!--  Summary of what the PR does -->
+## Summary
 
-- issue: <!-- Please include the issue number this PR is addressing like so: "- issue: #12". If there isn't an issue, please create one!-->
+<!-- Explain the problem and the resulting behaviour. Include a concrete before/after example when useful. -->
+
+## Related issue
+
+<!-- Create an issue before opening this PR. Link it here, for example: Closes #12. -->
+
+## Validation
+
+<!-- List the checks performed and their results. For Discord workflows, include the test-server scenario and relevant roles/state. For documentation, describe the source/link checks. State any unverified behaviour. -->
 
 ## Checklist
 
-<!-- Put an x inside [ ] to check it, like so: [x] -->
-
-- [ ] If code changes were made then they have been tested.
-- [ ] This PR is not a code change (i.e, README)
+- [ ] This PR links the issue it addresses.
+- [ ] The change is focused and follows the surrounding code or documentation conventions.
+- [ ] Code changes have been tested, or this PR only changes documentation.
+- [ ] Affected documentation is updated, or no documentation update is needed.
+- [ ] No tokens, webhook credentials or private configuration are included.
