@@ -27,15 +27,15 @@ SOLVED_TAG_ID = int(getenv("SOLVED_TAG_ID"))
 
 
 class DebugPostView(ui.LayoutView):
-    def __init__(self, post: app_commands.AppCommandThread, *, is_pending: bool, pending_post_timestamp: int = 0, owner_id: int) -> None:
+    def __init__(self, post: app_commands.AppCommandThread, *, is_inactive: bool, inactive_timestamp: int = 0, owner_id: int) -> None:
         super().__init__(timeout=None)
         container = ui.Container(ui.TextDisplay(f"## [{post.name[0:25]}]({post.jump_url})"))
         container.add_item(ui.Separator())
 
         middle_content = ""
-        if is_pending:
+        if is_inactive:
             middle_content += "\n- In `inactive_posts`: ✅"
-            middle_content += f"\n- Time inserted into db: <t:{pending_post_timestamp}:R>"
+            middle_content += f"\n- Time inserted into db: <t:{inactive_timestamp}:R>"
         else:
             middle_content += "\n- In `inactive_posts`: ❌"
         if post.last_message_id:
@@ -183,12 +183,12 @@ class DebugCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         is_inactive = post.id in self.bot.inactive_posts
         if is_inactive:
-            is_inactive_timestamp = self.bot.inactive_posts[post.id]
+            inactive_timestamp = self.bot.inactive_posts[post.id]
         else:
-            is_inactive_timestamp = 0
+            inactive_timestamp = 0
         
         owner_id = self.bot.get_post_owner_id(post)
-        await interaction.followup.send(view=DebugPostView(post, is_inactive=is_inactive, pending_post_timestamp=pending_post_timestamp,
+        await interaction.followup.send(view=DebugPostView(post, is_inactive=is_inactive, inactive_timestamp=inactive_timestamp,
                                                            owner_id=owner_id),
                                                            allowed_mentions=discord.AllowedMentions.none(),
                                                            ephemeral=True)
