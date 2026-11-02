@@ -34,10 +34,10 @@ class DebugPostView(ui.LayoutView):
 
         middle_content = ""
         if is_pending:
-            middle_content += "\n- In `pending_posts`: ✅"
+            middle_content += "\n- In `inactive_posts`: ✅"
             middle_content += f"\n- Time inserted into db: <t:{pending_post_timestamp}:R>"
         else:
-            middle_content += "\n- In `pending_posts`: ❌"
+            middle_content += "\n- In `inactive_posts`: ❌"
         if post.last_message_id:
             middle_content += f"\n- Last Msg ID: `{post.last_message_id}` ({format_dt(snowflake_time(post.last_message_id), 'R')})"
         middle_content += f"\n- Owner: <@{owner_id}> (`{owner_id}`)"
@@ -82,9 +82,9 @@ class EvalSqlModal(ui.Modal):
         await interaction.followup.send(f"```json\n{sql_result[0:1950]}```")
 
 class GlobalCacheModal(ui.Modal):
-    def __init__(self, cache_type: Literal['PENDING_POSTS', 'RTDR']):
+    def __init__(self, cache_type: Literal['INACTIVE_POSTS', 'RTDR']):
         super().__init__(title=f"{cache_type}", custom_id="global_cache_modal")
-        self.cache_type: Literal['PENDING_POSTS', 'RTDR'] = cache_type
+        self.cache_type: Literal['INACTIVE_POSTS', 'RTDR'] = cache_type
 
         self.post_to_debug = ui.Label(text="Post ID", description="The ID of the post you want to debug, if applicable",
                                  component=ui.TextInput(required=False, max_length=25))
@@ -111,8 +111,8 @@ class GlobalCacheModal(ui.Modal):
 
         debug_type: Literal['clear', 'view', 'add', 'remove', 'check'] = self.debug_type.component.values[0] # type: ignore
 
-        if self.cache_type == 'PENDING_POSTS':
-            cache = interaction.client.pending_posts
+        if self.cache_type == 'INACTIVE_POSTS':
+            cache = interaction.client.inactive_posts
         else:
             cache = interaction.client.rtdr_posts
 
@@ -157,7 +157,7 @@ class GlobalCacheModal(ui.Modal):
                 await interaction.followup.send(f"Successfully added <#{post_id}> to RTDR cache with {owner.mention} ({owner.id}) as owner.", ephemeral=True)
             else:
                 cache[post_id] = int(datetime.now(UTC).timestamp())
-                await interaction.followup.send(f"Successfully added <#{post_id}> to PENDING_POSTS cache.", ephemeral=True)
+                await interaction.followup.send(f"Successfully added <#{post_id}> to INACTIVE_POSTS cache.", ephemeral=True)
         elif debug_type == "remove":
             try:
                 del cache[post_id]
@@ -181,14 +181,14 @@ class DebugCog(commands.Cog):
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def debug_post(self, interaction: discord.Interaction, post: app_commands.AppCommandThread): # AppCommandThread is needed as .Thread can't resolve if the post is archived
         await interaction.response.defer(ephemeral=True)
-        is_pending = post.id in self.bot.pending_posts
-        if is_pending:
-            pending_post_timestamp = self.bot.pending_posts[post.id]
+        is_inactive = post.id in self.bot.inactive_posts
+        if is_inactive:
+            is_inactive_timestamp = self.bot.inactive_posts[post.id]
         else:
-            pending_post_timestamp = 0
+            is_inactive_timestamp = 0
         
         owner_id = self.bot.get_post_owner_id(post)
-        await interaction.followup.send(view=DebugPostView(post, is_pending=is_pending, pending_post_timestamp=pending_post_timestamp,
+        await interaction.followup.send(view=DebugPostView(post, is_inactive=is_inactive, pending_post_timestamp=pending_post_timestamp,
                                                            owner_id=owner_id),
                                                            allowed_mentions=discord.AllowedMentions.none(),
                                                            ephemeral=True)
@@ -209,7 +209,7 @@ class DebugCog(commands.Cog):
     @debug_group_cmd.command(name="global_cache", description="Get debug info and actions regarding the global cache")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(cache_type="The cache type to debug")
-    async def debug_global_cache(self, interaction: discord.Interaction, cache_type: Literal['RTDR', 'PENDING_POSTS']):
+    async def debug_global_cache(self, interaction: discord.Interaction, cache_type: Literal['RTDR', 'INACTIVE_POSTS']):
         await interaction.response.send_modal(GlobalCacheModal(cache_type))
 
 async def setup(bot: SHBot):

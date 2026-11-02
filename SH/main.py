@@ -42,7 +42,7 @@ class SHBot(commands.Bot):
         self.uptime = time.time() # used in cogs/bot,py
 
         self.rtdr_posts: dict[int, int] = {} # posts for RTDR
-        self.pending_posts: dict[int, int] = {} # posts for pending
+        self.inactive_posts: dict[int, int] = {} # posts that are inactive
 
 
     async def setup_hook(self):
@@ -176,23 +176,23 @@ class SHBot(commands.Bot):
         self.rtdr_posts.pop(thread_id, None)
 
 
-    def add_post_to_pending(self, thread_id: int, *, timestamp: int | None = None) -> None:
+    def add_to_inactive_posts(self, thread_id: int, *, timestamp: int | None = None) -> None:
         """
-        Adds a post to the `pending_posts` cache and store the time it was inserted at.
+        Adds a post to the `inactive_posts` cache and store the time it was inserted at.
 
         Parameters
         ----------
         `timestamp`: `int`
-            When the post is added to pending. Defaults to the current timestamp.
+            When the post is added to cache. Defaults to the current timestamp.
         """
         timestamp = timestamp or int(datetime.now(UTC).timestamp())
-        self.pending_posts[thread_id] = timestamp
+        self.inactive_posts[thread_id] = timestamp
 
-    def remove_post_from_pending(self, thread_id: int) -> None:
+    def remove_from_inactive_posts(self, thread_id: int) -> None:
         """
-        Removes a post from the `pending_posts` cache
+        Removes a post from the `inactive_posts` cache
         """
-        self.pending_posts.pop(thread_id, None)
+        self.inactive_posts.pop(thread_id, None)
 
 
     async def on_ready(self):
