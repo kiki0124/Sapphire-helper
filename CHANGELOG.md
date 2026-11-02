@@ -1,10 +1,21 @@
 # Changelog
 
-This file records notable changes to Sapphire Helper. The current development version is 6.3; the entries below describe unreleased work unless a release heading states otherwise.
+This file records notable changes to Sapphire Helper. The current development version is 6.4; the entries below describe unreleased work unless a release heading states otherwise.
 
 Dates in release headings use day/month/year. Issue and pull-request links provide implementation context. Historical release entries are retained; this is not an exhaustive list of commits.
 
-## [6.3] - 2/11/26
+## Unreleased
+
+### Added
+
+
+### Fixed
+
+
+### Notable Internal Changes
+
+
+## [6.3](https://github.com/kiki0124/Sapphire-helper/compare/6.2...6.3) - 2/11/26
 
 ### Added
 - Reminders now ignore posts that are unanswered ([#83](https://github.com/kiki0124/Sapphire-helper/issues/83))
@@ -39,7 +50,7 @@ Dates in release headings use day/month/year. Issue and pull-request links provi
 - Custom Max Cache for `sent_cmd_suggestion_posts` and `incomplete_msg_posts` ([#111](https://github.com/kiki0124/Sapphire-helper/issues/111))
 
 
-## [6.2] - 21/7/26
+## 6.2 - 21/7/26
 
 ### Added
 - Cv2 for majority of messages ([#49](https://github.com/kiki0124/Sapphire-helper/issues/49))
