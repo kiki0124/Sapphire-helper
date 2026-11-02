@@ -4,7 +4,7 @@ This file records notable changes to Sapphire Helper. The current development ve
 
 Dates in release headings use day/month/year. Issue and pull-request links provide implementation context. Historical release entries are retained; this is not an exhaustive list of commits.
 
-## [6.3] - Unreleased
+## [6.3] - 2/11/26
 
 ### Added
 - Reminders now ignore posts that are unanswered ([#83](https://github.com/kiki0124/Sapphire-helper/issues/83))
