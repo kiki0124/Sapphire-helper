@@ -7,7 +7,6 @@ from discord import ui
 import os
 from dotenv import load_dotenv
 import psutil
-import time
 from sys import version_info as py_version
 from typing import Literal, TYPE_CHECKING
 
@@ -42,21 +41,6 @@ class Bot(commands.Cog):
         message = await ctx.reply(content=f"Pong!\nClient latency: {str(self.bot.latency)[:4]}s", mention_author=False)
         latency = perf_counter() - start
         await message.edit(content=f"{message.content}\nDiscord latency: {latency:.2f}s")
-
-    @commands.command(name="restart")
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def restart(self, ctx: commands.Context):
-        cog: EPI = self.bot.get_cog("EPI") # type: ignore
-        if cog.epi_data:
-            await ctx.send("EPI is currently enabled, please disable it first before restarting!", delete_after=10)
-            return
-        cogs_dir = Path(__file__).parent
-        extensions = os.listdir(cogs_dir)
-        for filename in extensions:
-            if filename.endswith(".py"):
-                await self.bot.reload_extension(f"cogs.{filename[:-3]}")
-
-        await ctx.reply(content=f"Reloaded {len(extensions)} extension(s)", mention_author=False)
 
     @commands.command()
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)

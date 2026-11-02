@@ -202,6 +202,10 @@ bot = SHBot()
 
 
 async def perform_extension_action(action: Literal["load", "reload", "unload"], extension: str) -> None:
+    if extension == "cogs.epi":
+        epi_cog = bot.get_cog("EPI")
+        if epi_cog and epi_cog.epi_data:
+            raise ValueError("EPI mode is currently enabled, please disable it before configuring this extension!")
     await getattr(bot, f"{action}_extension")(extension)
 
 @bot.tree.command(name="extensions", description="Manage the bot's extensions")
@@ -245,7 +249,7 @@ async def extensions_cmd(interaction: discord.Interaction, action: Literal["load
             for file in files:
                 try:
                     await perform_extension_action(action, f"cogs.{file[:-3]}")
-                except commands.ExtensionError as error:
+                except Exception as error:
                     unsuccessful.append((file, str(error)))
                 else:
                     successful.append(file)
@@ -259,7 +263,7 @@ async def extensions_cmd(interaction: discord.Interaction, action: Literal["load
 
         try:
             await perform_extension_action(action, f"cogs.{extension}")
-        except commands.ExtensionError as error:
+        except Exception as error:
             await interaction.followup.send(f"Failed to {action} `{extension}`: `{error}`", ephemeral=True)
         else:
             await interaction.followup.send(f"{action.capitalize()}ed `{extension}`!", ephemeral=True)
