@@ -7,7 +7,6 @@ from discord import ui
 import os
 from dotenv import load_dotenv
 import psutil
-from pathlib import Path
 import time
 from sys import version_info as py_version
 from typing import Literal, TYPE_CHECKING
@@ -26,7 +25,6 @@ DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
 class Bot(commands.Cog):
     def __init__(self, bot: SHBot):
         self.bot = bot
-        self.last_restarted = time.time()
 
         self.process = psutil.Process()
 
@@ -101,7 +99,6 @@ class Bot(commands.Cog):
         python_version_fmt = f"{py_version.major}.{py_version.minor}.{py_version.micro}"
         other_info_text = (
                      f"- **Uptime (since)**: <t:{int(self.bot.uptime)}:R>",
-                     f"- **Last Restarted**: <t:{int(self.last_restarted)}:R>\n",
                      f"-# discord.py {discord.__version__}  •  python {python_version_fmt}")
         
         container.add_item(title)
