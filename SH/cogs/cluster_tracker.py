@@ -624,7 +624,7 @@ class ClusterTracker(commands.Cog):
                     await self.bot.send_unhandled_error(e)
 
                 else:
-                    await asyncio.sleep(60) # fetch every minute
+                    await asyncio.sleep(120) # fetch every 2 minutes
                     delay = 1
                     continue
 
