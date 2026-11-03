@@ -143,8 +143,14 @@ class MaxCache:
     
     # dict-like functions
     def __setitem__(self, key, value) -> None:
+        if key in self._cache:
+            self._cache.move_to_end(key)
+            self._cache[key] = value
+            return
+
         if len(self) == self.max_size:
             self._cache.popitem(last=False)
+
         self._cache[key] = value
 
     def __getitem__(self, key) -> Any:
