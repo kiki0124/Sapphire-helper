@@ -5,6 +5,7 @@ from discord.ext import commands
 from discord import app_commands, ui
 from discord.utils import format_dt
 
+from time import perf_counter
 from utils import check_time_more_than, str_to_timedelta, cluster_tracker_add, cluster_tracker_fetch_users, cluster_tracker_remove, format_mentions
 from datetime import datetime, timedelta, UTC
 import aiohttp
@@ -42,8 +43,6 @@ class StatusPage:
         How long a cluster has to be offline for in order for the notification message to be sent in the experts-channel.
     started_at: :class:`int`
         The timestamp in UTC of when a cluster was first detected offline.
-    log_msgs: :class:`list`
-        The msgs that had clusters logged as offline.
     notified_message: :class:`discord.Message`
         The message that was sent in the experts-channel when the threshold was hit.
     offline: :class:`int`
@@ -57,7 +56,8 @@ class StatusPage:
     """
 
     __slots__ = ('threshold', 'started_at', 'notified_message',
-                 'clusters', 'offline_clusters', 'dashboard_online', 'cb_online', 'received_at')
+                 'clusters', 'offline_clusters', 
+                 'cb_online', 'received_at', 'dashboard_ping')
 
     def __init__(self, threshold: timedelta):
         self.threshold = threshold
@@ -68,7 +68,7 @@ class StatusPage:
         self.clusters: list[Cluster] = []
         self.offline_clusters: list[Cluster] = []
 
-        self.dashboard_online: bool = True
+        self.dashboard_ping: tuple[int, float] = (0, 0)
         self.cb_online: bool = True
 
         self.received_at: datetime = datetime.now(UTC)
@@ -145,7 +145,6 @@ class StatusPage:
             return -1
 
         cb_payload = payload[1]
-        dashboard_payload = payload[2]
 
         self.offline_clusters.clear()
 
@@ -174,7 +173,6 @@ class StatusPage:
                 self.offline_clusters.append(cluster)
 
         self.cb_online = cb_payload['smallBar']['text'] == "Operational"
-        self.dashboard_online = dashboard_payload['smallBar']['text'] == "Operational"
         self.received_at = datetime.now(UTC)
 
         return len(self.offline_clusters)
@@ -192,7 +190,6 @@ class StatusPage:
         self.clusters.clear()
         self.offline_clusters.clear()
         self.cb_online = True
-        self.dashboard_online = True
         self.notified_message = None
 
 
@@ -277,6 +274,9 @@ class Websocket:
 
 class ClusterTracker(commands.Cog):
     MAX_OFFLINE_CLUSTERS_PER_MESSAGE = 25
+    DASHBOARD_PING_THRESHOLD = 3
+
+    dashboard_ping_task: asyncio.Task[None]
 
     def __init__(self, bot: SHBot) -> None:
         self.bot = bot
@@ -286,9 +286,18 @@ class ClusterTracker(commands.Cog):
 
     async def cog_load(self) -> None:
         self.websocket.start_connection()
+        self.dashboard_ping_task = asyncio.create_task(self.fetch_dashboard_ping())
 
     async def cog_unload(self) -> None:
         await self.websocket.disconnect_ws()
+
+        if self.dashboard_ping_task is not None:
+            self.dashboard_ping_task.cancel()
+            try:
+                await self.dashboard_ping_task
+            except asyncio.CancelledError:
+                pass
+
 
     async def receive_ws(self, ws: aiohttp.ClientWebSocketResponse):
         """
@@ -450,11 +459,11 @@ class ClusterTracker(commands.Cog):
 
 
             db_cb_container = ui.Container(ui.TextDisplay("### Dashboard & CB"), ui.Separator())
-            if not self.cluster_tracker.dashboard_online or not self.cluster_tracker.cb_online:
+            if self.cluster_tracker.dashboard_ping[1] > self.DASHBOARD_PING_THRESHOLD or not self.cluster_tracker.cb_online:
                 db_cb_container.accent_colour = discord.Colour.brand_red()
             else:
                 db_cb_container.accent_color = discord.Color.green()
-            fmt = f"- Dashboard Online: {self.format_online(self.cluster_tracker.dashboard_online)}\n- CB Online: {self.format_online(self.cluster_tracker.cb_online)}"
+            fmt = f"- Dashboard: `{self.cluster_tracker.dashboard_ping[1] * 1000:.0f}ms` (<t:{self.cluster_tracker.dashboard_ping[0]}:R>)\n- CB Online: {self.format_online(self.cluster_tracker.cb_online)}"
             db_cb_container.add_item(ui.TextDisplay(fmt))
 
 
@@ -585,6 +594,42 @@ class ClusterTracker(commands.Cog):
         else:
             await cluster_tracker_remove(interaction.user.id)
             await interaction.followup.send("You will no longer be notified!", ephemeral=True)
+
+
+    async def fetch_dashboard_ping(self) -> None:
+        delay = 1 # delay for exponential backoff
+        
+        async with aiohttp.ClientSession(conn_timeout=30, read_timeout=30) as session:
+            while True:
+                try:
+                    start = perf_counter()
+                    async with session.get("https://dashboard.sapph.xyz/") as res:
+                        end = perf_counter()
+                        res.raise_for_status()
+
+                    new_ping = end - start
+                    now = int(datetime.now(UTC).timestamp())
+                    self.cluster_tracker.dashboard_ping = (now, new_ping)
+
+                except asyncio.CancelledError:
+                    raise
+
+                except aiohttp.ClientResponseError as e:
+                    if e.status == 502:
+                        await self.bot.send_log(ALERTS_THREAD_ID, content=f"An error occurred: {e}") # no pings for this
+                    else:
+                        await self.bot.send_unhandled_error(e)
+
+                except Exception as e:
+                    await self.bot.send_unhandled_error(e)
+
+                else:
+                    await asyncio.sleep(30)
+                    delay = 1
+                    continue
+
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 45)
 
 
 async def setup(bot: SHBot):
