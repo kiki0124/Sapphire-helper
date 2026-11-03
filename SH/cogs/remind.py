@@ -410,20 +410,6 @@ class Reminders(commands.Cog):
 
         await interaction.followup.send(f"Simulation complete for {post.mention}!", ephemeral=True)
 
-    @reminders_cmd_group.command(name="get_active_threads", description="Get all the active threads in support channel")
-    @app_commands.describe(post="The post to check if it was in active threads")
-    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def reminders_get_active_threads(self, interaction: discord.Interaction, post: app_commands.AppCommandThread | None = None):
-        await interaction.response.defer(ephemeral=True)
-        posts = [post.id for post in await interaction.guild.active_threads() if post.parent_id == SUPPORT_CHANNEL_ID]
-
-        content = f"- Posts fetched: `{len(posts)}`"
-        if post:
-            content += f"\n- Post in fetched: `{post.id in posts}`"
-        content += f"\n```py\n{posts}```"
-
-        container = ui.Container(ui.TextDisplay(content[0:4000]))
-        await interaction.followup.send(view=ui.LayoutView().add_item(container), ephemeral=True)
 
     @reminders_cmd_group.command(name="restore_inactive_posts", description="Manually restore inactive posts. Note that this should already be called at startup")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
