@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 from time import perf_counter
 from discord import ui
 import os
@@ -28,19 +29,18 @@ class Bot(commands.Cog):
         self.process = psutil.Process()
 
     @staticmethod
-    def get_cooldown_key(ctx: commands.Context):
-        if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
+    def get_cooldown_key(interaction: discord.Interaction) -> app_commands.Cooldown | None:
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
             return None
         return commands.Cooldown(1, 15)
 
-    @commands.command(name="ping")
-    @commands.guild_only()
-    @commands.dynamic_cooldown(get_cooldown_key, type=commands.BucketType.member)
-    async def ping(self, ctx: commands.Context):
+    @app_commands.command(name="shping", description="Get the ping of SH")
+    @app_commands.checks.dynamic_cooldown(get_cooldown_key)
+    async def ping(self, interaction: discord.Interaction):
         start = perf_counter()
-        message = await ctx.reply(content=f"Pong!\nClient latency: {str(self.bot.latency)[:4]}s", mention_author=False)
+        message = await interaction.response.send_message(f"Pong!\nClient latency: {self.bot.latency:.2f}s")
         latency = perf_counter() - start
-        await message.edit(content=f"{message.content}\nDiscord latency: {latency:.2f}s")
+        await interaction.edit_original_response(content=f"{message.resource.content}\nDiscord latency: {latency:.2f}s") # type: ignore
 
     @commands.command()
     @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
@@ -60,9 +60,9 @@ class Bot(commands.Cog):
 
         return bytes / (1024 ** 2)
 
-    @commands.command()
-    @commands.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def stats(self, ctx: commands.Context):
+    @app_commands.command(name="stats", description="Get CPU and Memory stats of SH")
+    @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    async def stats(self, interaction: discord.Interaction):
         view = ui.LayoutView()
         container = ui.Container(accent_colour=0xA06BE6)
 
@@ -93,7 +93,7 @@ class Bot(commands.Cog):
         container.add_item(ui.TextDisplay('\n'.join(other_info_text)))
 
         view.add_item(container)
-        await ctx.reply(view=view, mention_author=False)
+        await interaction.response.send_message(view=view)
 
 async def setup(bot: SHBot):
     await bot.add_cog(Bot(bot))

@@ -448,50 +448,56 @@ class Utility(commands.Cog):
             tags.append(appeal)
         await interaction.channel.edit(name=f"[ATBL] {interaction.channel.name}", reason=f"@{interaction.user.name} used /atbl", applied_tags=tags)
 
-    @commands.hybrid_command(name="incomplete-post", description="Request more information from the post creator")
-    @commands.guild_only()
-    async def incomplete_post(self, ctx: commands.Context):
-        await ctx.defer(ephemeral=True)
-        if not isinstance(ctx.channel, discord.Thread) or ctx.channel.parent_id != SUPPORT_CHANNEL_ID:
-            await ctx.reply(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
+    @app_commands.command(name="incomplete-post", description="Request more information from the post creator")
+    async def incomplete_post(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        post = interaction.channel
+        if not isinstance(post, discord.Thread) or post.parent_id != SUPPORT_CHANNEL_ID:
+            await interaction.followup.send(content=f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>!", ephemeral=True)
             return
     
-        if SOLVED_TAG_ID in ctx.channel._applied_tags or NEED_DEV_REVIEW_TAG_ID in ctx.channel._applied_tags:
-            await ctx.reply("You cannot use this command as this post has the *Solved* or *Needs dev review* tag.", ephemeral=True, delete_after=3)
+        if any(tag_id in post._applied_tags for tag_id in (SOLVED_TAG_ID, NEED_DEV_REVIEW_TAG_ID)):
+            await interaction.followup.send("You cannot use this command as this post has the *Solved* or *Needs dev review* tag.", ephemeral=True)
             return
         
-        if ctx.channel.id in self.bot.incomplete_msg_posts:
-            await ctx.reply("You cannot use this command as an automatic message was already sent.", ephemeral=True, delete_after=5)
+        if post.id in self.bot.incomplete_msg_posts:
+            await interaction.followup.send("You cannot use this command as an automatic message was already sent.", ephemeral=True)
             return
-        user_id = self.bot.get_post_owner_id(ctx.channel)
+
+        owner_id = self.bot.get_post_owner_id(post)
         text_prefix = "## Incomplete support post\nHey"
-        if ctx.author.get_role(EXPERTS_ROLE_ID) or ctx.author.get_role(MODERATORS_ROLE_ID) or ctx.author.get_role(DEVELOPERS_ROLE_ID):
-            text_prefix = f"## Incomplete support post\nHey <@{user_id}>"
+        if interaction.user.get_role(EXPERTS_ROLE_ID) or interaction.user.get_role(MODERATORS_ROLE_ID) or interaction.user.get_role(DEVELOPERS_ROLE_ID):
+            text_prefix = f"## Incomplete support post\nHey <@{owner_id}>"
         view = ui.LayoutView()
         container = ui.Container(
             ui.TextDisplay(f"{text_prefix}, it seems like your support post is incomplete. Please make sure to provide the following information:\n\n> `-` What feature do you need help with?\n> `-` What exactly is the issue / what are you trying to do?\n> `-` What did you already try?\n> `-` Include screenshots if possible."),
-            ui.TextDisplay(format_recommended_by(ctx.author)),
+            ui.TextDisplay(format_recommended_by(interaction.user)),
             accent_colour=0xFFA800
         )
         view.add_item(container)
 
-        if not ctx.interaction:
-            await ctx.message.delete()
-        elif ctx.interaction:
-            await ctx.interaction.delete_original_response()
-        if WAITING_FOR_REPLY_TAG_ID in ctx.channel._applied_tags or UNANSWERED_TAG_ID in ctx.channel._applied_tags:
-            tags = [ctx.channel.parent.get_tag(NOT_SOLVED_TAG_ID)]
-            if CUSTOM_BRANDING_TAG_ID in ctx.channel._applied_tags:
-                tags.append(ctx.channel.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
-            if APPEAL_GG_TAG_ID in ctx.channel._applied_tags:
-                tags.append(ctx.channel.parent.get_tag(APPEAL_GG_TAG_ID))
+        try:
+            await interaction.delete_original_response()
+        except discord.HTTPException:
+            pass
+    
+        if WAITING_FOR_REPLY_TAG_ID in post._applied_tags or UNANSWERED_TAG_ID in post._applied_tags:
+            tags = [post.parent.get_tag(NOT_SOLVED_TAG_ID)]
+            if CUSTOM_BRANDING_TAG_ID in post._applied_tags:
+                tags.append(post.parent.get_tag(CUSTOM_BRANDING_TAG_ID))
+            if APPEAL_GG_TAG_ID in post._applied_tags:
+                tags.append(post.parent.get_tag(APPEAL_GG_TAG_ID))
             action_id = generate_random_id()
-            await ctx.channel.edit(applied_tags=tags, reason=f"ID: {action_id}. @{ctx.author.name} used /incomplete-post")
-            await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=ctx.channel.mention, tags=tags, context="/incomplete-post used")
-        await ctx.channel.send(
+            await post.edit(applied_tags=tags, reason=f"ID: {action_id}. @{interaction.user.name} used /incomplete-post")
+            await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/incomplete-post used")
+
+        await post.send(
             view=view,
-            allowed_mentions=discord.AllowedMentions(users=[discord.Object(user_id)])
+            allowed_mentions=discord.AllowedMentions(users=[discord.Object(owner_id)])
         )
+
+
     @staticmethod
     async def non_expert_mod_cooldown(interaction: discord.Interaction):
         """
@@ -509,7 +515,7 @@ class Utility(commands.Cog):
     )
     @app_commands.guild_only()
     @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
-    async def wrong_server(self, interaction: discord.Interaction):
+    async def unrelated(self, interaction: discord.Interaction):
         if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != SUPPORT_CHANNEL_ID:
             await interaction.response.send_message(f"This command can only be used in <#{SUPPORT_CHANNEL_ID}>", ephemeral=True)
             return

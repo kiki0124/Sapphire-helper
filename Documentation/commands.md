@@ -91,12 +91,12 @@ Despite its name, `simulate` is not a dry run.
 
 | Command | Access | Behaviour |
 | --- | --- | --- |
-| `@Sapphire Helper ping` | Members | Reports gateway and message-request latency. Non-staff have a 15-second cooldown. |
-| `@Sapphire Helper stats` | Staff | Shows version, host CPU/memory figures, uptime and extension-reload time. |
-| `@Sapphire Helper restart` | Staff | Reloads all cogs. Refuses while EPI is enabled. It does not restart the process. |
+| `/ping` | Members | Reports gateway and message-request latency. Non-staff have a 15-second cooldown. |
+| `/stats` | Staff | Shows version, host CPU/memory figures, uptime and extension-reload time. |
+| `/extensions` | Staff | Configure extensions. Refuses while EPI is enabled. It does not restart the process. |
 | `@Sapphire Helper sync` | Staff | Registers the current application commands with Discord. |
 | `/debug post` | Staff | Shows owner, tags, archive/lock state and pending-reminder state for a post. |
-| `/debug global_cache` | Staff | Opens a modal to inspect or change RTDR or pending-post caches. |
+| `/debug global_cache` | Staff | Opens a modal to inspect or change RTDR or inactive_posts-post caches. |
 | `/debug create_db_table` | Staff | Runs the same table-creation helper used at startup. |
 | `/debug eval_sql` | Staff | Executes submitted SQL against the real database. It can change or delete data; results are sent as a normal channel response. |
 
