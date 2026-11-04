@@ -7,12 +7,16 @@ Dates in release headings use day/month/year. Issue and pull-request links provi
 ## Unreleased
 
 ### Added
-
+- Added hot reloading of specific extensions ([#104](https://github.com/kiki0124/Sapphire-helper/pull/104))
+- Removed all prefix commands except for sync ([#117](https://github.com/kiki0124/Sapphire-helper/issues/117))
+- Removed `/get_active_threads` command
+- Added tracking of dashboard ping ([#124](https://github.com/kiki0124/Sapphire-helper/issues/124))
 
 ### Fixed
 
 
 ### Notable Internal Changes
+- `pending_posts` and friends is renamed to `inactive_posts`
 
 
 ## [6.3](https://github.com/kiki0124/Sapphire-helper/compare/6.2...6.3) - 2/11/26
