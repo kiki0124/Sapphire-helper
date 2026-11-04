@@ -113,21 +113,19 @@ class Reminders(commands.Cog):
         # used for debugging purposes
         self.last_fetched_threads: list[int] = []
 
-    def reminders_filter(self, thread: discord.Thread):
+    def reminders_filter(self, thread: discord.Thread | app_commands.AppCommandThread, *, tags: list[int]):
         """  
         Filter function for posts in reminder system, returns true if all of the following criteria are met:
         * Not locked, not archived
-        * Doesn't have needs dev review & solved & unanswered (#issue 83)
+        * Doesn't have tags in tags
         * Is in #support (parent_id==SUPPORT_CHANNEL_ID)
         """
-        if thread.parent_id != SUPPORT_CHANNEL_ID:
+        if thread.parent_id != SUPPORT_CHANNEL_ID or any(tag_id in thread._applied_tags for tag_id in tags):
             return False
 
-        applied_tags = thread._applied_tags
-        tags_filter = all(tag_id not in applied_tags for tag_id in (NEED_DEV_REVIEW_TAG_ID, SOLVED_TAG_ID, UNANSWERED_TAG_ID))
         archived = not thread.archived
         locked = not thread.locked
-        return tags_filter and archived and locked
+        return archived and locked
 
     @commands.Cog.listener("on_ready")
     async def add_persistent_view(self):
@@ -159,7 +157,10 @@ class Reminders(commands.Cog):
             if not check_time_more_than(snowflake_time(post.id).timestamp(), timedelta(days=1)):
                 continue
 
-            if not self.reminders_filter(post) or self.bot.user.id not in [member.id for member in post.members]:
+            if (
+                (not self.reminders_filter(post, tags=[SOLVED_TAG_ID, NEED_DEV_REVIEW_TAG_ID, UNANSWERED_TAG_ID])) or 
+                    self.bot.user.id not in [member.id for member in post.members]
+                ):
                 continue
 
             try:
@@ -235,7 +236,7 @@ class Reminders(commands.Cog):
         user_ids: list[int] = []
         for i in range(len(posts) - 1, -1, -1): # we need to do this so that we don't modify the rest of the list when we remove a post
             post = posts[i]
-            if post.parent_id != SUPPORT_CHANNEL_ID or post.locked or any(tag_id in post._applied_tags for tag_id in (SOLVED_TAG_ID, NEED_DEV_REVIEW_TAG_ID)):
+            if not self.reminders_filter(post, tags=[SOLVED_TAG_ID, NEED_DEV_REVIEW_TAG_ID]):
                 del posts[i]
                 continue
 
@@ -283,9 +284,9 @@ class Reminders(commands.Cog):
             last_msg_timestamp = snowflake_time(post.last_message_id).timestamp()
             more_than_day = check_time_more_than(last_msg_timestamp,
                                                 timedelta(days=1)) # Check time before making any further API/DB calls
-            if not more_than_day or post.id in self.bot.inactive_posts:
-                continue
-            if not self.reminders_filter(post):
+
+            # filter_and_get_post_owner_ids (called in close_abandoned_posts) already checks the filters, except UNANSWERED_TAG_ID
+            if not more_than_day or post.id in self.bot.inactive_posts or UNANSWERED_TAG_ID in post._applied_tags:
                 continue
 
             post_author_id = self.bot.get_post_owner_id(post)
@@ -404,9 +405,13 @@ class Reminders(commands.Cog):
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def reminders_simulate(self, interaction: discord.Interaction, post: app_commands.AppCommandThread):
         await interaction.response.defer(ephemeral=True)
-        await interaction.followup.send(f"Sleeping for 5 seconds to prevent clashes with reminders...")
-        await asyncio.sleep(5)
-        await self.check_for_inactive_posts([interaction.guild.get_thread(post.id) or await post.fetch()])
+
+        # check_for_inactive_posts no longer checks for SOLVED_TAG_ID & NEED_DEV_REVIEW_TAG_ID as part of an optimisation
+        if self.reminders_filter(post, tags=[SOLVED_TAG_ID, NEED_DEV_REVIEW_TAG_ID]):
+            await interaction.followup.send(f"Sleeping for 5 seconds to prevent clashes with reminders...")
+            await asyncio.sleep(5)
+
+            await self.check_for_inactive_posts([interaction.guild.get_thread(post.id) or await post.fetch()])
 
         await interaction.followup.send(f"Simulation complete for {post.mention}!", ephemeral=True)
 
