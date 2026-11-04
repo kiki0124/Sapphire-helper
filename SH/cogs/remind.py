@@ -188,6 +188,15 @@ class Reminders(commands.Cog):
             return discord.utils.format_dt(self.reminders_loop.next_iteration)
         return "`None`"
 
+
+    def remove_from_global_caches(self, post_id: int) -> None:
+        """
+        Helper function that removes the post from self.bot.rtdr_posts and self.bot.inactive_posts
+        """
+        self.bot.remove_from_inactive_posts(post_id)
+        self.bot.remove_post_from_rtdr(post_id)
+        
+
     @tasks.loop(hours=1)
     async def reminders_loop(self):
         """
@@ -275,6 +284,7 @@ class Reminders(commands.Cog):
             await post.edit(archived=True, reason=f"ID: {action_id}. Post creator left the server, auto close post", applied_tags=tags)
             await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
             del posts[i] # remove from the post so that check_for_inactive_posts won't need to check for it
+            self.remove_from_global_caches(post.id)
 
     async def check_for_inactive_posts(self, posts: list[discord.Thread]):
         for post in posts:
@@ -338,8 +348,7 @@ class Reminders(commands.Cog):
             try:
                 post = self.bot.get_channel(post_id) or await self.bot.fetch_channel(post_id)
             except discord.NotFound:
-                self.bot.remove_post_from_rtdr(post_id)
-                self.bot.remove_from_inactive_posts(post.id)
+                self.remove_from_global_caches(post_id)
                 continue
 
             if NEED_DEV_REVIEW_TAG_ID not in post._applied_tags:
@@ -360,8 +369,7 @@ class Reminders(commands.Cog):
                     continue
                 await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, 
                                            context=f"Close inactive post")
-                self.bot.remove_post_from_rtdr(post.id)
-                self.bot.remove_from_inactive_posts(post.id)
+                self.remove_from_global_caches(post_id)
 
 
     @reminders_loop.before_loop
