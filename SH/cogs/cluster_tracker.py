@@ -242,11 +242,13 @@ class Websocket:
 
     async def connect_to_ws(self):
         delay = 1 # delay for exponential backoff
-        
+        headers = {
+            "origin": "https://sapph.xyz"
+        }
         async with aiohttp.ClientSession() as session:
             while True:
                 try:
-                    async with session.ws_connect(self.STATUS_WS_URL) as ws:
+                    async with session.ws_connect(self.STATUS_WS_URL, headers=headers) as ws:
                         self._ws = ws
                         self._connected.set()
                         delay = 1
