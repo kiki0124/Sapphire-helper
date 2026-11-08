@@ -73,8 +73,12 @@ class SHBot(commands.Bot):
                 )
             except discord.HTTPException:
                 pass
-        log_thread = self.get_channel(thread_id) or await self.fetch_channel(thread_id)
-        webhooks = [webhook for webhook in await log_thread.parent.webhooks() if webhook.token]
+        log_thread: discord.Thread = self.get_channel(thread_id) or await self.fetch_channel(thread_id) # type: ignore
+        if log_thread.parent is None:
+            parent = await self.fetch_channel(log_thread.parent_id)
+        else:
+            parent = log_thread.parent
+        webhooks = [webhook for webhook in await parent.webhooks() if webhook.token]
         if not webhooks:
             webhook = await log_thread.parent.create_webhook(name="Created by Sapphire Helper", reason="Create a webhook for action logs, EPI logs and so on. It will be reused in the future if it wont be deleted.")
         else:
