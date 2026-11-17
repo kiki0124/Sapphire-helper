@@ -40,15 +40,15 @@ class Cluster(NamedTuple):
     started_percent: int # will always be 0 for non starting clusters
 
     @property
-    def online(self):
+    def online(self) -> bool:
         return self.state is ClusterState.online
 
     @property
-    def offline(self):
+    def offline(self) -> bool:
         return self.state is ClusterState.offline
 
     @property
-    def starting(self):
+    def starting(self) -> bool:
         return self.state is ClusterState.starting
 
 
@@ -548,7 +548,7 @@ class ClusterTracker(commands.Cog):
             starting_clusters = self.cluster_tracker.starting_clusters
             staring_container = ui.Container(ui.TextDisplay(f"## Clusters Starting: {len(starting_clusters)}/{len(self.cluster_tracker.clusters)}"))
             if starting_clusters:
-                colour = discord.Colour.dark_grey()
+                colour = discord.Colour.light_grey()
                 staring_container.add_item(ui.Separator())
 
                 content = f"Started <t:{self.cluster_tracker.starting_since}:R>:\n{self.fmt_clusters(starting_clusters, ClusterState.starting.value)}"
