@@ -1,5 +1,5 @@
 # Use a lightweight base image
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # PYTHONDONTWRITEBYTECODE=1: Prevents Python from writing .pyc files to save space on disk.
 # PYTHONUNBUFFERED=1: Ensures Python output is unbuffered so it will be displayed on console in real-time.

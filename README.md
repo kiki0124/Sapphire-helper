@@ -19,7 +19,7 @@ The source was made public on 9 September 2025 so people can learn from it and c
 
 ## Requirements
 
-- Python 3.11 or later; the Dockerfile uses Python 3.11.
+- Python 3.13 or later; the Dockerfile uses Python 3.13.
 - The pinned dependencies in [SH/requirements.txt](SH/requirements.txt).
 - A Discord bot token and the roles, channels and forum tags referenced by the environment configuration.
 - The **Message Content** privileged intent enabled in the Discord developer portal. Members and Presence intents are deliberately disabled.

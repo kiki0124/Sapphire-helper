@@ -12,7 +12,7 @@ docker build -f Dockerfile -t sapphire-helper SH
 
 The root Dockerfile expects `requirements.txt` and `main.py` at the root of its build context. Using `SH` as the context places the application at `/app`, matching its startup command. Building with `docker build .` does not match the current repository layout.
 
-The Dockerfile uses Python 3.11 and installs the pinned requirements. It also explicitly installs `aiocache`, which is already in the requirements file.
+The Dockerfile uses Python 3.13 and installs the pinned requirements. It also explicitly installs `aiocache`, which is already in the requirements file.
 
 ## Configuration and database
 
