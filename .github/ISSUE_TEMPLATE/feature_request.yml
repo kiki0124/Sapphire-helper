@@ -31,7 +31,7 @@ body:
     id: alternatives
     attributes:
       label: Alternatives or current workaround
-      description: Describe any existing approach and why it is insufficient.
+      description: Describe any existing approach and it's possible advantages/disadvantages.
   - type: textarea
     id: context
     attributes:
