@@ -9,14 +9,13 @@ The source was made public on 9 September 2025 so people can learn from it and c
 
 ## Features
 
-- Support-post management: solved and unsolved states, developer-review requests, automatic tags, and delayed closure.
-- Follow-ups: inactivity reminders, closure of abandoned posts, and requests for missing information.
-- Reusable answer tags with autocomplete, previews and usage tracking.
-- Staff-triggered redirection of support questions into their own forum posts.
-- Emergency Post Information (EPI): incident messages, optional sticky updates, and resolution notifications.
-- Developer paging through ntfy, including automated pages for recognised rate-limit messages.
-- Live Sapphire cluster monitoring with outage notifications and staff subscriptions.
-- Runtime diagnostics, error handling and action logs.
+- **Support-post management:** solved and unsolved states, developer-review requests, automatic tags, and delayed closure.
+- **Follow-ups:** inactivity reminders, closure of abandoned posts, and requests for missing information.
+- **Reusable answer tags** with autocomplete, previews and usage tracking.
+- Staff-triggered **redirection of support questions** into their own forum posts.
+- **Emergency Post Information (EPI):** incident messages, optional sticky updates, and resolution notifications.
+- **Developer paging** through ntfy, including automated pages for recognised rate-limit messages.
+- **Live Sapphire cluster monitoring** with outage notifications and staff subscriptions.
 
 ## Requirements
 
@@ -27,7 +26,7 @@ The source was made public on 9 September 2025 so people can learn from it and c
 - Discord permissions for the enabled features, including sending messages, reading history, managing messages and threads, managing webhooks, and managing channels where required.
 - Writable SQLite storage and network access to Discord, Sapphire's status services and ntfy.
 
-This bot is tailored to one support server. Some integrations use hard-coded IDs and channel names; review [configuration](Documentation/configuration.md) before adapting it to another server.
+**This bot is tailored to one support server.** Some integrations use hard-coded IDs and channel names; review [configuration](Documentation/configuration.md) before adapting it to another server.
 
 ## Local setup
 
