@@ -548,18 +548,18 @@ class ClusterTracker(commands.Cog):
 
             # starting clusters
             starting_clusters = self.cluster_tracker.starting_clusters
-            staring_container = ui.Container(ui.TextDisplay(f"## Clusters Starting: {len(starting_clusters)}/{len(self.cluster_tracker.clusters)}"))
+            starting_container = ui.Container(ui.TextDisplay(f"## Clusters Starting: {len(starting_clusters)}/{len(self.cluster_tracker.clusters)}"))
             if starting_clusters:
                 colour = discord.Colour.light_grey()
-                staring_container.add_item(ui.Separator())
+                starting_container.add_item(ui.Separator())
 
                 content = f"Started <t:{self.cluster_tracker.starting_since}:R>:\n{self.fmt_clusters(starting_clusters, ClusterState.starting.value)}"
-                staring_container.add_item(ui.TextDisplay(content))
+                starting_container.add_item(ui.TextDisplay(content))
                 if len(starting_clusters) > self.MAX_CLUSTERS_PER_MESSAGE:
-                    staring_container.add_item(ui.TextDisplay(f"*And {len(starting_clusters) - self.MAX_CLUSTERS_PER_MESSAGE} more...*"))
+                    starting_container.add_item(ui.TextDisplay(f"*And {len(starting_clusters) - self.MAX_CLUSTERS_PER_MESSAGE} more...*"))
             else:
                 colour = discord.Colour.green()
-            staring_container.accent_color = colour
+            starting_container.accent_color = colour
 
 
             slowest_clusters = self.cluster_tracker.get_slowest_clusters()
@@ -585,7 +585,7 @@ class ClusterTracker(commands.Cog):
             info_container.add_item(ui.TextDisplay(info_description))
 
 
-            view = ui.LayoutView().add_item(offline_container).add_item(staring_container).add_item(slow_container).add_item(db_cb_container).add_item(info_container)
+            view = ui.LayoutView().add_item(offline_container).add_item(starting_container).add_item(slow_container).add_item(db_cb_container).add_item(info_container)
             await interaction.followup.send(view=view, ephemeral=True)
 
     @group_cmd.command(name="search", description="Get information for specific clusters and more")
