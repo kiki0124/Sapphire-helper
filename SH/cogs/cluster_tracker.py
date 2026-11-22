@@ -6,7 +6,9 @@ from discord import app_commands, ui
 from discord.utils import format_dt
 
 from time import perf_counter
-from utils import check_time_more_than, str_to_timedelta, cluster_tracker_add, cluster_tracker_fetch_users, cluster_tracker_remove, format_mentions
+from utils import (check_time_more_than, str_to_timedelta, 
+                   cluster_tracker_add, cluster_tracker_fetch_users, 
+                   cluster_tracker_remove, format_mentions)
 from datetime import datetime, timedelta, UTC
 import aiohttp
 import asyncio
@@ -131,8 +133,7 @@ class StatusPage:
         elif self.offline_since == 0:
             return self.starting_since
         else:
-            res = min(self.starting_since, self.offline_since)
-            return res
+            return min(self.starting_since, self.offline_since)
 
     @staticmethod
     def sort_clusters(clusters: list[Cluster], *, highest_ping: bool) -> list[Cluster]:
@@ -167,7 +168,7 @@ class StatusPage:
             [
                 {
                     "name": "Main bot",
-                    "clusters": [] (this may be empty if there is an error on the ws)
+                    "clusters": [...] (this may be empty if there is an error on the ws)
                 },
                 {
                     "name": "Custom branded bots",
@@ -245,6 +246,7 @@ class StatusPage:
         self.received_at = datetime.now(UTC)
         self.clusters.clear()
         self.offline_clusters.clear()
+        self.starting_clusters.clear()
         self.cb_online = True
 
 
@@ -337,7 +339,7 @@ class ClusterTracker(commands.Cog):
 
     def __init__(self, bot: SHBot) -> None:
         self.bot = bot
-        self.cluster_tracker = StatusPage(timedelta(seconds=0))
+        self.cluster_tracker = StatusPage(timedelta(minutes=8))
 
         self.websocket = Websocket(self)
 
@@ -389,7 +391,7 @@ class ClusterTracker(commands.Cog):
                     num_offline_starting = self.cluster_tracker.update_from_ws_data(actual_data)
                     if num_offline_starting is None:
                         return
-                    await self.handle_clusters(*num_offline_starting)
+                    await self.handle_cluster_data_from_ws(*num_offline_starting)
 
     @staticmethod
     def format_timedelta(td: timedelta) -> str:
@@ -429,7 +431,7 @@ class ClusterTracker(commands.Cog):
 
         return container
 
-    async def handle_clusters(self,  offline: int, starting: int) -> None:
+    async def handle_cluster_data_from_ws(self,  offline: int, starting: int) -> None:
         if offline == 0 and starting == 0:
             # No clusters were detected offline/starting
             notified_msg = self.cluster_tracker.notified_message
@@ -586,11 +588,6 @@ class ClusterTracker(commands.Cog):
             view = ui.LayoutView().add_item(offline_container).add_item(staring_container).add_item(slow_container).add_item(db_cb_container).add_item(info_container)
             await interaction.followup.send(view=view, ephemeral=True)
 
-    @staticmethod
-    def get_cluster_numbers(text: str) -> set[int]:
-        raw: list[str] = text.replace(" ", "").split(",")
-        return {int(num) for num in raw}
-
     @group_cmd.command(name="search", description="Get information for specific clusters and more")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID, MODERATORS_ROLE_ID)
     @app_commands.describe(cluster_numbers="The cluster(s) to get info on. E.g: 10 | 12,54,21",
@@ -603,9 +600,9 @@ class ClusterTracker(commands.Cog):
             clusters: list[Cluster] = []
 
             try:
-                numbers = self.get_cluster_numbers(cluster_numbers)
+                numbers =  {int(num) for num in cluster_numbers.replace(" ", "").split(",")}
             except ValueError:
-                await interaction.followup.send(f"`{cluster_numbers}` is not a valid cluster!", ephemeral=True)
+                await interaction.followup.send(f"`{cluster_numbers}` are not a valid clusters! (`1, 2, 3`)", ephemeral=True)
                 return
 
             for cluster_number in numbers:
