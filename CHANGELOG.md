@@ -35,6 +35,7 @@ Dates in release headings use day/month/year. Issue and pull-request links provi
 - Changed page "notification sent successfully" response to use cv2.
 - Improved ui and detection for sending automated *incomplete-post* messages.
 - Show who solved a *NDR* post in the response.
+- EPI now shows the issue that was resolved upon disabling it.
 
 ### Fixed
 - Fixed `/unrelated` command not adding `not-solved` tag. ([#82](https://github.com/kiki0124/Sapphire-helper/issues/82))
