@@ -285,11 +285,6 @@ class EpiData:
         self._enabled: bool = False
 
 
-    def __repr__(self) -> str:
-        attrs = ", ".join((f"{attr!r}={getattr(self, attr)}" for attr in self.__slots__))
-        return f"<{self.__class__.__name__} {attrs}>"
-
-
     def clear(self) -> None:
         """
         Clears the state of the data
@@ -493,7 +488,9 @@ class EPI(commands.Cog):
 
         self.view_insert_item(view, 0, ui.TextDisplay(f"[<t:{self.epi_data.started_at}:R>]"))
         view.add_item(ui.Separator(spacing=discord.SeparatorSpacing.large))
-        view.add_item(ui.TextDisplay(f"[<t:{int(datetime.now(UTC).timestamp())}:R>]"))
+
+        now_ts = int(datetime.now(UTC).timestamp())
+        view.add_item(ui.TextDisplay(f"[<t:{now_ts}:R>]"))
 
         resolved_container = ui.Container(accent_colour=discord.Colour.green())
         resolved_container.add_item(ui.TextDisplay("# The above issue is resolved!"))
@@ -538,7 +535,7 @@ class EPI(commands.Cog):
             return
         
         if not any((message, status_message_id, sticky)):
-            await interaction.followup.send("At least one of `message`, `status_message_id`, `sticky` argument must be provided!")
+            await interaction.followup.send("At least one of `message`, `status_message_id` or `sticky` must be provided!")
             return
 
         command_response = "Successfully updated EPI mode!"
