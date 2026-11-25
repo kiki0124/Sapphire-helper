@@ -13,7 +13,6 @@ from typing import Literal, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from main import SHBot
-    from epi import EPI
 
 load_dotenv()
 

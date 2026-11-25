@@ -43,6 +43,7 @@ class SHBot(commands.Bot):
 
         self.rtdr_posts: dict[int, int] = {} # posts for RTDR
         self.inactive_posts: dict[int, int] = {} # posts that are inactive
+        self.reminded_posts: set[int] = set() # posts that have reminders sent already, to avoid being sent twice
 
 
     async def setup_hook(self):
@@ -165,6 +166,13 @@ class SHBot(commands.Bot):
                 return 0
         return owner_id
 
+    def clear_from_global_cache(self, thread_id: int) -> None:
+        """
+        Helper function to remove from all global cache.
+        """
+        self.rtdr_posts.pop(thread_id, None)
+        self.inactive_posts.pop(thread_id, None)
+        self.reminded_posts.discard(thread_id)
 
     # CACHE HELPER FUNCTIONS
     def add_post_to_rtdr(self, thread_id: int, owner_id: int) -> None:
@@ -198,6 +206,38 @@ class SHBot(commands.Bot):
         """
         self.inactive_posts.pop(thread_id, None)
 
+
+    # CACHE HELPER FUNCTIONS
+    def add_post_to_reminded(self, thread_id: int) -> None:
+        """
+        Adds a post to the `RTDR` cache.
+        """
+        self.reminded_posts.add(thread_id)
+
+    def remove_post_from_reminded(self, thread_id: int) -> None:
+        """
+        Removes a post from the `RTDR` cache.
+        """
+        self.reminded_posts.discard(thread_id)
+
+
+    def add_to_reminder_caches(self, thread_id: int, *, timestamp: int | None = None) -> None:
+        """
+        Helper function to add to reminder-related caches:
+        - reminded_posts
+        - inactive_posts
+        """
+        self.reminded_posts.add(thread_id)
+        self.add_to_inactive_posts(thread_id, timestamp=timestamp)
+
+    def clear_from_reminder_caches(self, thread_id: int) -> None:
+        """
+        Helper function to remove from reminder-related caches:
+        - reminded_posts
+        - inactive_posts
+        """
+        self.reminded_posts.discard(thread_id)
+        self.inactive_posts.pop(thread_id, None)
 
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")

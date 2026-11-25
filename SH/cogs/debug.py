@@ -81,10 +81,13 @@ class EvalSqlModal(ui.Modal):
         sql_result = str(await utils.execute_sql(sql_cmd_input.strip()))
         await interaction.followup.send(f"```json\n{sql_result[0:1950]}```")
 
+
+CACHE_TYPES = Literal['INACTIVE_POSTS', 'RTDR', 'REMINDED']
+
 class GlobalCacheModal(ui.Modal):
-    def __init__(self, cache_type: Literal['INACTIVE_POSTS', 'RTDR']):
+    def __init__(self, cache_type: CACHE_TYPES):
         super().__init__(title=f"{cache_type}", custom_id="global_cache_modal")
-        self.cache_type: Literal['INACTIVE_POSTS', 'RTDR'] = cache_type
+        self.cache_type: CACHE_TYPES = cache_type
 
         self.post_to_debug = ui.Label(text="Post ID", description="The ID of the post you want to debug, if applicable",
                                  component=ui.TextInput(required=False, max_length=25))
@@ -113,6 +116,8 @@ class GlobalCacheModal(ui.Modal):
 
         if self.cache_type == 'INACTIVE_POSTS':
             cache = interaction.client.inactive_posts
+        elif self.cache_type == 'REMINDED':
+            cache = interaction.client.reminded_posts
         else:
             cache = interaction.client.rtdr_posts
 
@@ -155,12 +160,19 @@ class GlobalCacheModal(ui.Modal):
                 owner = self.owner_input.component.values[0]
                 cache[post_id] = owner.id
                 await interaction.followup.send(f"Successfully added <#{post_id}> to RTDR cache with {owner.mention} ({owner.id}) as owner.", ephemeral=True)
+                return
+
+            if self.cache_type == 'REMINDED':
+                interaction.client.add_post_to_reminded(post_id)
             else:
                 cache[post_id] = int(datetime.now(UTC).timestamp())
-                await interaction.followup.send(f"Successfully added <#{post_id}> to INACTIVE_POSTS cache.", ephemeral=True)
+            await interaction.followup.send(f"Successfully added <#{post_id}> to {self.cache_type} cache.", ephemeral=True)
         elif debug_type == "remove":
             try:
-                del cache[post_id]
+                if isinstance(cache, set):
+                    cache.remove(post_id)
+                else:
+                    del cache[post_id]
             except KeyError:
                 await interaction.followup.send(f"<#{post_id}> ({post_id}) is not in {self.cache_type} cache.", ephemeral=True)
             else:
@@ -206,10 +218,10 @@ class DebugCog(commands.Cog):
         await interaction.followup.send("Success!\n", ephemeral=True)
 
 
-    @debug_group_cmd.command(name="global_cache", description="Get debug info and actions regarding the global cache")
+    @debug_group_cmd.command(name="global_cache", description="Get debug info and actions regarding the global caches")
     @app_commands.checks.has_any_role(EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID)
     @app_commands.describe(cache_type="The cache type to debug")
-    async def debug_global_cache(self, interaction: discord.Interaction, cache_type: Literal['RTDR', 'INACTIVE_POSTS']):
+    async def debug_global_cache(self, interaction: discord.Interaction, cache_type: CACHE_TYPES):
         await interaction.response.send_modal(GlobalCacheModal(cache_type))
 
 async def setup(bot: SHBot):

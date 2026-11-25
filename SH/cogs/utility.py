@@ -102,7 +102,7 @@ class ndr_options_buttons(ui.View):
         await self.Interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="/needs-dev-review command used")
         channel = post.guild.get_channel(NDR_CHANNEL_ID)
         await channel.send(f'A new post has been marked as "Needs dev review"\n> {post.mention}')
-        self.Interaction.client.remove_from_inactive_posts(post.id)
+        self.Interaction.client.clear_from_reminder_caches(post.id)
 
     @ui.button(label="Only add tag", style=discord.ButtonStyle.grey, custom_id="ndr-only-add-tag")
     async def on_only_add_tag_click(self, interaction: discord.Interaction, button: ui.Button):
@@ -193,8 +193,7 @@ class Utility(commands.Cog):
             archived=True,
             reason=f"Auto archive {'solved' if close_delay == 3600 else 'unrelated'} post after {close_delay} seconds"
         )
-        self.bot.remove_post_from_rtdr(post.id)
-        self.bot.remove_from_inactive_posts(post.id)
+        self.bot.clear_from_global_cache(post.id)
 
     async def mark_post_as_solved(self, post: discord.Thread) -> None:
         """  
