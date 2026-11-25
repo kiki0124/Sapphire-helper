@@ -293,7 +293,7 @@ class Reminders(commands.Cog):
 
             last_msg_timestamp = snowflake_time(post.last_message_id).timestamp()
             more_than_day = check_time_more_than(last_msg_timestamp,
-                                                timedelta(seconds=1)) # Check time before making any further API/DB calls
+                                                timedelta(days=1)) # Check time before making any further API/DB calls
 
             # filter_and_get_post_owner_ids (called in close_abandoned_posts) already checks the filters, except UNANSWERED_TAG_ID
             # ensure no reminders are already sent
