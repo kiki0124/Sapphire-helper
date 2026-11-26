@@ -164,7 +164,7 @@ class SHBot(commands.Bot):
         Helper function to remove from all global cache.
         """
         self.rtdr_posts.pop(thread_id, None)
-        self.inactive_posts.pop(thread_id, None)
+        self.pending_posts.pop(thread_id, None)
         self.reminded_posts.discard(thread_id)
 
     # CACHE HELPER FUNCTIONS
@@ -221,19 +221,19 @@ class SHBot(commands.Bot):
         """
         Helper function to add to reminder-related caches:
         - reminded_posts
-        - inactive_posts
+        - pending_posts
         """
         self.reminded_posts.add(thread_id)
-        self.add_to_inactive_posts(thread_id, timestamp=timestamp)
+        self.add_post_to_pending(thread_id, timestamp=timestamp)
 
     def clear_from_reminder_caches(self, thread_id: int) -> None:
         """
         Helper function to remove from reminder-related caches:
         - reminded_posts
-        - inactive_posts
+        - pending_posts
         """
         self.reminded_posts.discard(thread_id)
-        self.inactive_posts.pop(thread_id, None)
+        self.pending_posts.pop(thread_id, None)
 
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")

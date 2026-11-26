@@ -135,8 +135,8 @@ class Reminders(commands.Cog):
         self.bot.add_view(CloseNowView())
 
     async def cog_load(self):
-        # Check that the bot was recently started (i.e inactive_posts would be cleared from cache)
-        # And that inactive_posts is empty
+        # Check that the bot was recently started (i.e pending_posts would be cleared from cache)
+        # And that pending_posts is empty
         if ((perf_counter() - self.bot.uptime) <= 5) and not self.bot.pen:
             await self.restore_inactive_and_reminded_posts()
         self.reminders_loop.start()
@@ -281,7 +281,7 @@ class Reminders(commands.Cog):
             await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
             await post.edit(archived=True, reason=f"ID: {action_id}. Post creator left the server, auto close post", applied_tags=tags)
             await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
-            del posts[i] # remove from the post so that check_for_inactive_posts won't need to check for it
+            del posts[i] # remove from the post so that check_for_pending_posts won't need to check for it
             self.bot.clear_from_global_cache(post.id)
 
     async def check_for_pending_posts(self, posts: list[discord.Thread]):
@@ -292,7 +292,7 @@ class Reminders(commands.Cog):
             last_msg_timestamp = snowflake_time(post.last_message_id).timestamp()
             more_than_day = check_time_more_than(last_msg_timestamp,
                                                 timedelta(days=1)) # Check time before making any further API/DB calls
-            if not more_than_day or any(post.id in cache for cache in (self.bot.reminded_posts, self.bot.inactive_posts)):
+            if not more_than_day or any(post.id in cache for cache in (self.bot.reminded_posts, self.bot.pending_posts)):
                 continue
             if not self.reminders_filter(post):
                 continue
@@ -338,7 +338,7 @@ class Reminders(commands.Cog):
             owner_id = self.bot.get_post_owner_id(message.channel)
             is_owner = message.author.id == owner_id
             if is_owner:
-                self.bot.remove_from_inactive_posts(message.channel.id)
+                self.bot.remove_post_from_pending(message.channel.id)
             else:
                 self.bot.remove_post_from_reminded(message.channel.id)
 
@@ -424,7 +424,7 @@ class Reminders(commands.Cog):
         await interaction.followup.send(f"Simulation complete for {post.mention}!", ephemeral=True)
 
 
-    @reminders_cmd_group.command(name="restore_reminder_caches", description="Manually restore inactive_posts and reminded_posts")
+    @reminders_cmd_group.command(name="restore_reminder_caches", description="Manually restore pending_posts and reminded_posts")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
     async def reminders_restore_reminder_caches_cmd(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
