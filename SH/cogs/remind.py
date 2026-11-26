@@ -428,12 +428,12 @@ class Reminders(commands.Cog):
         await interaction.followup.send(f"Simulation complete for {post.mention}!", ephemeral=True)
 
 
-    @reminders_cmd_group.command(name="restore_inactive_posts", description="Manually restore inactive posts. Note that this should already be called at startup")
+    @reminders_cmd_group.command(name="restore_reminder_caches", description="Manually restore inactive_posts and reminded_posts")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def reminders_restore_inactive_posts_cmd(self, interaction: discord.Interaction):
+    async def reminders_restore_reminder_caches_cmd(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         await self.restore_inactive_and_reminded_posts()
-        await interaction.followup.send(f"Success! Use `/debug global_cache` to check all current inactive posts pending a closure", ephemeral=True)
+        await interaction.followup.send(f"Success! Use `/debug global_cache` to check all current caches.", ephemeral=True)
 
 async def setup(bot: SHBot):
     await bot.add_cog(Reminders(bot))
