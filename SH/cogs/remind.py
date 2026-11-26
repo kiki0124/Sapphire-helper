@@ -303,7 +303,7 @@ class Reminders(commands.Cog):
             post_author_id = self.bot.get_post_owner_id(post)
             
             # If the last message > 3d, we send the reminder regardless of other requirements
-            if check_time_more_than(last_msg_timestamp, timedelta(seconds=15)):
+            if check_time_more_than(last_msg_timestamp, timedelta(days=3)):
                 view = CloseNowView(post_author_id, time_ago="3 days")
                 view.stop()
 

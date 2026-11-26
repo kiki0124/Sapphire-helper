@@ -41,9 +41,9 @@ class SHBot(commands.Bot):
         self.incomplete_msg_posts = MaxCache(100) # list of the post IDs | ~70 posts were added in ~1 month
         self.uptime = time.time() # used in cogs/bot.py
 
-        self.rtdr_posts: dict[int, int] = {} # posts for RTDR
-        self.inactive_posts: dict[int, int] = {} # posts that are inactive
-        self.reminded_posts: set[int] = set() # posts that have reminders sent already, to avoid being sent twice
+        self.rtdr_posts: dict[int, int] = {} # posts for RTDR '{post_id: owner_id}'
+        self.inactive_posts: dict[int, int] = {} # posts that are inactive and have reminders sent. Posts are removed upon OP activity/response.
+        self.reminded_posts: set[int] = set() # posts that have a reminder sent already without a reply from others, avoiding reminders being sent twice
 
 
     async def setup_hook(self):
@@ -210,13 +210,16 @@ class SHBot(commands.Bot):
     # CACHE HELPER FUNCTIONS
     def add_post_to_reminded(self, thread_id: int) -> None:
         """
-        Adds a post to the `RTDR` cache.
+        Adds a post to the `reminded_posts` cache.
         """
         self.reminded_posts.add(thread_id)
 
     def remove_post_from_reminded(self, thread_id: int) -> None:
         """
-        Removes a post from the `RTDR` cache.
+        Removes a post from the `reminded_posts` cache.
+        Used when there is a reply sent.
+
+        This is usually called explicitly on commands that act as a reply.
         """
         self.reminded_posts.discard(thread_id)
 

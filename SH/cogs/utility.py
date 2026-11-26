@@ -495,6 +495,7 @@ class Utility(commands.Cog):
             view=view,
             allowed_mentions=discord.AllowedMentions(users=[discord.Object(owner_id)])
         )
+        self.bot.remove_post_from_reminded(interaction.channel_id)
 
 
     @staticmethod
@@ -537,6 +538,8 @@ class Utility(commands.Cog):
                     tags.pop(i)
                     tags.append(interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID))
                     await interaction.channel.edit(applied_tags=tags)
+
+                    self.bot.remove_post_from_reminded(interaction.channel_id)
                     break
 
         description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
