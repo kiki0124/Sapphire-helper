@@ -56,8 +56,7 @@ class CloseNowRow(ui.ActionRow):
 
         await interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=interaction.channel.mention, tags=tags, context=f"Close now button clicked")
         await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. {interaction.user.name} Clicked close now button")
-        interaction.client.remove_post_from_pending(interaction.channel_id)
-        interaction.client.remove_post_from_rtdr(interaction.channel_id)
+        interaction.client.clear_from_global_cache(interaction.channel_id)
 
 
     @ui.button(label="Still need help", style=discord.ButtonStyle.red, custom_id="remind-cancel")
@@ -79,6 +78,8 @@ class CloseNowRow(ui.ActionRow):
             footer = f"-# When the issue is resolved, you may use </solved:{await interaction.client.get_solved_id()}> to mark it as solved."
             view = ui.LayoutView().add_item(ui.Container(ui.TextDisplay(description), ui.Separator(), ui.TextDisplay(footer)))
             await interaction.message.reply(view=view)
+        else:
+            interaction.client.remove_post_from_reminded(interaction.channel_id)
 
     async def interaction_check(self, interaction: discord.Interaction[SHBot]) -> bool:
         self.is_owner = interaction.user.id == interaction.client.get_post_owner_id(interaction.channel)
@@ -134,17 +135,16 @@ class Reminders(commands.Cog):
         self.bot.add_view(CloseNowView())
 
     async def cog_load(self):
-        # Check that the bot was recently started (i.e pending_posts would be cleared from cache)
-        # And that pending posts is empty
-        if ((perf_counter() - self.bot.uptime) <= 5) and not self.bot.pending_posts:
-            await self.restore_pending_posts()
-
+        # Check that the bot was recently started (i.e inactive_posts would be cleared from cache)
+        # And that inactive_posts is empty
+        if ((perf_counter() - self.bot.uptime) <= 5) and not self.bot.pen:
+            await self.restore_inactive_and_reminded_posts()
         self.reminders_loop.start()
 
     async def cog_unload(self):
         self.reminders_loop.cancel()
 
-    async def restore_pending_posts(self):
+    async def restore_inactive_and_reminded_posts(self):
         """
         Restores pending_posts that were cleared from cache
         when the bot was completely restarted.
@@ -152,7 +152,7 @@ class Reminders(commands.Cog):
         suport_channel = self.bot.get_channel(SUPPORT_CHANNEL_ID) or await self.bot.fetch_channel(SUPPORT_CHANNEL_ID)
 
         for post in await suport_channel.guild.active_threads():
-            if post.id in self.bot.pending_posts or not post.last_message_id:
+            if all(post.id in cache for cache in (self.bot.pending_posts, self.bot.reminded_posts)) or post.last_message_id is None:
                 continue
 
             # posts must at least be a day old for a reminder to be sent!
@@ -175,7 +175,7 @@ class Reminders(commands.Cog):
                     continue
                 for child in component.children:
                     if isinstance(child, discord.TextDisplay) and "it seems like your last message was sent more than" in child.content:
-                        self.bot.add_post_to_pending(post.id, timestamp=int(last_message.created_at.timestamp()))
+                        self.bot.add_to_reminder_caches(post.id, timestamp=int(last_message.created_at.timestamp()))
                         break
 
     def get_reminder_next_iteration(self) -> str:
@@ -281,8 +281,8 @@ class Reminders(commands.Cog):
             await post.send("This post was automatically marked as **Solved** because the post creator left the server.")
             await post.edit(archived=True, reason=f"ID: {action_id}. Post creator left the server, auto close post", applied_tags=tags)
             await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, context="Post creator left the server")
-            del posts[i] # remove from the post so that check_for_pending_posts won't need to check for it
-            self.remove_from_global_caches(post.id)
+            del posts[i] # remove from the post so that check_for_inactive_posts won't need to check for it
+            self.bot.clear_from_global_cache(post.id)
 
     async def check_for_pending_posts(self, posts: list[discord.Thread]):
         for post in posts:
@@ -292,10 +292,13 @@ class Reminders(commands.Cog):
             last_msg_timestamp = snowflake_time(post.last_message_id).timestamp()
             more_than_day = check_time_more_than(last_msg_timestamp,
                                                 timedelta(days=1)) # Check time before making any further API/DB calls
-            if not more_than_day or post.id in self.bot.pending_posts:
+            if not more_than_day or any(post.id in cache for cache in (self.bot.reminded_posts, self.bot.inactive_posts)):
                 continue
             if not self.reminders_filter(post):
                 continue
+
+            # filter_and_get_post_owner_ids (called in close_abandoned_posts) already checks the filters, except UNANSWERED_TAG_ID
+            # ensure no reminders are already sent
 
             post_author_id = self.bot.get_post_owner_id(post)
             
@@ -305,7 +308,7 @@ class Reminders(commands.Cog):
                 view.stop()
 
                 await post.send(view=view)
-                self.bot.add_post_to_pending(post.id)
+                self.bot.add_to_reminder_caches(post.id)
                 continue
 
             # from here on, we already know last_message is (> 1d ago) but (< 3d ago)
@@ -322,7 +325,7 @@ class Reminders(commands.Cog):
             view.stop()
 
             await post.send(view=view)
-            self.bot.add_post_to_pending(post.id)
+            self.bot.add_to_reminder_caches(post.id)
             
     @commands.Cog.listener('on_message')
     async def remove_pending_posts(self, message: discord.Message):
@@ -330,11 +333,14 @@ class Reminders(commands.Cog):
             return
         
         if isinstance(message.channel, discord.Thread) and message.channel.parent_id == SUPPORT_CHANNEL_ID:
-            others_filter = not message.channel.locked and NEED_DEV_REVIEW_TAG_ID not in message.channel._applied_tags
+            if any(tag in message.channel._applied_tags for tag in (SOLVED_TAG_ID, NEED_DEV_REVIEW_TAG_ID)):
+                return
             owner_id = self.bot.get_post_owner_id(message.channel)
-            message_author = message.author.id == owner_id
-            if message_author and others_filter and message.channel.id in self.bot.pending_posts:
-                self.bot.remove_post_from_pending(message.channel.id)
+            is_owner = message.author.id == owner_id
+            if is_owner:
+                self.bot.remove_from_inactive_posts(message.channel.id)
+            else:
+                self.bot.remove_post_from_reminded(message.channel.id)
 
 
     async def close_pending_posts(self):
@@ -346,7 +352,7 @@ class Reminders(commands.Cog):
             try:
                 post = self.bot.get_channel(post_id) or await self.bot.fetch_channel(post_id)
             except discord.NotFound:
-                self.remove_from_global_caches(post.id)
+                self.bot.clear_from_global_cache(post_id)
                 continue
 
             if NEED_DEV_REVIEW_TAG_ID not in post._applied_tags:
@@ -366,8 +372,8 @@ class Reminders(commands.Cog):
                 except discord.HTTPException:
                     continue
                 await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, 
-                                           context=f"Close pending post")
-                self.remove_from_global_caches(post.id)
+                                           context=f"Close inactive post")
+                self.bot.clear_from_global_cache(post_id)
 
 
     @reminders_loop.before_loop
@@ -417,27 +423,13 @@ class Reminders(commands.Cog):
 
         await interaction.followup.send(f"Simulation complete for {post.mention}!", ephemeral=True)
 
-    @reminders_cmd_group.command(name="get_active_threads", description="Get all the active threads in support channel")
-    @app_commands.describe(post="The post to check if it was in active threads")
+
+    @reminders_cmd_group.command(name="restore_reminder_caches", description="Manually restore inactive_posts and reminded_posts")
     @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def reminders_get_active_threads(self, interaction: discord.Interaction, post: app_commands.AppCommandThread | None = None):
+    async def reminders_restore_reminder_caches_cmd(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        posts = [post.id for post in await interaction.guild.active_threads() if post.parent_id == SUPPORT_CHANNEL_ID]
-
-        content = f"- Posts fetched: `{len(posts)}`"
-        if post:
-            content += f"\n- Post in fetched: `{post.id in posts}`"
-        content += f"\n```py\n{posts}```"
-
-        container = ui.Container(ui.TextDisplay(content[0:4000]))
-        await interaction.followup.send(view=ui.LayoutView().add_item(container), ephemeral=True)
-
-    @reminders_cmd_group.command(name="restore_pending_posts", description="Manually restore pending posts. Note that this should already be called at startup")
-    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
-    async def reminders_restore_pending_posts_cmd(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        await self.restore_pending_posts()
-        await interaction.followup.send(f"Success! Use `/debug global_cache` to check all current pending posts.", ephemeral=True)
+        await self.restore_inactive_and_reminded_posts()
+        await interaction.followup.send(f"Success! Use `/debug global_cache` to check all current caches.", ephemeral=True)
 
 async def setup(bot: SHBot):
     await bot.add_cog(Reminders(bot))
