@@ -51,7 +51,7 @@ class ConfirmCloseButtons(ui.ActionRow):
 
         await interaction.client.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=interaction.channel.mention, tags=tags, context="Post starter message delete and confirm button clicked- mark post as solved")
         await interaction.channel.edit(archived=True, applied_tags=tags, reason=f"ID: {action_id}. Auto close as starter message was deleted and confirm button was clicked.")
-        interaction.client.remove_post_from_rtdr(interaction.channel_id)
+        interaction.client.clear_from_global_cache(interaction.channel_id)
 
 
     @ui.button(label="Still need help", style=discord.ButtonStyle.red, custom_id="auto-close-cancel")
