@@ -372,7 +372,7 @@ class Reminders(commands.Cog):
                 except discord.HTTPException:
                     continue
                 await self.bot.send_log(ALERTS_THREAD_ID, action_id=action_id, post_mention=post.mention, tags=tags, 
-                                           context=f"Close inactive post")
+                                           context=f"Close pending post")
                 self.bot.clear_from_global_cache(post_id)
 
 
