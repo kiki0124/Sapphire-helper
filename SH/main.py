@@ -17,6 +17,8 @@ load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
+FEEDBACK_CHANNEL_ID = int(os.getenv("FEEDBACK_CHANNEL_ID"))
+
 
 class SHBot(commands.Bot):
     def __init__(self) -> None:
@@ -234,6 +236,19 @@ class SHBot(commands.Bot):
         """
         self.reminded_posts.discard(thread_id)
         self.pending_posts.pop(thread_id, None)
+
+    @staticmethod
+    def is_public_channel(channel: discord.TextChannel | discord.ForumChannel | discord.Thread, everyone_role: discord.Role) -> bool:
+        """
+        Essentially, these channels:
+        - #general
+        - #bot-commands
+        - #feedback
+        - #support
+        """
+        return channel.permissions_for(everyone_role).view_channel and (channel.permissions_for(everyone_role).send_messages or
+                                                                        channel.id == FEEDBACK_CHANNEL_ID or
+                                                                        isinstance(channel, discord.Thread) and channel.parent_id == FEEDBACK_CHANNEL_ID)
 
     async def on_ready(self):
         print(f"Bot is ready. Logged in as {self.user.name}")
