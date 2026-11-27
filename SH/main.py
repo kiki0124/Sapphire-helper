@@ -245,7 +245,7 @@ class SHBot(commands.Bot):
         self.inactive_posts.pop(thread_id, None)
 
     @staticmethod
-    def is_public_channel(channel: discord.TextChannel | discord.ForumChannel |discord.Thread, everyone_role: discord.Role) -> bool:
+    def is_public_channel(channel: discord.TextChannel | discord.ForumChannel | discord.Thread, everyone_role: discord.Role) -> bool:
         """
         Essentially, these channels:
         - #general
