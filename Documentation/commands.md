@@ -81,7 +81,6 @@ All reminder commands require staff access.
 | Command | Behaviour |
 | --- | --- |
 | `/reminders debug` | Shows loop state, timing and information about previously fetched posts. |
-| `/reminders get_active_threads` | Fetches active support threads; optionally checks whether a selected post is included. |
 | `/reminders restore_pending_posts` | Attempts to reconstruct pending reminders from qualifying Discord messages. |
 | `/reminders simulate` | Runs the real reminder eligibility function for one post after a short delay. It can send a reminder and change pending state. |
 

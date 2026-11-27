@@ -27,6 +27,8 @@ TAG_LOGGING_THREAD_ID = int(os.getenv("TAG_LOGGING_THREAD_ID"))
 NOT_SOLVED_TAG_ID = int(os.getenv("NOT_SOLVED_TAG_ID"))
 UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
 
+SUPPORT_CHANNEL_ID = int(os.getenv('SUPPORT_CHANNEL_ID'))
+
 
 MAX_TAG_CACHE_SIZE = 100
 
@@ -171,8 +173,10 @@ class TagConfirmRow(ui.ActionRow):
         await interaction.channel.send(view=tag_view, allowed_mentions=discord.AllowedMentions.none())
 
 
-        if not isinstance(interaction.channel, discord.Thread) or not isinstance(interaction.channel.parent, discord.ForumChannel):
+        if not isinstance(interaction.channel, discord.Thread) or interaction.channel.parent_id != SUPPORT_CHANNEL_ID:
             return
+
+        interaction.client.remove_post_from_reminded(interaction.channel_id)
         # only add not-solved if the post is unanswered
         try:
             unanswered_tag_index: int = interaction.channel._applied_tags.index(UNANSWERED_TAG_ID)
