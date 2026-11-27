@@ -19,7 +19,6 @@ TOKEN = os.getenv("BOT_TOKEN")
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 FEEDBACK_CHANNEL_ID = int(os.getenv("FEEDBACK_CHANNEL_ID"))
 
-COG_DIR = Path(__file__).parent / 'cogs'
 
 class SHBot(commands.Bot):
     def __init__(self) -> None:
