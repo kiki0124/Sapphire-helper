@@ -83,8 +83,6 @@ class EpiDisableView(ui.View):
         self.epi_cog = epi_cog
         self.bot = epi_cog.bot
 
-        self.channels_overwrites: dict[int, dict[discord.Role, discord.PermissionOverwrite]] = {}
-
     @staticmethod
     def view_insert_item(view: ui.LayoutView, index: int, item: ui.Item[Any]) -> None:
         """
