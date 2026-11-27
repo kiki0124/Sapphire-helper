@@ -257,7 +257,7 @@ class LockUnlockSlowmodeChannelsSelect(ui.ChannelSelect):
             embed = discord.Embed(
                 title="Channel Unlocked",
                 description=f">>> {self.reason}",
-                colour=0x36CE36
+                colour=discord.Colour.green()
                 )
             embed.set_footer(text=f"@{interaction.user.name} ({interaction.user.id})", icon_url=interaction.user.display_avatar.url)
             await channel.send(embed=embed)
@@ -278,7 +278,7 @@ class LockUnlockSlowmodeChannelsSelect(ui.ChannelSelect):
                     if channel.id in locked_channnels:
                         await interaction.followup.send(f"❌ You cannot lock {channel.mention} as its already locked!", ephemeral=True)
                     elif not interaction.client.is_public_channel(channel, channel.guild.default_role):
-                        await interaction.followup.send(f"❌ You can only {self.action} channels you can send messages in and `@everyone` can view!\n-# {channel.mention}",
+                        await interaction.followup.send(f"❌ You can only lock channels you can send messages in and `@everyone` can view!\n-# {channel.mention}",
                                                         ephemeral=True)
                     else:
                         await self.lock_channel(channel, interaction)
@@ -292,9 +292,9 @@ class LockUnlockSlowmodeChannelsSelect(ui.ChannelSelect):
                 case "slowmode":
                     await channel.edit(slowmode_delay=self.slowmode, reason=f"/slowmode used by {interaction.user.name} ({interaction.user.id}). Reason: {self.reason}")
                     if self.slowmode > 0:
-                        await interaction.followup.send(f"Successfully set slowmode in {channel.mention} to {self.slowmode}s with reason: {self.reason}", ephemeral=True)
+                        await interaction.followup.send(f"✅ Successfully set slowmode in {channel.mention} to {self.slowmode}s with reason: {self.reason}", ephemeral=True)
                     else:
-                        await interaction.followup.send(f"Successfully disabled slowmode in {channel.mention}!", ephemeral=True)
+                        await interaction.followup.send(f"✅ Successfully disabled slowmode in {channel.mention}!", ephemeral=True)
                     successful.append(channel.id)
 
         if successful: # Check that channels were successfully edited
