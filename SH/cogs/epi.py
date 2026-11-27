@@ -211,7 +211,7 @@ class LockUnlockSlowmodeChannelsSelect(ui.ChannelSelect):
         previous_permissions = channel.overwrites_for(channel.guild.default_role).pair() # permissions bit of (allow, deny)
         await save_channel_permissions(channel.id, allow=previous_permissions[0].value, deny=previous_permissions[1].value)
 
-    async def experts_mod_devs_perm_overwrites(self, channel: discord.TextChannel | discord.ForumChannel) -> dict[discord.Role, discord.PermissionOverwrite]:
+    async def expert_mod_dev_perm_overwrites(self, channel: discord.TextChannel | discord.ForumChannel) -> dict[discord.Role, discord.PermissionOverwrite]:
         overwrites: dict[discord.Role, discord.PermissionOverwrite] = {}
         for role_id in (EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID):
             role = channel.guild.get_role(role_id) or await channel.guild.fetch_role(role_id)
@@ -224,7 +224,7 @@ class LockUnlockSlowmodeChannelsSelect(ui.ChannelSelect):
         await self.save_channel_ovewrites(channel)
 
         new_ovewrites = channel.overwrites
-        expert_mod_dev_ovr = await self.experts_mod_devs_perm_overwrites(channel)
+        expert_mod_dev_ovr = await self.expert_mod_dev_perm_overwrites(channel)
         new_ovewrites.update(expert_mod_dev_ovr) # type: ignore
 
         everyone_overwrites = discord.PermissionOverwrite(send_messages=False, 
@@ -290,6 +290,10 @@ class LockUnlockSlowmodeChannelsSelect(ui.ChannelSelect):
                     else:
                         await interaction.followup.send(f"❌ You cannot unlock {channel.mention} as it isn't locked!", ephemeral=True)
                 case "slowmode":
+                    if not interaction.client.is_public_channel(channel, channel.guild.default_role):
+                        await interaction.followup.send(f"❌ You can only set slowmode in channels you can send messages in and `@everyone` can view!\n-# {channel.mention}",
+                                                        ephemeral=True)
+                        continue
                     await channel.edit(slowmode_delay=self.slowmode, reason=f"/slowmode used by {interaction.user.name} ({interaction.user.id}). Reason: {self.reason}")
                     if self.slowmode > 0:
                         await interaction.followup.send(f"✅ Successfully set slowmode in {channel.mention} to {self.slowmode}s with reason: {self.reason}", ephemeral=True)
