@@ -211,7 +211,7 @@ class LockUnlockSlowmodeChannelsSelect(ui.ChannelSelect):
         previous_permissions = channel.overwrites_for(channel.guild.default_role).pair() # permissions bit of (allow, deny)
         await save_channel_permissions(channel.id, allow=previous_permissions[0].value, deny=previous_permissions[1].value)
 
-    async def experts_mode_devs_perm_overwrites(self, channel: discord.TextChannel | discord.ForumChannel) -> dict[discord.Role, discord.PermissionOverwrite]:
+    async def experts_mod_devs_perm_overwrites(self, channel: discord.TextChannel | discord.ForumChannel) -> dict[discord.Role, discord.PermissionOverwrite]:
         overwrites: dict[discord.Role, discord.PermissionOverwrite] = {}
         for role_id in (EXPERTS_ROLE_ID, MODERATORS_ROLE_ID, DEVELOPERS_ROLE_ID):
             role = channel.guild.get_role(role_id) or await channel.guild.fetch_role(role_id)
@@ -224,7 +224,7 @@ class LockUnlockSlowmodeChannelsSelect(ui.ChannelSelect):
         await self.save_channel_ovewrites(channel)
 
         new_ovewrites = channel.overwrites
-        expert_mod_dev_ovr = await self.experts_mode_devs_perm_overwrites(channel)
+        expert_mod_dev_ovr = await self.experts_mod_devs_perm_overwrites(channel)
         new_ovewrites.update(expert_mod_dev_ovr) # type: ignore
 
         everyone_overwrites = discord.PermissionOverwrite(send_messages=False, 
@@ -641,6 +641,19 @@ class EPI(commands.Cog):
         view = ui.View()
         view.add_item(LockUnlockSlowmodeChannelsSelect(self, "unlock", reason, interaction))
         await interaction.followup.send("Select the channels that should be unlocked below.\n-# Minimum of 1, maximum of 5.", view=view, ephemeral=True)
+
+    @app_commands.command(name="lock_unlock_cache_clear", description="Clear the cache for channel overwrites used by lock and unlock commands.")
+    @app_commands.checks.has_any_role(MODERATORS_ROLE_ID, EXPERTS_ROLE_ID, DEVELOPERS_ROLE_ID)
+    @app_commands.describe(channel="The channel of the cache to clear")
+    async def clear_channels_overwrites_cache(self, interaction: discord.Interaction, channel: discord.TextChannel | discord.ForumChannel | None = None):
+        if channel is not None:
+            self.channels_ovewrites.pop(channel.id, None)
+            response = f"{channel.mention}'s ({channel.id}) channel permission overwrite cache has been cleared"
+        else:
+            self.channels_ovewrites.clear()
+            response = "All channels' permission overwrite cache has been cleared"
+        await interaction.response.send_message(response, ephemeral=True)
+        await self.bot.send_log(ALERTS_THREAD_ID, content=f"{response} by {interaction.user.mention}")
 
     @app_commands.command(name="slowmode", description="Set a slowmode to channels using the select menu sent. Should only be used in emergencies.")
     @app_commands.describe(duration="The new slowmode for the channel (10s | 50m | 1m, 30s)", reason="What's the reason for this slowmode?")
