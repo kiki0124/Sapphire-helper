@@ -505,10 +505,7 @@ class Utility(commands.Cog):
         return commands.Cooldown(1,  5.0 * 60.0)
 
 
-    @app_commands.command(
-            name='unrelated',
-            description='Inform the post creator that their question/issue is not Sapphire/appeal.gg related.'
-    )
+    @app_commands.command(name='unrelated', description='Inform the post creator that their question/issue is not Sapphire/appeal.gg related.')
     @app_commands.guild_only()
     @app_commands.checks.dynamic_cooldown(non_expert_mod_cooldown)
     async def wrong_server(self, interaction: discord.Interaction):
@@ -534,9 +531,8 @@ class Utility(commands.Cog):
                     tags.pop(i)
                     tags.append(interaction.channel.parent.get_tag(NOT_SOLVED_TAG_ID))
                     await interaction.channel.edit(applied_tags=tags)
-
-                    self.bot.remove_post_from_reminded(interaction.channel_id)
                     break
+            self.bot.remove_post_from_reminded(interaction.channel.id)
 
         description = f"{text_prefix}, your question/issue **is not related** to Sapphire or appeal.gg. Please search for the proper server/resource to get an answer to your question.\nWe cannot help you any further with your query."
 

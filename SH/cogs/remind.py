@@ -137,7 +137,7 @@ class Reminders(commands.Cog):
     async def cog_load(self):
         # Check that the bot was recently started (i.e pending_posts would be cleared from cache)
         # And that pending_posts is empty
-        if ((perf_counter() - self.bot.uptime) <= 5) and not self.bot.pen:
+        if ((perf_counter() - self.bot.uptime) <= 5) and not self.bot.pending_posts:
             await self.restore_inactive_and_reminded_posts()
         self.reminders_loop.start()
 
