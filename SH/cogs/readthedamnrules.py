@@ -17,7 +17,7 @@ MODERATORS_ROLE_ID = int(os.getenv('MODERATORS_ROLE_ID'))
 SUPPORT_CHANNEL_ID = int(os.getenv("SUPPORT_CHANNEL_ID"))
 ALERTS_THREAD_ID = int(os.getenv("ALERTS_THREAD_ID"))
 DEVELOPERS_ROLE_ID = int(os.getenv("DEVELOPERS_ROLE_ID"))
-FEEDBACK_CHANNEL_ID = int(os.getenv("FEEDBACK_CHANNEL_ID"))
+
 
 class RTDR(commands.Cog):
     def __init__(self, bot: SHBot) -> None:
@@ -123,15 +123,11 @@ class RTDR(commands.Cog):
         await reference_message.channel.send(content=f'{reference_message.author.mention} asked something about Sapphire or appeal.gg. A post was opened to answer it: {post[0].mention}\n-# Please ask any Sapphire or appeal.gg related questions in <#{SUPPORT_CHANNEL_ID}>. Asking anywhere else repeatedly will result in a punishment.', delete_after=300, allowed_mentions=discord.AllowedMentions.none())
         await reference_message.channel.delete_messages(messages_to_move, reason=f"rtdr system used by {user.name}")
     
-    @staticmethod
-    def is_allowed_rtdr_channel(channel: discord.TextChannel | discord.Thread, everyone_role: discord.Role):
-        return channel.permissions_for(everyone_role).view_channel and (channel.permissions_for(everyone_role).send_messages or isinstance(channel, discord.Thread) and channel.parent_id == FEEDBACK_CHANNEL_ID)
-    
     @commands.Cog.listener('on_message')
     async def redirect_to_support(self, message: discord.Message):
         if not message.author.bot and message.reference and message.content.startswith(self.bot.user.mention) and message.guild:
             everyone = message.guild.default_role
-            if not self.is_allowed_rtdr_channel(message.channel, everyone):
+            if not self.bot.is_public_channel(message.channel, everyone):
                 return
             if message.author.get_role(EXPERTS_ROLE_ID) or message.author.get_role(MODERATORS_ROLE_ID) or message.author.get_role(DEVELOPERS_ROLE_ID):
                 replied_message = message.reference.cached_message or await message.channel.fetch_message(message.reference.message_id)
@@ -146,7 +142,7 @@ class RTDR(commands.Cog):
             return
         everyone = reaction.message.guild.default_role
         #                                                                          allowed reactions, all other reactions will be ignored in this context
-        if not self.is_allowed_rtdr_channel(reaction.message.channel, everyone) or reaction.emoji not in ("❓", "❔"): 
+        if not self.bot.is_public_channel(reaction.message.channel, everyone) or reaction.emoji not in ("❓", "❔"): 
             return
         if user.get_role(EXPERTS_ROLE_ID) or user.get_role(MODERATORS_ROLE_ID) or user.get_role(DEVELOPERS_ROLE_ID):
             await self.handle_request(reaction.message, user=user)
